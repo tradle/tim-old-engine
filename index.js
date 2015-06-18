@@ -345,3 +345,15 @@ function normalize (json) {
     return json
   }
 }
+
+function rethrow (err) {
+  if (err) throw err
+}
+
+// function toBuffer (obj) {
+//   if (Buffer.isBuffer(obj)) return obj
+//   if (typeof obj === 'string') return new Buffer(obj, 'binary')
+//   if (!obj || typeof obj !== 'object') throw new Error('invalid argument')
+
+//   return new Buffer(utils.stringify(obj), 'binary')
+// }

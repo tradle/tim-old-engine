@@ -32,7 +32,9 @@
     "zlorp": "git://github.com/mvayngrib/zlorp.git"
   },
   "devDependencies": {
+    "buffer-equal": "0.0.1",
     "leveldown": "^0.10.0",
+    "memdown": "^1.0.0",
     "standard": "^4.1.0",
     "tape": "^4.0.0",
     "tradle-test-helpers": "git://github.com/tradle/test-helpers"

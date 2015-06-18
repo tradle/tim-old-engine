@@ -22,7 +22,10 @@ module.exports = function loadComponents (options, cb) {
     networkName: 'String',
     keeper: 'Object',
     dht: 'Object',
-    leveldown: 'Function'
+    leveldown: 'Function',
+    port: 'Number',
+    pathPrefix: 'String',
+    syncInterval: 'Number'
   }, options)
 
   var networkName = options.networkName
@@ -71,7 +74,7 @@ module.exports = function loadComponents (options, cb) {
     leveldown: leveldown,
     chainloader: chainloader,
     blockchain: blockchain,
-    syncInterval: 1000
+    syncInterval: options.syncInterval
   })
 
   chaindb.run()

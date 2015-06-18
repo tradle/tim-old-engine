@@ -1,11 +1,13 @@
 
-// var test = require('tape')
+var test = require('tape')
 var fs = require('fs')
 var path = require('path')
 var crypto = require('crypto')
+var bufferEqual = require('buffer-equal')
 var parallel = require('run-parallel')
 var extend = require('extend')
-var leveldown = require('leveldown')
+var memdown = require('memdown')
+var stringify = require('tradle-utils').stringify
 var DHT = require('bittorrent-dht')
 var loadComponents = require('../components')
 var Builder = require('chained-obj').Builder
@@ -43,14 +45,16 @@ var commonOpts = {
   networkName: networkName,
   keeper: keeper,
   blockchain: blockchain,
-  leveldown: leveldown
+  leveldown: memdown,
+  syncInterval: 1000
 }
 
 var driverBill = new Driver(extend({
   pathPrefix: 'bill',
   identity: bill,
   wallet: billWallet,
-  dht: billDHT
+  dht: billDHT,
+  port: billPort
 }, commonOpts))
 
 // driverBill.on('message', function (msg) {
@@ -61,34 +65,138 @@ var driverTed = new Driver(extend({
   pathPrefix: 'ted',
   identity: ted,
   wallet: tedWallet,
-  dht: tedDHT
+  dht: tedDHT,
+  port: tedPort
 }, commonOpts))
 
 // driverTed.on('message', function (msg) {
-//   debugger
+//   console.log('message', msg)
 // })
 
-driverTed.on('resolved', function (chainedObj) {
-  console.log('resolved', chainedObj)
+// driverTed.on('resolved', function (chainedObj) {
+//   console.log('resolved', chainedObj)
+// })
+
+test('setup', function (t) {
+  t.plan(1)
+
+  parallel([
+    driverBill.once.bind(driverBill, 'ready'),
+    driverTed.once.bind(driverTed, 'ready')
+  ], t.error)
 })
 
-parallel([
-  driverBill.once.bind(driverBill, 'ready'),
-  driverTed.once.bind(driverTed, 'ready')
-], function (err) {
-  if (err) throw err
+test('regular message', function (t) {
+  t.plan(1)
+  t.timeoutAfter(10000)
 
   // regular message
+  var msg = new Buffer(stringify({
+    hey: 'ho'
+  }), 'binary')
 
-  // publishIdentity(sendChainedMsg)
-  // driverBill.getPending(console.log)
-  driverBill.getResolved(function (r) {
-    console.log(r)
-    driverBill.destroy(function () {
-      process.exit()
+  driverTed.once('message', function (m) {
+    t.deepEqual(m, msg)
+  })
+
+  driverBill.send({
+    msg: msg,
+    to: ted
+  })
+})
+
+test('chained message', function (t) {
+  t.plan(2)
+  t.timeoutAfter(15000)
+
+  // chained msg
+  var msg = {
+    hey: 'ho'
+  }
+
+  var signed
+
+  publishIdentity(function (err) {
+    if (err) throw err
+
+    // driverTed.on('message', function () {
+    //   driverBill.getPending(console.log)
+    //   driverBill.getResolved(function (r) {
+    //     console.log(r)
+    //     driverBill.destroy(function () {
+    //       process.exit()
+    //     })
+    //   })
+    // })
+
+    var num = 0
+    driverTed.on('resolved', function (chainedObj) {
+      if (++num === 1) {
+        t.equal(chainedObj.parsed.data.value.name.firstName, 'Bill')
+      }
+      else {
+        t.deepEqual(chainedObj.file, signed)
+      }
+    })
+
+    sendChainedMsg(msg, function (err, sent) {
+      if (err) throw err
+
+      signed = sent
     })
   })
 })
+
+test('teardown', function (t) {
+  t.plan(1)
+
+  parallel([
+    driverBill.destroy.bind(driverBill),
+    driverTed.destroy.bind(driverTed)
+  ], t.error)
+})
+
+function publishIdentity (cb) {
+  var builder = new Builder()
+    .data(billPub)
+    .build(function (err, buf) {
+      if (err) throw err
+
+      driverBill.send({
+        msg: buf,
+        to: ted,
+        chain: {
+          public: true
+        }
+      })
+
+      if (cb) cb()
+    })
+}
+
+function sendChainedMsg (msg, cb) {
+  var builder = new Builder()
+    .data(msg)
+    .signWith(bill.keys({ type: 'dsa' })[0])
+    .build(function (err, buf) {
+      if (err) throw err
+
+      driverBill.send({
+        msg: buf,
+        to: ted,
+        chain: {
+          public: true,
+          recipients: ted.keys({
+            type: 'bitcoin',
+            networkName: 'testnet',
+            purpose: 'payment'
+          }).map(function (k) { return k.pubKeyString() })
+        }
+      })
+
+      if (cb) cb(null, buf)
+    })
+}
 
 function dhtFor (identity) {
   return new DHT({
@@ -115,46 +223,4 @@ function walletFor (identity) {
       networkName: networkName
     })[0].priv()
   })
-}
-
-function publishIdentity (cb) {
-  var builder = new Builder()
-    .data(billPub)
-    .build(function (err, buf) {
-      if (err) throw err
-
-      driverBill.send({
-        msg: buf,
-        to: ted,
-        chain: {
-          public: true
-        }
-      })
-
-      if (cb) cb()
-    })
-}
-
-function sendChainedMsg (cb) {
-  var builder = new Builder()
-    .data({
-      hey: 'ho'
-    })
-    .signWith(bill.keys({ type: 'dsa' })[0])
-    .build(function (err, buf) {
-      if (err) throw err
-
-      driverBill.send({
-        msg: buf,
-        to: ted,
-        chain: {
-          public: true,
-          recipients: ted.keys({
-            type: 'bitcoin',
-            networkName: 'testnet',
-            purpose: 'payment'
-          }).map(function (k) { return k.pubKeyString() })
-        }
-      })
-    })
 }
