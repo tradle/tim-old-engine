@@ -2,9 +2,7 @@
 var assert = require('assert')
 var fs = require('fs')
 var levelup = require('levelup')
-var leveldown = require('leveldown')
 var typeforce = require('typeforce')
-var leveldown = require('leveldown')
 var ChainLoader = require('chainloader')
 var ChainDB = require('chaindb')
 var Identity = require('midentity').Identity
@@ -18,17 +16,21 @@ var PREFIX = 'tradle'
 // var conf = require('./conf')
 
 module.exports = function loadComponents (options, cb) {
-  assert('identity' in options &&
-    'blockchain' in options &&
-    'networkName' in options &&
-    'keeper' in options &&
-    'dht' in options)
+  typeforce({
+    identity: 'Object',
+    blockchain: 'Object',
+    networkName: 'String',
+    keeper: 'Object',
+    dht: 'Object',
+    leveldown: 'Function'
+  }, options)
 
   var networkName = options.networkName
   var keeper = options.keeper
   var dht = options.dht
   var identity = options.identity
   var blockchain = options.blockchain
+  var leveldown = options.leveldown
   var wallet = options.wallet || new Wallet({
     networkName: networkName,
     blockchain: blockchain,

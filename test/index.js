@@ -5,6 +5,7 @@ var path = require('path')
 var crypto = require('crypto')
 var parallel = require('run-parallel')
 var extend = require('extend')
+var leveldown = require('leveldown')
 var DHT = require('bittorrent-dht')
 var loadComponents = require('../components')
 var Builder = require('chained-obj').Builder
@@ -41,7 +42,8 @@ tedDHT.addNode('127.0.0.1:' + billPort, billDHT.nodeId)
 var commonOpts = {
   networkName: networkName,
   keeper: keeper,
-  blockchain: blockchain
+  blockchain: blockchain,
+  leveldown: leveldown
 }
 
 var driverBill = new Driver(extend({
