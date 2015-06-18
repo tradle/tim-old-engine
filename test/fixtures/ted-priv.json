@@ -1,0 +1,87 @@
+{
+  "_type": "tradle.Identity",
+  "contact": [
+    {
+      "identifier": "somebodyelse",
+      "type": "skype"
+    }
+  ],
+  "location": {
+    "city": "San Dimas",
+    "country": "USA",
+    "formatted": "666 Wyld Stallyns Dr, San Dimas, California",
+    "postalCode": 666,
+    "region": "California",
+    "street": "666 Wyld Stallyns Dr"
+  },
+  "name": {
+    "firstName": "Ted",
+    "formatted": "Ted Theodore Logan",
+    "lastName": "Logan",
+    "middleName": "Theodore"
+  },
+  "photos": [
+    {
+      "type": "headshot",
+      "url": "http://scrapetv.com/News/News%20Pages/Entertainment/images-9/keanu-reeves-bill-and-ted.jpg"
+    }
+  ],
+  "pubkeys": [
+    {
+      "curve": "ed25519",
+      "fingerprint": "2aac0da5a765524f98dcee0d1ad61bddf701d867dabd9ebc506781b4ca9eedd0",
+      "priv": "01adc160d86a7b45b1194395688df952d7c0d76e7460d13fe8f463df3c9ad478",
+      "purpose": "update",
+      "type": "ec",
+      "value": "027d0beefc6a70bfeab2535ce002c60b74184a2c2e7b6cb61c4fd468da68bbba55"
+    },
+    {
+      "curve": "ed25519",
+      "fingerprint": "00123912c19be7d7b04bfc44e357c7ccb0daf5c1401d8dfd04c9e022598ea264",
+      "priv": "04a6615d77e364c175899a66f5f92f605a0218ebc6d5876eed62247816f7cd26",
+      "purpose": "sign",
+      "type": "ec",
+      "value": "024a3398091a14a05f07f8c6313b83ae90ecfbc9e067119c49cf3f0dcb6445ab6a"
+    },
+    {
+      "fingerprint": "80dd7c0eae1faa1531710ba9fa1b759ae670846b",
+      "priv": "AAAAAACA1lOZZ0p9qVhGusS0cIOiGxMhblFXK6q4U+w86Au/YDpe4eTKKbOh1/XSo4026/2mqaXl9eGKAP3jJDaKvo1OTeKwVQpqKfoxdrgICMv3a9fIz9BD6hMxbPODypnJ23YBq0u9D9pp7WatBk9wZ4jzUJOycTbgpgBwpyv3FVF8NLsAAAAUzcX9wDrnUxNEvrpC4cbSDnOYBSkAAACAGwMSbCuqpkgFNLWleI2lDnFydWFcuDl0xJifyI7dz6BACsswbOycdq6uEzIaR7On33kNGeX6VMKIxhuFNwShOIVL8UjuZkCEBvjdWVOhtgqO2TcJSSL/YA8O+1ROAJAB38A5pY2WT/NXW3X6G69ZkrPSFDbWRI7PX0egLbTq5UIAAACAc4EIsLAfzZ6nve0FSqfI/OSNZR/mYooUND60p8ZgHoc5eIG384BRrw7uXKED/ya3AKXuhQfkQNWQUvwqSIO+MOnRSWZzWz37y8YzuKxbizMNf2NsdT/WH52mBAan59BwkvKaSPuXEe/4kfBe1vO2iXStS5JzMZ+H/BkCYBPnM+sAAAAUif7HGrNUCUW6n5gOEJbEA4+KPns=",
+      "purpose": "sign",
+      "type": "dsa",
+      "value": "AAAAAACA1lOZZ0p9qVhGusS0cIOiGxMhblFXK6q4U+w86Au/YDpe4eTKKbOh1/XSo4026/2mqaXl9eGKAP3jJDaKvo1OTeKwVQpqKfoxdrgICMv3a9fIz9BD6hMxbPODypnJ23YBq0u9D9pp7WatBk9wZ4jzUJOycTbgpgBwpyv3FVF8NLsAAAAUzcX9wDrnUxNEvrpC4cbSDnOYBSkAAACAGwMSbCuqpkgFNLWleI2lDnFydWFcuDl0xJifyI7dz6BACsswbOycdq6uEzIaR7On33kNGeX6VMKIxhuFNwShOIVL8UjuZkCEBvjdWVOhtgqO2TcJSSL/YA8O+1ROAJAB38A5pY2WT/NXW3X6G69ZkrPSFDbWRI7PX0egLbTq5UIAAACAc4EIsLAfzZ6nve0FSqfI/OSNZR/mYooUND60p8ZgHoc5eIG384BRrw7uXKED/ya3AKXuhQfkQNWQUvwqSIO+MOnRSWZzWz37y8YzuKxbizMNf2NsdT/WH52mBAan59BwkvKaSPuXEe/4kfBe1vO2iXStS5JzMZ+H/BkCYBPnM+s="
+    },
+    {
+      "curve": "ed25519",
+      "fingerprint": "f35b3dc4bd9dac4962febbfba977b6c2689947905d6eb7649eb28fd1639c698d",
+      "priv": "0645b66330d1ac29b3bf000b8d1d6827ba7746b3103d2395111aa4606da859f0",
+      "purpose": "encrypt",
+      "type": "ec",
+      "value": "0257ee2c23b410187758c3965e0a6850d4c9ba780fb02f73de175847bc30caa5eb"
+    },
+    {
+      "fingerprint": "16a8UfGksUbgWfEfbxLvLvj3wufWGT5Ajh",
+      "label": "most triumphant key",
+      "networkName": "bitcoin",
+      "priv": "KxNnfNaGtARotyKpjzBxLqz6PLRjh59ZPgvYuXHWjXvremMkgNHT",
+      "purpose": "payment",
+      "type": "bitcoin",
+      "value": "02e7a22fee063f61b7abbe35ece5f84ecf26707489f0079ec00f654ed4dc4f654e"
+    },
+    {
+      "fingerprint": "mkUHTMrAcUJQhhKCyXMTj3VJhg9uvKTQDD",
+      "label": "most excellent key",
+      "networkName": "testnet",
+      "priv": "cPSVU49VYRuPWjJE5fbM3Qbt3oQQP8pdTkpccqabn7JUSBUVPv1o",
+      "purpose": "payment",
+      "type": "bitcoin",
+      "value": "02464bb42a7f8c3b11b591ec4efe65ecfde2878e746429e96783c00ce3c3cc489c"
+    }
+  ],
+  "summary": "Bill's best friend",
+  "v": "0.3",
+  "websites": [
+    {
+      "url": "wyldstallyns.com"
+    }
+  ]
+}

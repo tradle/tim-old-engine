@@ -1,0 +1,87 @@
+{
+  "_type": "tradle.Identity",
+  "contact": [
+    {
+      "identifier": "somebody",
+      "type": "skype"
+    }
+  ],
+  "location": {
+    "city": "San Dimas",
+    "country": "USA",
+    "formatted": "666 Wyld Stallyns Dr, San Dimas, California",
+    "postalCode": 666,
+    "region": "California",
+    "street": "666 Wyld Stallyns Dr"
+  },
+  "name": {
+    "firstName": "Bill",
+    "formatted": "Bill S. Preston",
+    "lastName": "Preston",
+    "middleName": "S"
+  },
+  "photos": [
+    {
+      "type": "headshot",
+      "url": "http://www.celebritynooz.com/images2/alexwinter-then.jpg"
+    }
+  ],
+  "pubkeys": [
+    {
+      "_sig": "3044022000b336641de01930edaae2239bc578185c05a1293636ca8bac8a4cc28f8f6dca022005bf2738d69bc9fc393adbfaa87aceee7626f924acf74c1c75e4f5d3dac72a13",
+      "curve": "ed25519",
+      "fingerprint": "232a9f3b70e8babd9b4ee5e9a8f7a875d62d337f47304cdfdad1fe03e2f9d6d8",
+      "purpose": "update",
+      "type": "ec",
+      "value": "02479c1c23e2ca7c95d5e788110cf4be1f37733343771d174e9920beb60e2ac22f"
+    },
+    {
+      "_sig": "304402200df05aa636bd0b17df315fd58be329cd4b39ad97a6900174fa95c6aed8b29f5002200e9a43c8402de3b9841fd4c5e362e026d79a892ec97fdbc47d86fc93acf48639",
+      "curve": "ed25519",
+      "fingerprint": "4f8ea41ee36749f51f4b0111bbe78f4aea8560865730b3cb55c08e5f0ecb26f4",
+      "purpose": "sign",
+      "type": "ec",
+      "value": "024439193f49bd574cfc5772e3d0a9855617a25b37c34ebda48343ca2a088f4e26"
+    },
+    {
+      "_sig": "ynaNEQDs2cnDmIyz/nDYdYRaM1Oct4BhZZMkfpmOiLLlBeXMedWHYA==",
+      "fingerprint": "08a643475923670fa02f866a3cad09c83b207467",
+      "purpose": "sign",
+      "type": "dsa",
+      "value": "AAAAAACAnwmUXO6xAyeQmuL/qApeALWgKLNSS7f/mNqh8AMUzc72wKlLsG5XMKowZh937pYANHldkZfXVZeNdDEGJkBqtfl0a2j0Et+LfAjAR8Wu7OXe+geCsEnqfqD99WzYH1OlgrYriMQcTpuZTuZVJzVVxVx9HQR3tIlGcepKtMv51n0AAAAU5kjqmUj7byj1tux2zCfSpOsyLKkAAACAlC+jrDjJADQzlv0/JanHTD3qrfC+27pU44F/dq+B8677i1GbLY7DmPAWwI4btOH/bcbyu0xtCw2BsrzoN+bB2xUS5v+BUcyxdn+Qd+cA+UT9p3+m5agJ7KDd32vNOU4t+O/amD1l9jCrukpcYI8+1WETuZFKQOhJ9t9K8bzOnU0AAACAOMu0G8G7lQZalpylveA3cYrA0DHYX5AWbQIVsHKsfXm9n8h9xB5qT5rQNeAf9nw6a2utQ2YiPuylE4jf9tqyh99Ls9rpOmnEA6Q6XrkqxUZAKmWL+u+mgRpICNrHVr1oT4dWT17UProTYdqloa9yCLzVOK7z+FSgwVYLyC/+FrM="
+    },
+    {
+      "_sig": "30440220095be4fdbf4a6f3a390f900b9a5c3a92ad18a8b98c873ee140192688fe2b5b75022006017cf2a909b33a3830c04788c59ce25947df10799615bfc29cc7bf2e99bc94",
+      "curve": "ed25519",
+      "fingerprint": "95dfa152b6c10c5226ade64b809ce9181ce942f2c2b5201ac3c910ac3c50c642",
+      "purpose": "encrypt",
+      "type": "ec",
+      "value": "0342e9ca37fad387685f897e70e644f6fbfb6fe78226d4a2a2d5f1d285dfbba376"
+    },
+    {
+      "_sig": "304402206158015358a650771057d3b21952c719aeb0fee310cd617e913a7be2cb948e62022025570bbb0799821aa5a86c0cf0fa2dc6e7b4c37e10ef8b8597425b959e352b72",
+      "fingerprint": "1PvvJAFLDxPh2U1t5o19gFbSoHs4hG3Jcc",
+      "label": "most triumphant key",
+      "networkName": "bitcoin",
+      "purpose": "payment",
+      "type": "bitcoin",
+      "value": "027e3cdbeab82b9ef63259a09c41973743641274359e49f125d97a5b6413e34971"
+    },
+    {
+      "_sig": "304402201b6d0ddec2b3daa3bb4e6b091376a805f0cc9442918f504166f337eb6b42755802205b9b2a98dc7b47b3412a7bc1ceca6c9007fe504fa329458b2f7a4ecac7f3de3f",
+      "fingerprint": "mhqqAZcpLSAhqKojhBBxJ5NuaeHaiDTx9g",
+      "label": "most excellent key",
+      "networkName": "testnet",
+      "purpose": "payment",
+      "type": "bitcoin",
+      "value": "03d88086e18da4a1285137065404fe5df72401624577fb8918615f022424790eff"
+    }
+  ],
+  "summary": "Ted's best friend",
+  "v": "0.3",
+  "websites": [
+    {
+      "url": "wyldstallyns.com"
+    }
+  ]
+}
