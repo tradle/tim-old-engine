@@ -17,6 +17,7 @@ var tedPriv = require('./fixtures/ted-priv')
 var Identity = require('midentity').Identity
 var Fakechain = require('blockloader/fakechain')
 var help = require('tradle-test-helpers')
+var publishIdentity = require('../publishIdentity')
 var FakeKeeper = help.FakeKeeper
 var fakeWallet = help.fakeWallet
 var bill = Identity.fromJSON(billPriv)
@@ -86,28 +87,28 @@ test('setup', function (t) {
   ], t.error)
 })
 
-test('regular message', function (t) {
-  t.plan(1)
-  t.timeoutAfter(10000)
+// test('regular message', function (t) {
+//   t.plan(1)
+//   t.timeoutAfter(10000)
 
-  // regular message
-  var msg = new Buffer(stringify({
-    hey: 'ho'
-  }), 'binary')
+//   // regular message
+//   var msg = new Buffer(stringify({
+//     hey: 'ho'
+//   }), 'binary')
 
-  driverTed.once('message', function (m) {
-    t.deepEqual(m, msg)
-  })
+//   driverTed.once('message', function (m) {
+//     t.deepEqual(m, msg)
+//   })
 
-  driverBill.send({
-    msg: msg,
-    to: ted
-  })
-})
+//   driverBill.send({
+//     msg: msg,
+//     to: ted
+//   })
+// })
 
 test('chained message', function (t) {
   t.plan(2)
-  t.timeoutAfter(15000)
+  // t.timeoutAfter(15000)
 
   // chained msg
   var msg = {
@@ -115,36 +116,24 @@ test('chained message', function (t) {
   }
 
   var signed
+  var num = 0
 
-  publishIdentity(function (err) {
-    if (err) throw err
+  driverTed.on('resolved', function (chainedObj) {
+    debugger
+    t.deepEqual(chainedObj.file, signed)
+  })
 
-    // driverTed.on('message', function () {
-    //   driverBill.getPending(console.log)
-    //   driverBill.getResolved(function (r) {
-    //     console.log(r)
-    //     driverBill.destroy(function () {
-    //       process.exit()
-    //     })
-    //   })
-    // })
-
-    var num = 0
-    driverTed.on('resolved', function (chainedObj) {
-      if (++num === 1) {
-        t.equal(chainedObj.parsed.data.value.name.firstName, 'Bill')
-      }
-      else {
-        t.deepEqual(chainedObj.file, signed)
-      }
-    })
-
+  driverTed.chaindb.on('saved', function (chainedObj) {
+    debugger
+    t.equal(chainedObj.parsed.data.value.name.firstName, 'Bill')
     sendChainedMsg(msg, function (err, sent) {
       if (err) throw err
 
       signed = sent
     })
   })
+
+  publishIdentity(billPub, driverBill.chainwriterq, rethrow)
 })
 
 test('teardown', function (t) {
@@ -156,23 +145,23 @@ test('teardown', function (t) {
   ], t.error)
 })
 
-function publishIdentity (cb) {
-  var builder = new Builder()
-    .data(billPub)
-    .build(function (err, buf) {
-      if (err) throw err
+// function publishIdentity (cb) {
+//   var builder = new Builder()
+//     .data(billPub)
+//     .build(function (err, buf) {
+//       if (err) throw err
 
-      driverBill.send({
-        msg: buf,
-        to: ted,
-        chain: {
-          public: true
-        }
-      })
+//       driverBill.send({
+//         msg: buf,
+//         to: ted,
+//         chain: {
+//           public: true
+//         }
+//       })
 
-      if (cb) cb()
-    })
-}
+//       if (cb) cb()
+//     })
+// }
 
 function sendChainedMsg (msg, cb) {
   var builder = new Builder()
@@ -223,4 +212,8 @@ function walletFor (identity) {
       networkName: networkName
     })[0].priv()
   })
+}
+
+function rethrow (err) {
+  if (err) throw err
 }
