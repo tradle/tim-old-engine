@@ -14,16 +14,25 @@ var Queue = require('level-jobs')
 var bufferEqual = require('buffer-equal')
 var extend = require('extend')
 var omit = require('object.omit')
+var pick = require('object.pick')
 var utils = require('tradle-utils')
 var parallel = require('run-parallel')
 var concat = require('concat-stream')
 var mapStream = require('map-stream')
 var safe = require('safecb')
 var typeforce = require('typeforce')
-var Parser = require('chained-obj').Parser
-var normalize = require('./normalizeJSON')
+var ChainedObj = require('chained-obj')
+var Parser = ChainedObj.Parser
+var Builder = ChainedObj.Builder
+var normalizeJSON = require('./normalizeJSON')
 var chainstream = require('./chainstream')
 var OneBlock = require('./oneblock')
+var identityStore = require('./identityStore')
+var mi = require('midentity')
+var toKey = mi.toKey
+var constants = require('./constants')
+var ROOT_HASH = constants.rootHash
+var CUR_HASH = constants.currentHash
 var PREFIX = 'tradle'
 var INDICES = [
   'key',
@@ -36,13 +45,13 @@ var INDICES = [
 ]
 
 var normalizeStream = mapStream.bind(function (data, cb) {
-  cb(null, normalize(data))
+  cb(null, normalizeJSON(data))
 })
 
-var MessageType = Driver.MessageType = {
-  plaintext: 1 << 1,
-  chained: 1 << 2
-}
+// var MessageType = Driver.MessageType = {
+//   plaintext: 1 << 1,
+//   chained: 1 << 2
+// }
 
 module.exports = Driver
 util.inherits(Driver, EventEmitter)
@@ -51,8 +60,9 @@ function Driver (options) {
   var self = this
 
   typeforce({
-    identityPriv: 'Object', // maybe allow read-only mode if this is missing
-    identityPub: 'Object',
+    identityKeys: 'Array', // maybe allow read-only mode if this is missing
+    identityJSON: 'Object',
+    identityHash: '?String',
     blockchain: 'Object',
     networkName: 'String',
     keeper: 'Object',
@@ -72,7 +82,7 @@ function Driver (options) {
   var networkName = this.networkName
   var keeper = this.keeper
   var dht = this.dht
-  var identity = this.identity
+  var identity = this.identity = Identity.fromJSON(this.identityJSON)
   var blockchain = this.blockchain
   var leveldown = this.leveldown
   var wallet = this.wallet = this.wallet || new Wallet({
@@ -94,8 +104,6 @@ function Driver (options) {
       type: 'dsa'
     })[0].priv()
   })
-
-  this.p2p.on('data', this._onmessage)
 
   this.chainwriter = new ChainWriter({
     wallet: wallet,
@@ -120,30 +128,84 @@ function Driver (options) {
     keeper: keeper,
     networkName: networkName,
     prefix: PREFIX,
-    lookup: function byFingerprint (fingerprint, cb) {
-      self.lookupIdentity({
-        private: true,
-        query: {
-          fingerprint: fingerprint
-        }
-      }, function (err, identity) {
-        return {
-          key: identity.keys({ fingerprint: fingerprint })[0],
-          identity: identity
-        }
-      })
-    }
+    lookup: this._lookupByFingerprint
   })
 
-  this._setupTxStream(this._setupInputStreams)
-  this._setupStorage()
+  this._fingerprintToIdentity = {} // in-memory cache of recent conversants
+  this._setupP2P()
+
+  var tasks = []
+  if (!this.identityHash) {
+    tasks.push(this._prepIdentity)
+  }
+
+  tasks.push(this._setupTxStream)
+  tasks.push(this._setupStorage)
+
+  parallel(tasks, function (err) {
+    if (err) return cb(err)
+
+    self._setupInputStreams(function (err) {
+      if (err) return cb(err)
+
+      self._logStream.on('data', self._onLogged)
+      self.emit('ready')
+    })
+  })
+}
+
+Driver.prototype._onLogged = function (data) {
+  var self = this
+  var val = data.value
+  if (val.type === Identity.TYPE) {
+    this._addressBook.update(val)
+  }
+
+  if (val.tx) {
+    this._lastBlock.push(pick(val, ['tx', 'height']))
+  }
+
+  if (val.from === this.identityHash) {
+    var query = {}
+    query[ROOT_HASH] = options.to
+    this.lookupIdentity({
+      query: query
+    }, function (err, identity) {
+      identity = identity.history.pop()
+      self.p2p.send(val.data, getFingerprint(identity))
+    })
+  }
+}
+
+Driver.prototype._prepIdentity = function (cb) {
+  var self = this
+
+  getDHTKey(this.identityJSON, function (err, key) {
+    if (err) return cb(err)
+
+    self.identityHash = key
+    cb()
+  })
+}
+
+Driver.prototype._setupPDP = function () {
+  var self = this
+
+  this.p2p.on('data', this._onmessage)
+  this.p2p.on('connect', function (fingerprint, addr) {
+    // var identity = self._fingerprintToIdentity[fingerprint]
+    // if (identity) return self.emit('connect', identity, addr)
+
+    // self.identityByFingerprint
+  })
 }
 
 Driver.prototype._setupTxStream = function (cb) {
   var self = this
 
   this._lastBlock = new OneBlock({
-    path: this._prefix('lastBlock.db')
+    path: this._prefix('lastBlock.db'),
+    leveldown: this.leveldown
   }, function (err) {
     if (err) return cb(err)
 
@@ -163,14 +225,7 @@ Driver.prototype._setupTxStream = function (cb) {
 }
 
 Driver.prototype._setupStorage = function (cb) {
-  // this.p2p.once('ready', this.init)
-
-  // this.p2p.on('connect', function (fingerprint, addr) {
-  //   self.emit('connect', fingerprint, addr)
-  // })
-
-
-  var logDB = levelup(this._prefix('msg-log.db'), {
+  this._logDB = levelup(this._prefix('msg-log.db'), {
     db: this.leveldown,
     valueEncoding: 'json'
   })
@@ -188,27 +243,11 @@ Driver.prototype._setupStorage = function (cb) {
   //   this._db.ensureIndex(i)
   // }, this)
 
-  this._logStream.on('data', function(data) {
-    var val = data.value
-    if (val.type === Identity.TYPE) {
-      self._updateIdentity(val)
-    }
 
-    if (val.tx) {
-      self._lastBlock.push(pick(val, ['tx', 'height']))
-    }
+  this._addressBook = identityStore({
+    path: this._prefix('identities.db'),
+    leveldown: this.leveldown
   })
-
-  this._identityDB = levelQuery(levelup(this._prefix('identities.db'), {
-    db: this.leveldown,
-    valueEncoding: 'json'
-  }))
-
-  this._identityDB.query.use(jsonqueryEngine())
-
-  var iddb = sublevel(this._identityDB)
-  this._iByDHTKey = iddb.sublevel('byDHTKey')
-  this._iDHTKeyByFingerprint = iddb.sublevel('byFingerprint')
 
   // this.chainstreams.identity.on('data', this._updateIdentity)
   this.chainstreams.public.on('data', this._logIt)
@@ -259,18 +298,19 @@ Driver.prototype._setupStorage = function (cb) {
       .then(function (theirDHTKey) {
         var key = getKey({
           msg: chainedObj.data,
-          type: MessageType.chained,
+          // type: MessageType.chained,
           them: theirDHTKey,
           incoming: theirFingerprint !== myFingerprint
         })
       })
+      .done()
 
     // var myFingerprint = self.p2p.fingerprint
 
     self._db.get(key, function (err, saved) {
       if (err) return
 
-      var savedObj = normalize(saved.msg)
+      var savedObj = normalizeJSON(saved.msg)
       if (!bufferEqual(savedObj, chainedObj.data)) return
 
       self.emit('resolved', chainedObj)
@@ -286,51 +326,8 @@ Driver.prototype._setupStorage = function (cb) {
   })
 }
 
-Driver.prototype._updateIdentity = function (identity, cb) {
-  var self = this
-  assert(identity._r, 'expected identity root hash')
-  assert(identity._c, 'expected identity current hash')
-  self._iByDHTKey.get(identity._r, function (err, stored) {
-    if (err) {
-      if (!/not found/i.test(err.message)) {
-        return cb(err)
-      }
-    }
-  })
-
-  if (stored) {
-    stored.history.push(identity)
-  } else {
-    stored = {
-      history: [identity]
-    }
-  }
-
-  self._iByDHTKey.put(identity._r, stored)
-
-  var fingerprintBatch = Identity.fromJSON(identity).keys().map(function (k) {
-    return { type: 'put', key: k.fingerprint(), value: identity._r }
-  })
-
-  self._iDHTKeyByFingerprint.batch(fingerprintBatch, cb)
-}
 
 Driver.prototype._setupInputStreams = function () {
-  // var txstream = this.rawtxstream.pipe(through2.obj(function (txInfo, enc, done) {
-  //   var wrapper = {
-  //     type: 'tx',
-  //     processed: false,
-  //     data: txInfo
-  //   }
-
-  //   self._log.append(wrapper, function (err) {
-  //     if (err) return done()
-
-  //     txstream.push(txInfo)
-  //     done()
-  //   })
-  // }))
-
   // var identityTxStream = txstream.pipe(mapStream(function (txInfo, callback) {
   //   if (isIdentityTx(txInfo)) {
   //     callback(null, txInfo)
@@ -361,14 +358,28 @@ Driver.prototype._setupInputStreams = function () {
     lookup: this.lookupByDHTKey
   })
 
-  txstream.pipe(publicObjStream)
-  txstream.pipe(privateObjStream)
+  this.rawtxstream.pipe(publicObjStream)
+  this.rawtxstream.pipe(privateObjStream)
 
   this.chainstreams = {
     public: publicObjStream,
     private: privateObjStream,
     identity: identityStream
   }
+}
+
+Driver.prototype._lookupByFingerprint = function (fingerprint, cb) {
+  this.lookupIdentity({
+    private: true,
+    query: {
+      fingerprint: fingerprint
+    }
+  }, function (err, identity) {
+    return {
+      key: keyForFingerprint(identity, fingerprint),
+      identity: identity
+    }
+  })
 }
 
 Driver.prototype.lookupByDHTKey = function (key, cb) {
@@ -378,25 +389,59 @@ Driver.prototype.lookupByDHTKey = function (key, cb) {
     })
 }
 
+Driver.prototype.getPrivateKey = function (fingerprint) {
+  var priv
+  this._keys.some(function (k) {
+    if (k.fingerprint() === fingerprint) {
+      priv = k
+      return true
+    }
+  })
+
+  return priv
+}
+
 Driver.prototype.lookupIdentity = function (options, cb) {
   typeforce({
     query: 'Object',
     private: '?Boolean'
   }, options)
 
-  var done = false
-  var me = options.private ? this.identityPriv : this.identityPub
-  var query = options.query
-  assert(query.fingerprint || query.key)
-
   cb = safe(cb)
+
+  var done = false
+  var meJSON = this.identityJSON
+  var query = options.query
+  var valid = !!query.fingerprint ^ !!query[ROOT_HASH]
+  if (!valid) {
+    return cb(new Error('query by "fingerprint" OR "' + ROOT_HASH + '" (root hash)'))
+  }
+
+  if (query[ROOT_HASH]) {
+    if (found(me)) return
+
+    return this.addressBook.query(query)
+  }
+
+  if (query.fingerprint) {
+    var pub = this.identity.keys({ fingerprint: fingerprint })[0]
+    if (pub) {
+      if (!options.private) return pub
+
+      var priv = this.getPrivateKey(query.fingerprint)
+      return priv || pub
+    }
+  }
+
   if (query.fingerprint) {
     if (found(me)) return
   }
 
-  this._identityDB.query(query)
+  var stream = this._identityDB.query(query)
     .on('data', function (data) {
-      found(data.value)
+      if (found(data.value)) {
+        stream.destroy()
+      }
     })
     .once('error', cb)
     .once('end', function () {
@@ -405,10 +450,14 @@ Driver.prototype.lookupIdentity = function (options, cb) {
 
   function found (identity) {
     if (done) return
-    if (!(identity instanceof Identity)) identity = Identity.fromJSON(identity)
 
-    identity = me.equals(identity) ? me : identity
-    var key = identity.keys({ fingerprint: fingerprint })[0]
+    var isMe = me[ROOT_HASH] === identity[ROOT_HASH]
+    var key
+    if (isMe && options.private) {
+      key = self.getPrivateKey(query.fingerprint)
+    }
+
+    var key = key || keyForFingerprint(identity, fingerprint)
     if (key) {
       cb(null, {
         key: key,
@@ -422,57 +471,25 @@ Driver.prototype.lookupIdentity = function (options, cb) {
 }
 
 Driver.prototype._logIt = function (obj) {
-  obj.type = obj.parsed && obj.parsed.data._type
-  this._log.append(omit(obj, 'parsed'))
-}
+  var parsed = obj.parsed
+  var copy = omit(obj, 'parsed')
 
-Driver.prototype._lookup = function (fingerprint, cb) {
-  var key = this.identity && this.identity.keys({ fingerprint: fingerprint })[0]
-  if (key) {
-    return cb(null, {
-      key: key,
-      identity: this.identity
-    })
+  if (!copy.type && parsed) {
+    copy.type = parsed.data._type
   }
 
-  this.byFingerprint(fingerprint)
-    .then(function (identityJSON) {
-      // TODO: optimize this, probably not necessary
-      var identity = Identity.fromJSON(identityJSON)
-      cb(null, {
-        key: identity.keys({ fingerprint: fingerprint })[0],
-        identity: identityJSON
-      })
-    })
-    .catch(cb)
-    .done()
+  if (copy.type !== 'text') {
+    assert(copy[ROOT_HASH], 'expected root hash')
+    assert(copy[CUR_HASH], 'expected current hash')
+  }
+
+  this._log.append(copy)
 }
-
-// Driver.prototype.init = function () {
-//   var self = this
-//   var chainwriter = this.chainwriter
-//   if (this._initialized) return
-
-//   this._initialized = true
-
-
-//   // this.chaindb.on('invalid', function (txId, chainedObj) {
-//   //   self._msgDB.get(chainedObj.key, function (err, saved) {
-//   //     if (err) return
-
-//   //     saved.invalid = true
-//   //     self._invalidDB.put(chainedObj)
-//   //     self._msgDB.del(chainedObj.key)
-//   //   })
-//   // })
-
-//   this.emit('ready')
-// }
 
 Driver.prototype._chainWriterWorker = function (task, cb) {
   var self = this
 
-  task = normalize(task)
+  task = normalizeJSON(task)
   var promise
 
   if (task.data) {
@@ -640,72 +657,47 @@ Driver.prototype.getMessages = function (theirFingerprint, results) {
 //   // })
 // }
 
-Driver.prototype._sendMsg = function (options) {
-  var self = this
-
+Driver.prototype.putOnChain = function (options) {
   typeforce({
-    msg: 'Object',
-    to: 'Identity'
+    data: 'Buffer'
   }, options)
 
-  var to = options.to
-  var theirFingerprint = getFingerprint(to)
-  var msg = {
-    type: options.chain ? MessageType.chained : MessageType.plaintext,
-    msg: options.msg
+  var recipients = options.recipients
+  if (!recipients && options.to) {
+    var to = options.to
+    var pubKey = to.keys({
+      type: 'bitcoin',
+      networkName: this.networkName
+    })[0].pubKeyString()
+
+    recipients = [pubKey]
   }
 
-  this.lookupIdentity({
-    query: {
-      fingerprint: theirFingerprint
-    }
-  }, function (err, identityHash) {
-    // self._db.put(extend({
-    //   from: this.identityHash,
-    //   to: identityHash,
-    //   incoming: false
-    // }, msg))
-  })
-
-  // this._log.append({
-  //   msgKey: getKey(extend({
-  //     to: theirFingerprint
-  //   }, msg))
-  // })
-
-  var msgBuf = msgToBuf(msg)
-  var to = options.to
-
-  this.p2p.send(msgBuf, theirFingerprint)
+  this.chainwriterq.push(extend(true, {
+    recipients: recipients
+  }, options)
 }
 
 Driver.prototype.send = function (options) {
   var self = this
 
   typeforce({
-    msg: 'Buffer',
-    to: 'Identity',
-    chain: '?Object'
+    msg: 'Object',
+    to: 'String'
   }, options)
 
-  this._sendMsg(options)
-  var chainOpts = options.chain
-  if (!chainOpts) return
+  parallel([
+    normalizeMsg.bind(null, options.msg)
+    // ,
+    // this.lookupIdentity.bind(this, { query: query })
+  ], function (err, results) {
+    if (err) throw err
 
-  // setTimeout(function () {
-    var to = options.to
-    var msg = options.msg
-    var pubKey = to.keys({
-      type: 'bitcoin',
-      networkName: self.networkName
-    })[0].pubKeyString()
-
-    self.chainwriterq.push({
-      data: msg,
-      public: chainOpts.public,
-      recipients: [pubKey]
-    })
-  // }, 5000)
+    var normalized = results[0]
+    normalized.from = self.identityHash
+    normalized.to = options.to
+    self._logIt(normalized)
+  })
 }
 
 Driver.prototype.destroy = function (cb) {
@@ -726,13 +718,10 @@ Driver.prototype.destroy = function (cb) {
         if (cb) cb()
       })
     },
-    function killChainDB(cb) {
-      self.chaindb.destroy().finally(function() {
-        cb()
-      })
-    },
     this.p2p.destroy.bind(this.p2p),
-    this.queueDB.close.bind(this.queueDB)
+    this.queueDB.close.bind(this.queueDB),
+    this._identityDB.close.bind(this.queueDB),
+    this._logDB.close.bind(this.queueDB)
   ], cb)
 }
 
@@ -814,6 +803,18 @@ function getKey (msg) {
 function getFingerprint (identity) {
   return identity.keys({ type: 'dsa' })[0]
     .fingerprint()
+}
+
+function keyForFingerprint (identityJSON, fingerprint) {
+  var key
+  identityJSON.pubkeys.some(function (k) {
+    if (k.fingerprint === fingerprint) {
+      key = k
+      return true
+    }
+  })
+
+  return key && toKey(key)
 }
 
 // function isIdentityTx (txInfo) {

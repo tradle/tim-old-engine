@@ -16,7 +16,6 @@
     "blockloader": "git://github.com/mvayngrib/blockloader.git",
     "bluebird": "^2.9.26",
     "cb-streams": "git://github.com/mvayngrib/cb-streams",
-    "chaindb": "git://github.com/mvayngrib/chaindb#stream",
     "chained-obj": "git://github.com/tradle/chained-obj.git",
     "chainloader": "git://github.com/mvayngrib/chainloader",
     "changes-feed": "^1.1.0",
@@ -32,6 +31,7 @@
     "simple-wallet": "git://github.com/mvayngrib/simple-wallet",
     "through2": "^2.0.0",
     "tradle-utils": "git://github.com/tradle/tradle-utils",
+    "tradle-verifier": "git://github.com/mvayngrib/tradle-verifier",
     "typeforce": "^1.0.1",
     "zlorp": "git://github.com/mvayngrib/zlorp.git"
   },
