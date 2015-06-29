@@ -1,11 +1,17 @@
 
+var assert = require('assert')
 var typeforce = require('typeforce')
+var Q = require('q')
 var levelup = require('levelup')
 var levelQuery = require('level-queryengine')
 var sublevel = require('level-sublevel')
 var jsonqueryEngine = require('jsonquery-engine')
 var externr = require('externr')
-var safe = require('safecb')
+var concat = require('concat-stream')
+var pick = require('object.pick')
+var constants = require('./constants')
+var ROOT_HASH = constants.rootHash
+var CUR_HASH = constants.currentHash
 
 module.exports = TypeStore
 
@@ -23,16 +29,18 @@ function TypeStore (options) {
   }))
 
   this._db.query.use(jsonqueryEngine())
+  this._db.ensureIndex(CUR_HASH)
 
   this._sub = sublevel(this._db)
   this._sublevels = {}
-  this._byRootHash = this.sublevel('_r')
-  this._byCurrentHash = this.sublevel('_c')
+  // this._byRootHash = this.createSublevel(constants.rootHash)
+  // this._byCurrentHash = this.createSublevel(constants.currentHash)
   this._externs = externr({
-    wrap: [ 'update', 'query' ]
+    wrap: [ '_update', '_query' ]
   })
 
-  // this._fingerprintToDHTKey = iddb.sublevel('byFingerprint')
+  this._defaultUpdate = this._defaultUpdate.bind(this)
+  this.use = this._externs.$register.bind(this._externs)
 }
 
 TypeStore.prototype.createSublevel = function (name) {
@@ -44,54 +52,37 @@ TypeStore.prototype.createSublevel = function (name) {
   return this._sub.sublevel(name)
 }
 
-TypeStore.prototype.update = function (obj, cb) {
-  assert(obj._type === this._type)
-  cb = safe(cb)
-  this._externs.update(this, [ obj, cb ], this._update)
+TypeStore.prototype.update = function (obj) {
+  return Q.ninvoke(this, '_update', obj)
 }
 
-TypeStore.prototype.query = function (query, cb) {
-  var self = this
-  cb = safe(cb)
+TypeStore.prototype._update = function (obj, cb) {
+  assert(obj._type === this._type)
+  this._externs._update(this, [ obj, cb ], this._defaultUpdate)
+}
 
-  this._externs.query(this, [ query, cb ], function default (query, cb) {
+TypeStore.prototype.get = function (rootHash, cb) {
+  return this._db.get(rootHash, cb)
+}
+
+TypeStore.prototype.query = function (query) {
+  return Q.ninvoke(this, '_query', query)
+}
+
+TypeStore.prototype._query = function (query, cb) {
+  var self = this
+
+  this._externs._query(this, [ query, cb ], function defQuery (query, cb) {
     self._db.query(query)
       .once('error', cb)
       .pipe(concat(function (results) {
+        if (!results.length) return cb(new Error('not found'))
+
         cb(null, results)
       }))
   })
 }
 
-// TypeStore.prototype.
-
-TypeStore.prototype._update = function (obj, cb) {
-  var self = this
-
-  self._byRootHash.get(obj._r, function (err, stored) {
-    if (err) {
-      if (!/not found/i.test(err.message)) {
-        return cb(err)
-      }
-    }
-
-    if (stored) {
-      stored.history.push(obj)
-    } else {
-      stored = {
-        history: [obj]
-      }
-    }
-
-    self._byRootHash.put(obj._r, stored, cb)
-  })
-}
-
-TypeStore.prototype.byFingerprint = function (fingerprint, cb) {
-  var self = this
-  return this._fingerprintToDHTKey.get(fingerprint, function (err, dhtKey) {
-    if (err) return cb(err)
-
-    return self._byRootHash.get(fingerprint, cb)
-  })
+TypeStore.prototype._defaultUpdate = function (obj, cb) {
+  this._db.put(obj[ROOT_HASH], obj, cb)
 }

@@ -9,19 +9,27 @@ var extend = require('extend')
 var memdown = require('memdown')
 var stringify = require('tradle-utils').stringify
 var DHT = require('bittorrent-dht')
-var loadComponents = require('../components')
 var Builder = require('chained-obj').Builder
-var billPub = fs.readFileSync(path.join(__dirname, './fixtures/bill-pub.json'))
+var billPub = require('./fixtures/bill-pub.json')
+var tedPub = require('./fixtures/ted-pub.json')
 var billPriv = require('./fixtures/bill-priv')
 var tedPriv = require('./fixtures/ted-priv')
-var Identity = require('midentity').Identity
+var constants = require('../constants')
+var tedHash = tedPub[constants.rootHash] = '7f767eae2f7341247e8626182d3368835db38d40'
+var billHash = billPub[constants.rootHash] ='c7ea4e09163c6ace981c33ed78ee0f53c1425dac'
+var mi = require('midentity')
+var Identity = mi.Identity
+var toKey = mi.toKey
 var Fakechain = require('blockloader/fakechain')
 var help = require('tradle-test-helpers')
 var publishIdentity = require('../publishIdentity')
+var getDHTKey = require('../getDHTKey')
 var FakeKeeper = help.FakeKeeper
 var fakeWallet = help.fakeWallet
-var bill = Identity.fromJSON(billPriv)
-var ted = Identity.fromJSON(tedPriv)
+var bill = Identity.fromJSON(billPub)
+var ted = Identity.fromJSON(tedPub)
+// var bill = Identity.fromJSON(billPriv)
+// var ted = Identity.fromJSON(tedPriv)
 var networkName = 'testnet'
 // var blockchain = new Fakechain({ networkName: networkName })
 var Driver = require('../')
@@ -47,12 +55,13 @@ var commonOpts = {
   keeper: keeper,
   blockchain: blockchain,
   leveldown: memdown,
-  syncInterval: 1000
+  syncInterval: 5000
 }
 
 var driverBill = new Driver(extend({
   pathPrefix: 'bill',
-  identity: bill,
+  identityJSON: billPub,
+  identityKeys: billPriv,
   wallet: billWallet,
   dht: billDHT,
   port: billPort
@@ -64,7 +73,8 @@ var driverBill = new Driver(extend({
 
 var driverTed = new Driver(extend({
   pathPrefix: 'ted',
-  identity: ted,
+  identityJSON: tedPub,
+  identityKeys: tedPriv,
   wallet: tedWallet,
   dht: tedDHT,
   port: tedPort
@@ -79,17 +89,21 @@ var driverTed = new Driver(extend({
 // })
 
 test('setup', function (t) {
-  t.plan(1)
+  t.plan(4)
 
-  parallel([
-    driverBill.once.bind(driverBill, 'ready'),
-    driverTed.once.bind(driverTed, 'ready')
-  ], t.error)
+  driverBill.once('ready', t.pass)
+  driverTed.once('ready', t.pass)
+  driverBill._addressBook.update(tedPub)
+    .then(t.pass)
+    .done()
+  driverTed._addressBook.update(billPub)
+    .then(t.pass)
+    .done()
 })
 
 // test('regular message', function (t) {
 //   t.plan(1)
-//   t.timeoutAfter(10000)
+//   // t.timeoutAfter(10000)
 
 //   // regular message
 //   var msg = new Buffer(stringify({
@@ -97,13 +111,21 @@ test('setup', function (t) {
 //   }), 'binary')
 
 //   driverTed.once('message', function (m) {
-//     t.deepEqual(m, msg)
+//     t.deepEqual(m.data, msg)
 //   })
 
-//   driverBill.send({
-//     msg: msg,
-//     to: ted
-//   })
+//   // driverBill._addressBook.update(tedPub, function (err) {
+//   //   if (err) throw err
+
+//   //   driverTed._addressBook.update(billPub, function (err) {
+//   //     if (err) throw err
+
+//       driverBill.sendPlaintext({
+//         msg: msg,
+//         to: tedHash
+//       })
+//     // })
+//   // })
 // })
 
 test('chained message', function (t) {
@@ -123,7 +145,7 @@ test('chained message', function (t) {
     t.deepEqual(chainedObj.file, signed)
   })
 
-  driverTed.chaindb.on('saved', function (chainedObj) {
+  driverTed.on('saved', function (chainedObj) {
     debugger
     t.equal(chainedObj.parsed.data.value.name.firstName, 'Bill')
     sendChainedMsg(msg, function (err, sent) {
@@ -133,7 +155,9 @@ test('chained message', function (t) {
     })
   })
 
-  publishIdentity(billPub, driverBill.chainwriterq, rethrow)
+  driverBill.publish(billPub)
+
+  // publishIdentity(billPub, driverBill.chainwriterq, rethrow)
 })
 
 test('teardown', function (t) {

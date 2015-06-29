@@ -9,13 +9,18 @@ module.exports = function normalizeMsg (msg, cb) {
   parse(msg, function (err, parsed) {
     if (err) return cb(err)
 
-    build(msg, function (err, buf) {
+    build(msg, function (err, result) {
       if (err) return cb(err)
 
-      cb(null, {
-        data: buf,
-        parsed: parsed
-      })
+      // utils.getStorageKeyFor(buf, function (err, key) {
+      //   if (err) return cb(err)
+
+        cb(null, {
+          // key: key,
+          data: result.form,
+          parsed: parsed
+        })
+      // })
     })
   })
 }
@@ -30,7 +35,7 @@ function parse (msg, cb) {
 
 function build (msg, cb) {
   cb = safe(cb)
-  if (Buffer.isBuffer(msg)) return cb(null, msg)
+  if (Buffer.isBuffer(msg)) return cb(null, {form: msg})
 
   new Builder()
     .data(msg)

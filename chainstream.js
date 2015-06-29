@@ -1,5 +1,6 @@
 
 var through2 = require('through2')
+var PassThrough = require('readable-stream').PassThrough
 var combine = require('stream-combiner2')
 var typeforce = require('typeforce')
 var Parser = require('chained-obj').Parser
@@ -18,7 +19,7 @@ var DEFAULT_PLUGINS = [
  */
 module.exports = function chainstream(options) {
   typeforce({
-    lookup: 'Function'
+    lookup: 'Function',
     chainloader: 'Object'
   }, options)
 
@@ -39,6 +40,8 @@ module.exports = function chainstream(options) {
 
   var trans = combine(
     through2.obj(function (txInfo, enc, done) {
+      // var tx = txInfo.tx
+      // tx.height = txInfo.height
       this.push(txInfo.tx)
       done()
     }),
