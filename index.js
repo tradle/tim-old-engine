@@ -3,13 +3,14 @@ var assert = require('assert')
 var crypto = require('crypto')
 var util = require('util')
 var EventEmitter = require('events').EventEmitter
+var Writable = require('readable-stream').Writable
 var Q = require('q')
 var typeforce = require('typeforce')
 var debug = require('debug')('chained-chat')
 var sublevel = require('level-sublevel')
 var levelup = require('levelup')
-var levelQuery = require('level-queryengine')
-var jsonqueryEngine = require('jsonquery-engine')
+// var levelQuery = require('level-queryengine')
+// var jsonqueryEngine = require('jsonquery-engine')
 var changesFeed = require('changes-feed')
 var bitcoin = require('bitcoinjs-lib')
 var Queue = require('level-jobs')
@@ -42,10 +43,11 @@ var chainstream = require('./chainstream')
 var OneBlock = require('./oneblock')
 var identityStore = require('./identityStore')
 var getDHTKey = require('./getDHTKey')
-var constants = require('./constants')
-var ROOT_HASH = constants.rootHash
-var CUR_HASH = constants.currentHash
-var PREFIX = 'tradle'
+var constants = require('tradle-constants')
+var TYPE = constants.TYPE
+var ROOT_HASH = constants.ROOT_HASH
+var CUR_HASH = constants.CUR_HASH
+var PREFIX = constants.OP_RETURN_PREFIX
 // var INDICES = [
 //   'key',
 //   'tx',
@@ -143,12 +145,14 @@ function Driver (options) {
     keeper: keeper,
     networkName: networkName,
     prefix: PREFIX,
-    lookup: this._lookupByFingerprint
+    lookup: this._lookupByFingerprint2
   })
 
   this._fingerprintToIdentity = {} // in-memory cache of recent conversants
   this._setupP2P()
-  this._setupStorage()
+  this._setupLog()
+  this._logRS.on('error', this._onLogReadError)
+  this._logWS.on('error', this._onLogWriteError)
 
   var tasks = [
     this._prepIdentity(),
@@ -156,86 +160,19 @@ function Driver (options) {
   ]
 
   Q.all(tasks)
-    .then(function () {
-      self._setupInputStreams()
-      self._logStream.on('data', self._onLogged)
-      self._logStream.on('error', self._onLogError)
+    .done(function () {
       self.emit('ready')
     })
-    .done()
 }
 
-Driver.prototype._onLogError = function (err) {
+Driver.prototype._onLogReadError = function (err) {
   debugger
   throw err
 }
 
-Driver.prototype._onLogged = function (data) {
-  if (data.tx) return
-  if (data.type === Identity.TYPE) {
-    this._addressBook.update(JSON.parse(data.data.toString('binary')))
-  }
-
-  if (data.from === this._myRootHash) {
-    this._processOutgoing(data)
-  } else {
-    this._processIncoming(data)
-  }
-}
-
-Driver.prototype._processOutgoing = function (obj) {
-  var self = this
-  // TODO: optimize into batch
-  // var query = {}
-  // query[ROOT_HASH] = { $in: obj.to }
-
-  // return Q.all(obj.to.map(function (hash) {
-  //     var query = {}
-  //     query[ROOT_HASH] = hash
-  //     return self.lookupIdentity({
-  //       query: query
-  //     })
-  //   }))
-
-  if (obj.mode === 'public') {
-    return this.putOnChain(obj)
-
-    // return this.chainwriter.create()
-    //   .data(obj.data)
-    //   .setPublic(true)
-    //   .execute()
-    //   .then(function (resp) {
-
-    //   })
-  }
-
+Driver.prototype._onLogWriteError = function (err) {
   debugger
-  return Q.all(obj.to.map(this.lookupIdentity))
-    .then(function (identities) {
-      if (err) throw err
-
-      identities.forEach(function (i) {
-        if (obj.type === 'text') {
-          var msg = toBuffer(pick(obj, ['type', 'data']))
-          self.p2p.send(msg, getFingerprint(i))
-        } else {
-          debugger
-        }
-      })
-    })
-
-  // this.lookupIdentity({
-  //   query: query
-  // }, function (err, identities) {
-  //   var msg = msgToBuf({
-  //     type: obj.type,
-  //     data: obj.data
-  //   })
-
-  //   identities.forEach(function (i) {
-  //     self.p2p.send(msg, getFingerprint(i))
-  //   })
-  // })
+  throw err
 }
 
 Driver.prototype._processIncoming = function (obj) {
@@ -244,21 +181,25 @@ Driver.prototype._processIncoming = function (obj) {
 
   assert(ROOT_HASH in obj, 'expected ' + ROOT_HASH)
   var query = pick(obj, ROOT_HASH)
-
-  this._logDB.query(query)
+  var stream = this._logDB.createValueStream({
+      reverse: true
+    })
     .on('error', rethrow) // TODO: handle
-    .pipe(concat(function(results) {
-      debugger
-      var saved = results.pop()
+    .on('data', function (saved) {
+      if (!saved.data) return
+
+      saved = normalizeJSON(saved)
+      stream.destroy()
       if (!bufferEqual(saved.data, obj.data)) return
 
-      self.emit('resolved', chainedObj)
+      self.emit('saved', obj)
+      self.emit('resolved', obj)
       saved.status = 'resolved'
 
-      var update = pick(obj, ['type', ROOT_HASH, CUR_HASH])
+      var update = pick(obj, ['tx', ROOT_HASH, CUR_HASH])
       update.status = 'resolved'
       self._log.append(update)
-    }))
+    })
 }
 
 Driver.prototype._prepIdentity = function () {
@@ -297,16 +238,27 @@ Driver.prototype._setupTxStream = function () {
   })
 
   this._lastBlock.once('ready', function () {
-    self.rawtxstream = cbstreams.stream.txs({
-      live: true,
-      interval: self.syncInterval || 60000,
-      api: self.blockchain,
-      height: self._lastBlock.height(),
-      addresses: [
-        self.wallet.addressString,
-        constants.IDENTITY_PUBLISH_ADDRESS
-      ]
-    })
+    cbstreams.stream.txs({
+        live: true,
+        interval: self.syncInterval || 60000,
+        api: self.blockchain,
+        height: self._lastBlock.height(),
+        addresses: [
+          self.wallet.addressString,
+          constants.IDENTITY_PUBLISH_ADDRESS
+        ]
+      })
+      .pipe(mapStream(function (txInfo, done) {
+        var entry = extend(newLogWrapper(['tx']), txInfo)
+        entry.tx = entry.tx.toBuffer()
+        done(null, entry)
+      }))
+      .pipe(self._logWS)
+
+
+    self._txStream
+      .pipe(toValueStream())
+      .pipe(self._lastBlock)
 
     defer.resolve()
   })
@@ -314,25 +266,211 @@ Driver.prototype._setupTxStream = function () {
   return defer.promise
 }
 
-Driver.prototype._setupStorage = function () {
-  this._logDB = levelQuery(levelup(this._prefix('msg-log.db'), {
+Driver.prototype._setupLog = function () {
+  var self = this
+
+  this._logDB = levelup(this._prefix('msg-log.db'), {
     db: this.leveldown,
     valueEncoding: 'json'
-  }))
+  })
 
-  // this._logDB.use(jsonqueryEngine())
-  // this._logDB.ensureIndex(ROOT_HASH)
-  // this._logDB.ensureIndex(CUR_HASH)
   this._log = changesFeed(this._logDB)
-  this._logStream = this._log
-    .createReadStream({ live: true, keys: false })
-    .pipe(normalizeStream())
+
+  this._logWS = new Writable({ objectMode: true })
+  this._logWS._write = function (chunk, enc, next) {
+    self._log.append(chunk)
+    next()
+  }
+
+  this._logRS = this._log
+    .createReadStream({ live: true })
+    .pipe(mapStream(function (data, cb) {
+      var id = data.change
+      data = normalizeJSON(data.value)
+      // so whoever processes this can refer to this entry
+      data._l.id = id
+      cb(null, data)
+    }))
+
+  this._logRS.setMaxListeners(0)
+
+  // this._logStream = duplexify(ws, rs)
+
+  this._txStream = this._logRS.pipe(logFilter('tx'))
+    .pipe(mapStream(function (data, cb) {
+      data.tx = bitcoin.Transaction.fromBuffer(data.tx)
+      cb(null, data)
+    }))
+
+  var newInbound = this._logRS.pipe(logFilter('new', 'inbound'))
+  newInbound.on('data', this._onInboundMessage)
+  // this._newInboundPlain = this._logRS.pipe(logFilter('plain', 'inbound'))
+  // this._newPublicStruct = this._logRS.pipe(logFilter('struct', 'public'))
+  // this._
+
+  var inboundStruct = this._logRS.pipe(logFilter('struct', 'inbound'))
+  inboundStruct.on('data', this._onInboundStruct)
+
+  var newOutboundPlain = this._logRS.pipe(logFilter('new', 'plain', 'outbound'))
+  newOutboundPlain.on('data', this._onNewOutboundPlainMessage)
+
+  var newOutboundStruct = this._logRS.pipe(logFilter('new', 'struct', 'outbound'))
+  newOutboundStruct.on('data', this._onNewOutboundStructMessage)
+
+  var storedOutboundStruct = this._logRS.pipe(logFilter('struct', 'outbound', 'stored'))
+  storedOutboundStruct.on('data', this._onStoredOutboundStructMessage)
+
+  // this._newOutbound.on('data', this._onNewOutboundMessage)
+
+  // this._newPlain = this._logRS.pipe(logFilter('new', 'plain'))
+
+  // this._newPlainInbound = this._newPlain.pipe(logFilter('inbound'))
+  // this._newPlainInbound.on('data', this._onInboundPlain)
+
+  // this._newStructured = this._logRS.pipe(logFilter('new', 'struct'))
+  var structStored = this._logRS.pipe(logFilter('struct', 'stored'))
+  var structChained = this._logRS.pipe(logFilter('struct', 'chained'))
+  structChained.on('data', this._onStructChained)
 
   this._addressBook = identityStore({
     path: this._prefix('identities.db'),
     leveldown: this.leveldown
   })
+
+  var objStream = chainstream({
+    chainloader: this.chainloader,
+    lookup: this.lookupByDHTKey
+  })
+
+  this._txStream
+    .pipe(objStream)
+    .pipe(mapStream(function (chainedObj, cb) {
+      // how do we know prev?
+      // necessary? maybe just write this straight to log
+      var entry = extend(
+        pick(chainedObj, ['height', 'data']),
+        entry,
+        newLogWrapper([
+          'struct',
+          'chained',
+          chainedObj.type === 'public' ? 'public' : 'private'
+        ], chainedObj)
+      )
+
+      var from = chainedObj.from.getOriginalJSON()
+      var to = chainedObj.to && chainedObj.to.getOriginalJSON()
+      entry.from = from[ROOT_HASH]
+      entry.tx = chainedObj.tx.toBuffer()
+      entry[CUR_HASH] = chainedObj.key
+      entry[ROOT_HASH] = chainedObj.parsed.data[ROOT_HASH] || entry[CUR_HASH]
+
+      if (to) entry.to = to[ROOT_HASH]
+
+      cb(null, entry)
+    }))
+    .pipe(this._logWS)
 }
+
+Driver.prototype._onInboundMessage = function (data) {
+  debugger
+}
+
+Driver.prototype._onInboundStruct = function (data) {
+  debugger
+}
+
+// Driver.prototype._onPub = function (data) {
+//   debugger
+// }
+
+Driver.prototype._onStructChained = function (data) {
+  debugger
+  // if (data._)
+  if (data._l.prev) {
+    this.emit('resolved', data)
+  }
+}
+
+Driver.prototype._onNewOutboundStructMessage = function (obj) {  debugger
+  var self = this
+  var isPublic = hasTag(obj, 'public')
+  var builder = new Builder()
+    .data(obj.data)
+
+  if (obj.attachments) {
+    obj.attachments.forEach(builder.attach, builder)
+  }
+
+  if (obj.sign) {
+    builder.signWith(this.signingKey)
+  }
+
+  var lookup = isPublic ? this._getAddress : this._lookupBTCKey
+  var tasks = [
+    Q.ninvoke(builder, 'build')
+  ].concat(obj.to.map(lookup))
+
+  var wrapper = newLogWrapper([
+    'struct',
+    'stored',
+    'outbound',
+    isPublic ? 'public' : 'private'
+  ], obj) // obj is prev
+  wrapper.chain = obj.chain // whether to put it on chain
+  wrapper.to = obj.to
+  wrapper.sign = obj.sign
+  return Q.all(tasks)
+    .then(function (results) {
+      var build = results[0]
+      var recipients = results.slice(1)
+      wrapper.data = build.form
+      return self.chainwriter.create()
+        .data(wrapper.data)
+        .setPublic(isPublic)
+        .recipients(recipients)
+        .execute()
+    })
+    .then(function (resp) {
+      copyDHTKeys(wrapper, resp.key)
+      return self._logIt(wrapper)
+    })
+}
+
+Driver.prototype._onStoredOutboundStructMessage = function (obj) {
+  if (obj.chain) this.putOnChain(obj)
+}
+
+Driver.prototype._onNewOutboundPlainMessage = function (data) {
+  var self = this
+  var msg = toBuffer(pick(obj, ['data']))
+  return Q.allSettled(data.to.map(this.lookupIdentity))
+    .then(function (results) {
+      var found = results.filter(function (r) {
+        return r.state === 'fulfilled'
+      })
+
+      if (found.length !== results.length) {
+        var missing = results.map(function (r, i) {
+          return r.state === 'fulfilled' ? null : data.to[i]
+        })
+        .filter(notNull)
+        .join(', ')
+
+        self.emit('warn', 'no identities found for: ' + missing)
+      }
+
+      identities.forEach(function (i) {
+        self.p2p.send(msg, getFingerprint(i))
+      })
+    })
+
+    // TODO:
+    //   do we log that we sent it?
+    //   do we log when we delivered it? How do we know it was delivered?
+}
+
+// Driver.prototype._onInboundPlaintext = function (data) {
+// }
 
 // Driver.prototype._setupStorage = function (cb) {
   // this._db = levelQuery(levelup(this._prefix('msgs.db'), {
@@ -419,70 +557,33 @@ Driver.prototype._setupStorage = function () {
 // }
 
 
-Driver.prototype._setupInputStreams = function () {
-  // var identityTxStream = txstream.pipe(mapStream(function (txInfo, callback) {
-  //   if (isIdentityTx(txInfo)) {
-  //     callback(null, txInfo)
-  //   }
-  // }))
+// Driver.prototype._setupInputStreams = function () {
+//   var self = this
+//   var objStream = chainstream({
+//     name: this.pathPrefix,
+//     chainloader: this.chainloader,
+//     lookup: this.lookupByDHTKey
+//   })
 
-  // var otherTxStream = txstream.pipe(mapStream(function (txInfo, callback) {
-  //   if (!isIdentityTx(txInfo)) {
-  //     callback(null, txInfo)
-  //   }
-  // }))
+//   // var publicObjStream = objStream.pipe(mapStream(function (obj, cb) {
+//   //   if (obj.type === 'public') cb(null, obj)
+//   //   else cb()
+//   // }))
 
-  var publicObjStream = chainstream({
-    chainloader: this.chainloader,
-    lookup: this.lookupByDHTKey
-  })
+//   // var identityStream = publicObjStream.pipe(mapStream(function (obj, cb) {
+//   //   if (obj.parsed.data._type === Identity.TYPE) {
+//   //     cb(null, obj)
+//   //   } else {
+//   //     cb()
+//   //   }
+//   // }))
 
-  var identityStream = publicObjStream.pipe(mapStream(function (data, cb) {
-    if (data.parsed.data._type === Identity.TYPE) {
-      cb(null, data)
-    } else {
-      cb()
-    }
-  }))
+//   // var privateObjStream = objStream.pipe(mapStream(function (obj, cb) {
+//   //   if (obj.type !== 'public') cb(null, obj)
+//   //   else cb()
+//   // }))
 
-  var privateObjStream = chainstream({
-    chainloader: this.chainloader,
-    lookup: this.lookupByDHTKey
-  })
-
-  this.rawtxstream.pipe(publicObjStream)
-  this.rawtxstream.pipe(privateObjStream)
-
-  this.chainstreams = {
-    public: publicObjStream,
-    private: privateObjStream,
-    identity: identityStream
-  }
-
-  // this.chainstreams.identity.on('data', this._updateIdentity)
-  this.chainstreams.public.on('data', function (data) {
-    debugger
-    self._logIt(data)
-  })
-  this.chainstreams.private.on('data', this._logIt)
-  this._logStream.pipe(mapStream(function (data) {
-      if (data.tx && data.height) {
-        cb(null, pick(data, ['tx', 'height']))
-      }
-    }))
-    .pipe(this._lastBlock)
-
-  // this._logStream.pipe(mapStream(function (data) {
-  //   if (data.type === 'text') {
-  //     var msg = msgToBuf({
-  //       type: MessageType.plaintext,
-  //       data: data.data
-  //     })
-
-  //     self.p2p.send(msg, getFingerprint(identity))
-  //   }
-  // }))
-}
+// }
 
 Driver.prototype._lookupByFingerprint = function (fingerprint, private) {
   var self = this
@@ -491,11 +592,19 @@ Driver.prototype._lookupByFingerprint = function (fingerprint, private) {
     })
     .then(function (identity) {
       var key = private && self.getPrivateKey(fingerprint)
-      key = key || keyForFingerprint(identity)
+      key = key || keyForFingerprint(identity, fingerprint)
       return {
         key: key,
         identity: identity
       }
+    })
+}
+
+Driver.prototype._lookupByFingerprint2 = function (fingerprint, private) {
+  return this._lookupByFingerprint.apply(this, arguments)
+    .then(function (result) {
+      result.identity = Identity.fromJSON(result.identity)
+      return result
     })
 }
 
@@ -523,6 +632,7 @@ Driver.prototype.getPrivateKey = function (fingerprint) {
 }
 
 Driver.prototype.lookupIdentity = function (query) {
+  var self = this
   var me = this.identityJSON
   var valid = !!query.fingerprint ^ !!query[ROOT_HASH]
   if (!valid) {
@@ -544,6 +654,10 @@ Driver.prototype.lookupIdentity = function (query) {
   return this._addressBook.query(query)
     .then(function (results) {
       return results[0]
+    })
+    .catch(function (err) {
+      self._debug('unable to find identity', query, err)
+      throw err
     })
 
   // var stream = this._identityDB.query(query)
@@ -580,29 +694,34 @@ Driver.prototype.lookupIdentity = function (query) {
 }
 
 Driver.prototype._logIt = function (obj) {
-  if (obj.tx) {
-    typeforce({
-      txId: 'String'
-    }, obj)
-  } else {
-    typeforce({
-      from: 'String',
-      to: 'Array'
-    }, obj)
-  }
-
-  var parsed = obj.parsed
-  var type = obj.type || (parsed && parsed.data._type)
-  if (type !== 'text') {
-    assert(obj[ROOT_HASH], 'expected root hash')
-    assert(obj[CUR_HASH], 'expected current hash')
-  }
-
-  var copy = omit(obj, 'parsed')
-  if (type) copy.type = type
-
-  return Q.ninvoke(this._log, 'append', copy)
+  return Q.ninvoke(this._log, 'append', obj)
 }
+
+// Driver.prototype._logIt = function (obj) {
+//   if (obj.tx) {
+//     typeforce({
+//       id: 'String',
+//       body: 'Object'
+//     }, obj.tx)
+//   } else {
+//     typeforce({
+//       from: 'String',
+//       to: 'Array'
+//     }, obj)
+//   }
+
+//   var parsed = obj.parsed
+//   var type = obj.type || (parsed && parsed.data[TYPE])
+//   if (type !== 'text') {
+//     assert(obj[ROOT_HASH], 'expected root hash')
+//     assert(obj[CUR_HASH], 'expected current hash')
+//   }
+
+//   var copy = omit(obj, 'parsed')
+//   if (type) copy.type = type
+
+//   return Q.ninvoke(this._log, 'append', copy)
+// }
 
 Driver.prototype._chainWriterWorker = function (task, cb) {
   var self = this
@@ -617,10 +736,12 @@ Driver.prototype._chainWriterWorker = function (task, cb) {
     .address(task.address)
     .execute()
     .then(function (tx) {
-      update = {
-        tx: tx,
-        txId: tx.getId()
-      }
+      update = extend({
+        tx: {
+          body: tx.toBuffer(),
+          id: tx.getId()
+        }
+      }, newLogWrapper(['struct', 'chained'], task))
 
       copyDHTKeys(update, task)
       return self._logIt(update)
@@ -631,44 +752,6 @@ Driver.prototype._chainWriterWorker = function (task, cb) {
     })
     .catch(cb)
     .done()
-
-  // if (task.data) {
-  //   // create
-  //   typeforce({
-  //     data: 'Object',
-  //     public: '?Boolean',
-  //     recipients: '?Array'
-  //   }, task)
-
-  //   promise = this.chainwriter.create()
-  //     .data(task.data)
-  //     .recipients(task.recipients || [])
-  //     .setPublic(!!task.public)
-  //     .execute()
-  // } else {
-  //   // share
-  //   typeforce({
-  //     key: 'Buffer',
-  //     encryptionKey: 'Buffer',
-  //     shareWith: 'Buffer',
-  //     public: '?Boolean'
-  //   }, task)
-
-  //   promise = this.chainwriter.share()
-  //     .shareAccessTo(task.key, task.encryptionKey)
-  //     .shareAccessWith(task.shareWith)
-  //     .setPublic(!!task.public)
-  //     .execute()
-  // }
-
-  // promise.then(function (resp) {
-  //   // do we need to append to log,
-  //   // or can we just wait till it's incoming on a chainstream?
-  //   self.emit('chained', task, resp)
-  //   cb()
-  // })
-  // .catch(cb)
-  // .done()
 }
 
 Driver.prototype.createReadStream = function (options) {
@@ -688,20 +771,20 @@ Driver.prototype._onmessage = function (msg, fingerprint) {
     return this.emit('warn', 'received message not in JSON format', msg)
   }
 
-  debugger
-  this.emit('message', msg, fingerprint)
-
+  msg.to = this._myRootHash
+  var type = 'permission' in msg ? 'plain' : 'struct'
+  extend(msg, newLogWrapper([type, 'inbound']))
   this._lookupByFingerprint(fingerprint)
     .then(function (from) {
-      debugger
-      var identity = results[0]
-      var normalized = results[1]
-      // normalized.key = results[2]
-      normalized.from = identity[ROOT_HASH]
-      normalized.to = self._myRootHash
-      delete normalized.parsed
-      self._logIt(normalized)
+      msg.from = from[ROOT_HASH]
     })
+    .catch(function (err) {
+      self._debug('failed to find identity by fingerprint', fingerprint, err)
+    })
+    .done(function () {
+      self._logIt(msg)
+    })
+
     // ,
     // normalizeMsg.bind(null, msg)
     // ,
@@ -825,16 +908,14 @@ Driver.prototype._onmessage = function (msg, fingerprint) {
 
 Driver.prototype.putOnChain = function (obj) {
   var self = this
+  assert(ROOT_HASH in obj && CUR_HASH in obj)
 
-  typeforce({
-    data: 'Buffer'
-  }, obj)
-
-  var type = obj.mode === 'public' ? TxData.types.public : TxData.types.permission
-  var options = {
-    data: obj.data,
+  var isPublic = hasTag(obj, 'public')
+  var type = isPublic ? TxData.types.public : TxData.types.permission
+  var options = extend({
+    data: obj[CUR_HASH],
     type: type
-  }
+  }, newLogWrapper([], obj))
 
   var recipients = obj.to
   if (!recipients && obj.to) {
@@ -847,9 +928,10 @@ Driver.prototype.putOnChain = function (obj) {
     recipients = [pubKey]
   }
 
+  // TODO: do we really need a separate queue/log for this?
   copyDHTKeys(options, obj, obj[CUR_HASH])
   recipients.forEach(function (r) {
-    var chainOpts = extend({}, options)
+    var chainOpts = extend(true, {}, options) // copy
     self._getAddress(r)
       .then(function (addr) {
         chainOpts.address = addr
@@ -870,50 +952,70 @@ Driver.prototype.sendPlaintext = function (options) {
 
   assert(to && msg, 'missing required arguments')
 
-  this._logIt({
-    type: 'text',
-    mode: 'private',
+  this._logIt(extend({
     data: msg,
     from: this._myRootHash,
     to: to
-  })
+  }, newLogWrapper(['new', 'plain', 'out'])))
 }
 
-Driver.prototype.publish = function (obj) {
-  var self = this
-  var wrapper = {
-    type: obj._type,
-    mode: 'public',
-    from: this._myRootHash
+Driver.prototype.publish = function (options) {
+  return this.sendStructured(extend({
+    public: true,
+    chain: true
+  }, options))
+}
+
+Driver.prototype.sendStructured = function (options) {
+  typeforce({
+    msg: 'Object',
+    attachments: '?Array',
+    to: '?Array',
+    public: '?Boolean',
+    sign: '?Boolean',
+    chain: '?Boolean'
+  }, options)
+
+  var obj = options.msg
+  assert(TYPE in obj, 'structured messages must specify type property: ' + TYPE)
+
+  // either "public" or it has recipients
+  var isPublic = !!options.public
+  assert(isPublic ^ !!options.to, 'private msgs must have recipients, public msgs cannot')
+
+  var wrapper = extend(
+    {
+      type: obj[TYPE],
+      data: obj,
+      from: this._myRootHash
+    },
+    pick(options, ['to', 'attachments', 'sign', 'chain']),
+    newLogWrapper([
+      'new',
+      'struct',
+      'outbound',
+      isPublic ? 'public' : 'private'
+    ])
+  )
+
+  var to
+  if (isPublic) {
+    if (wrapper.type === Identity.TYPE) {
+      to = [{
+        fingerprint: constants.IDENTITY_PUBLISH_ADDRESS
+      }]
+    } else {
+      var me = {}
+      me[ROOT_HASH] = this._myRootHash
+      wrapper.to = [me]
+    }
+  } else {
+    to = options.to
   }
 
-  if (wrapper.type === Identity.TYPE) {
-    wrapper.to = [{
-      fingerprint: constants.IDENTITY_PUBLISH_ADDRESS
-    }]
-  }
-  else {
-    wrapper.to = [{}]
-    wrapper.to[0][ROOT_HASH] = this._myRootHash
-  }
-
-  var builder = new Builder()
-    .data(obj)
-    .signWith(this.signingKey)
-
-  Q.ninvoke(builder, 'build')
-    .then(function (result) {
-      wrapper.data = result.form
-      return self.chainwriter.create()
-        .data(wrapper.data)
-        .setPublic(true)
-        .execute()
-    })
-    .then(function (resp) {
-      copyDHTKeys(wrapper, resp.key)
-      return self._logIt(wrapper)
-    })
-    .done()
+  validateRecipients(to)
+  wrapper.to = to
+  this._logIt(wrapper)
 }
 
 Driver.prototype._lookupBTCKey = function (recipient) {
@@ -926,59 +1028,73 @@ Driver.prototype._lookupBTCKey = function (recipient) {
     })
 }
 
-Driver.prototype.sendStructured = function (options) {
-  debugger
-  var self = this
+Driver.prototype._getAddress = function (recipient) {
+  if (recipient.fingerprint) return Q(recipient.fingerprint)
 
-  typeforce({
-    msg: 'Object',
-    to: 'Array'
-  }, options)
+  if (recipient.pubKey) {
+    var addr = bitcoin.ECPubKey.fromHex(recipient.pubKey)
+      .getAddress(bitcoin.networks[this.networkName])
 
-  var builder = new Builder()
-    .data(options.msg)
-    .signWith(this.identityKeys)
+    return Q(addr)
+  }
 
-  var tasks = options.to.map(function (r) {
-    return Q.ninvoke(this, '_lookupBTCKey')
-  })
+  if (recipient[ROOT_HASH]) {
+    return this._lookupBTCKey(recipient)
+  }
 
-  tasks.unshift(Q.ninvoke(builder, 'build'))
-  Q.all(tasks)
-    .then(function (results) {
-      debugger
-      var build = results[0]
-      var pubKeys = results.slice(1)
-      wrapper.data = build.form
-      return self.chainwriter.create()
-        .data(wrapper.data)
-        .recipients(pubKeys)
-        .execute()
-    })
-    .then(function (result) {
-      debugger
-      var wrapper = {
-        type: msg._type,
-        mode: 'private',
-        to: options.to,
-        toPubKeys: result.shares
-      }
-
-      copyDHTKeys(wrapper, msg, result.key)
-      self._logIt(wrapper)
-    })
-
-
-  // normalizeMsg(options.msg, function (err, normalized) {
-  //   if (err) throw err
-
-  //   normalized.from = self._myRootHash
-  //   normalized.to = options.to
-  //   normalized.mode = 'private'
-  //   delete normalized.parsed
-  //   self._logIt(normalized)
-  // })
+  return Q.reject(new Error('unable to deduce address'))
 }
+
+// Driver.prototype.sendStructured = function (options) {
+//   debugger
+//   var self = this
+
+//   typeforce({
+//     msg: 'Object',
+//     to: 'Array',
+//     sign: '?Boolean'
+//   }, options)
+
+//   var tasks = options.to.map(function (r) {
+//     return Q.ninvoke(this, '_lookupBTCKey')
+//   })
+
+//   tasks.unshift(Q.ninvoke(builder, 'build'))
+//   Q.all(tasks)
+//     .then(function (results) {
+//       debugger
+//       var build = results[0]
+//       var pubKeys = results.slice(1)
+//       wrapper.data = build.form
+//       return self.chainwriter.create()
+//         .data(wrapper.data)
+//         .recipients(pubKeys)
+//         .execute()
+//     })
+//     .then(function (result) {
+//       debugger
+//       var wrapper = {
+//         type: msg[TYPE],
+//         mode: 'private',
+//         to: options.to,
+//         toPubKeys: result.shares
+//       }
+
+//       copyDHTKeys(wrapper, msg, result.key)
+//       self._logIt(wrapper)
+//     })
+
+
+//   // normalizeMsg(options.msg, function (err, normalized) {
+//   //   if (err) throw err
+
+//   //   normalized.from = self._myRootHash
+//   //   normalized.to = options.to
+//   //   normalized.mode = 'private'
+//   //   delete normalized.parsed
+//   //   self._logIt(normalized)
+//   // })
+// }
 
 Driver.prototype.destroy = function (cb) {
   var self = this
@@ -1009,23 +1125,6 @@ Driver.prototype._debug = function () {
   var args = [].slice.call(arguments)
   args.unshift(this.identity.name())
   return debug.apply(null, args)
-}
-
-Driver.prototype._getAddress = function (recipient) {
-  if (recipient.fingerprint) return Q(recipient.fingerprint)
-
-  if (recipient.pubKey) {
-    var addr = bitcoin.ECPubKey.fromHex(recipient.pubKey)
-      .getAddress(bitcoin.networks[this.networkName])
-
-    return Q(addr)
-  }
-
-  if (recipient[ROOT_HASH]) {
-    return this._lookupBTCKey(recipient)
-  }
-
-  return Q.reject(new Error('unable to deduce address'))
 }
 
 function call (method) {
@@ -1104,15 +1203,9 @@ function getFingerprint (identity) {
 }
 
 function keyForFingerprint (identityJSON, fingerprint) {
-  var key
-  identityJSON.pubkeys.some(function (k) {
-    if (k.fingerprint === fingerprint) {
-      key = k
-      return true
-    }
+  return find(identityJSON.pubkeys, function (k) {
+    return k.fingerprint === fingerprint
   })
-
-  return key && toKey(key)
 }
 
 // function isIdentityTx (txInfo) {
@@ -1129,4 +1222,52 @@ function copyDHTKeys (dest, src, curHash) {
 
   dest[ROOT_HASH] = src[ROOT_HASH] || curHash
   dest[CUR_HASH] = curHash
+}
+
+function validateRecipients (recipients) {
+  if (!Array.isArray(recipients)) recipients = [recipients]
+
+  recipients.every(function (r) {
+    assert(r.fingerprint || r.pubKey || r[ROOT_HASH],
+    '"recipient" must specify "fingerprint", "pubKey" or identity.' + ROOT_HASH +
+    ' (root hash of recipient identity)')
+  })
+}
+
+function logFilter (/* tags */) {
+  var tags = [].concat.apply([], arguments)
+
+  return mapStream(function (data, cb) {
+    var matches = tags.every(hasTag.bind(null, data))
+    if (matches) return cb(null, data)
+    else cb()
+  })
+}
+
+function hasTag (obj, tag) {
+  return obj._l.tags.indexOf(tag) !== -1
+}
+
+function notNull (o) {
+  return !!o
+}
+
+function toValueStream () {
+  return mapStream(function (data, cb) {
+    cb(null, data.value)
+  })
+}
+
+function newLogWrapper (tags, prev) {
+  var wrapper = {
+    _l: {
+      tags: tags
+    }
+  }
+
+  if (prev) {
+    wrapper._l.prev = prev._l && prev._l.id
+  }
+
+  return wrapper
 }

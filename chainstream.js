@@ -1,10 +1,16 @@
 
 var through2 = require('through2')
-var PassThrough = require('readable-stream').PassThrough
+var debug = require('debug')('chainstream')
+var extend = require('extend')
 var combine = require('stream-combiner2')
 var typeforce = require('typeforce')
 var Parser = require('chained-obj').Parser
+var Identity = require('midentity').Identity
 var Verifier = require('tradle-verifier')
+var CONSTANTS = require('tradle-constants')
+var ROOT_HASH = CONSTANTS.ROOT_HASH
+var CUR_HASH = CONSTANTS.CUR_HASH
+var TYPE = CONSTANTS.TYPE
 var plugins = Verifier.plugins
 var DEFAULT_PLUGINS = [
   plugins.sigcheck,
@@ -20,9 +26,10 @@ var DEFAULT_PLUGINS = [
 module.exports = function chainstream(options) {
   typeforce({
     lookup: 'Function',
-    chainloader: 'Object'
+    chainloader: 'Object',
   }, options)
 
+  var chainloader = options.chainloader
   var verifier = new Verifier({
     lookup: options.lookup
   })
@@ -39,13 +46,30 @@ module.exports = function chainstream(options) {
   verifier.use(plugins)
 
   var trans = combine(
+    // through2.obj(function (txInfo, enc, done) {
+    //   // var tx = txInfo.tx
+    //   // tx.height = txInfo.height
+    //   this.push(txInfo.tx)
+    //   done()
+    // }),
     through2.obj(function (txInfo, enc, done) {
-      // var tx = txInfo.tx
-      // tx.height = txInfo.height
-      this.push(txInfo.tx)
-      done()
+      var self = this
+      chainloader.load(txInfo.tx)
+        .then(function (chainedObjs) {
+          var obj = chainedObjs && chainedObjs[0]
+          if (obj) {
+            obj = extend({}, obj, txInfo)
+            self.push(obj)
+          }
+        })
+        .catch(function (err) {
+          debug('nothing to load in tx?', err)
+        })
+        .finally(function () {
+          done()
+        })
     }),
-    options.chainloader,
+    // options.chainloader,
     mkParser(),
     basicIdCheck(),
     verifier
@@ -56,7 +80,7 @@ module.exports = function chainstream(options) {
 
 function mkParser () {
   return through2.obj(function (chainedObj, enc, done) {
-    var ps = this
+    var self = this
     Parser.parse(chainedObj.data, function (err, parsed) {
       if (err) {
         debug('invalid chained-obj', chainedObj.key)
@@ -64,7 +88,7 @@ function mkParser () {
       }
 
       chainedObj.parsed = parsed
-      ps.push(chainedObj)
+      self.push(chainedObj)
       done()
     })
 
@@ -75,13 +99,16 @@ function basicIdCheck () {
   return through2.obj(function (chainedObj, enc, done) {
     var parsed = chainedObj.parsed
     var json = parsed.data
-    var isIdentity = json._type === Identity.TYPE
+    var isIdentity = json[TYPE] === Identity.TYPE
     var from = chainedObj.from
     // only identities are allowed to be created without an identity
     if (!from && !isIdentity) return done()
 
-    chainedObj.from = from && from.identity
-    chainedObj.to = chainedObj.to && chainedObj.to.identity
+    if (from) chainedObj.from = from.identity
+    else if (isIdentity) chainedObj.from = Identity.fromJSON(json)
+
+    if (chainedObj.to) chainedObj.to = chainedObj.to.identity
+
     this.push(chainedObj)
     done()
   })

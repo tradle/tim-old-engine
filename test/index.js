@@ -1,6 +1,7 @@
 
 var test = require('tape')
 var fs = require('fs')
+var find = require('array-find')
 var path = require('path')
 var crypto = require('crypto')
 var bufferEqual = require('buffer-equal')
@@ -9,14 +10,23 @@ var extend = require('extend')
 var memdown = require('memdown')
 var stringify = require('tradle-utils').stringify
 var DHT = require('bittorrent-dht')
-var Builder = require('chained-obj').Builder
+var ChainedObj = require('chained-obj')
+var Builder = ChainedObj.Builder
+var Parser = ChainedObj.Parser
+// var CreateReq = require('bitjoe-js/lib/requests/create')
+// CreateReq.prototype._generateSymmetricKey = function () {
+//   return new Buffer('1111111111111111111111111111111111111111111111111111111111111111')
+// }
+
 var billPub = require('./fixtures/bill-pub.json')
 var tedPub = require('./fixtures/ted-pub.json')
 var billPriv = require('./fixtures/bill-priv')
 var tedPriv = require('./fixtures/ted-priv')
-var constants = require('../constants')
-var tedHash = tedPub[constants.rootHash] = '7f767eae2f7341247e8626182d3368835db38d40'
-var billHash = billPub[constants.rootHash] ='c7ea4e09163c6ace981c33ed78ee0f53c1425dac'
+var constants = require('tradle-constants')
+// var tedHash = tedPub[constants.ROOT_HASH] = 'c67905793f6cc0f0ab8d20aecfec441932ffb13d'
+// var billHash = billPub[constants.ROOT_HASH] ='fb07729c0cef307ab7c28cb76088cc60dbc98cdd'
+var tedHash = 'c67905793f6cc0f0ab8d20aecfec441932ffb13d'
+var billHash = 'fb07729c0cef307ab7c28cb76088cc60dbc98cdd'
 var mi = require('midentity')
 var Identity = mi.Identity
 var toKey = mi.toKey
@@ -37,9 +47,9 @@ var keeper = FakeKeeper.empty()
 var billPort = 51086
 var tedPort = 51087
 
-var billWallet = walletFor(bill)
+var billWallet = walletFor(billPriv)
 var blockchain = billWallet.blockchain
-var tedWallet = walletFor(ted)
+var tedWallet = walletFor(tedPriv)
 
 var billDHT = dhtFor(bill)
 billDHT.listen(billPort)
@@ -55,7 +65,7 @@ var commonOpts = {
   keeper: keeper,
   blockchain: blockchain,
   leveldown: memdown,
-  syncInterval: 5000
+  syncInterval: 1000
 }
 
 var driverBill = new Driver(extend({
@@ -89,16 +99,16 @@ var driverTed = new Driver(extend({
 // })
 
 test('setup', function (t) {
-  t.plan(4)
+  t.plan(2)
 
   driverBill.once('ready', t.pass)
   driverTed.once('ready', t.pass)
-  driverBill._addressBook.update(tedPub)
-    .then(t.pass)
-    .done()
-  driverTed._addressBook.update(billPub)
-    .then(t.pass)
-    .done()
+  // driverBill._addressBook.update(tedPub)
+  //   .then(t.pass)
+  //   .done()
+  // driverTed._addressBook.update(billPub)
+  //   .then(t.pass)
+  //   .done()
 })
 
 // test('regular message', function (t) {
@@ -137,25 +147,36 @@ test('chained message', function (t) {
     hey: 'ho'
   }
 
+  msg[constants.TYPE] = 'blahblah'
   var signed
   var num = 0
 
-  driverTed.on('resolved', function (chainedObj) {
-    debugger
-    t.deepEqual(chainedObj.file, signed)
-  })
 
-  driverTed.on('saved', function (chainedObj) {
-    debugger
-    t.equal(chainedObj.parsed.data.value.name.firstName, 'Bill')
-    sendChainedMsg(msg, function (err, sent) {
-      if (err) throw err
+  driverTed.on('saved', function (obj) {
+    Parser.parse(obj.data, function (err, parsed) {
+      t.equal(parsed.data.name.firstName, 'Bill')
 
-      signed = sent
+      driverTed.on('resolved', function (obj) {
+        t.equal(obj, 'blah')
+      })
+
+      var billInfo = {}
+      billInfo[constants.ROOT_HASH] = billHash
+      driverBill.sendStructured({
+        msg: msg,
+        to: [billInfo],
+        sign: true,
+        chain: true
+      })
+      .done()
     })
+
   })
 
-  driverBill.publish(billPub)
+  driverBill.publish({
+    msg: billPub,
+    sign: true
+  })
 
   // publishIdentity(billPub, driverBill.chainwriterq, rethrow)
 })
@@ -187,30 +208,6 @@ test('teardown', function (t) {
 //     })
 // }
 
-function sendChainedMsg (msg, cb) {
-  var builder = new Builder()
-    .data(msg)
-    .signWith(bill.keys({ type: 'dsa' })[0])
-    .build(function (err, buf) {
-      if (err) throw err
-
-      driverBill.send({
-        msg: buf,
-        to: ted,
-        chain: {
-          public: true,
-          recipients: ted.keys({
-            type: 'bitcoin',
-            networkName: 'testnet',
-            purpose: 'payment'
-          }).map(function (k) { return k.pubKeyString() })
-        }
-      })
-
-      if (cb) cb(null, buf)
-    })
-}
-
 function dhtFor (identity) {
   return new DHT({
     nodeId: nodeIdFor(identity),
@@ -227,14 +224,13 @@ function nodeIdFor (identity) {
     .slice(0, 20)
 }
 
-function walletFor (identity) {
+function walletFor (keys) {
   return fakeWallet({
     blockchain: blockchain,
     unspents: [100000, 100000, 100000, 100000],
-    priv: identity.keys({
-      type: 'bitcoin',
-      networkName: networkName
-    })[0].priv()
+    priv: find(keys, function (k) {
+      return k.type === 'bitcoin' && k.networkName === networkName
+    }).priv
   })
 }
 

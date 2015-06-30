@@ -1,5 +1,5 @@
 {
-  "_type": "tradle.Identity",
+  "_t": "tradle.Identity",
   "contact": [
     {
       "identifier": "somebody",

@@ -9,9 +9,10 @@ var jsonqueryEngine = require('jsonquery-engine')
 var externr = require('externr')
 var concat = require('concat-stream')
 var pick = require('object.pick')
-var constants = require('./constants')
-var ROOT_HASH = constants.rootHash
-var CUR_HASH = constants.currentHash
+var constants = require('tradle-constants')
+var ROOT_HASH = constants.ROOT_HASH
+var CUR_HASH = constants.CUR_HASH
+var TYPE = constants.TYPE
 
 module.exports = TypeStore
 
@@ -57,7 +58,7 @@ TypeStore.prototype.update = function (obj) {
 }
 
 TypeStore.prototype._update = function (obj, cb) {
-  assert(obj._type === this._type)
+  assert.equal(obj[TYPE], this._type)
   this._externs._update(this, [ obj, cb ], this._defaultUpdate)
 }
 
