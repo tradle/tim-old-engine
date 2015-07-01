@@ -62,10 +62,10 @@ var normalizeStream = mapStream.bind(null, function (data, cb) {
   cb(null, normalizeJSON(data))
 })
 
-var MessageType = Driver.MessageType = {
-  plaintext: 1 << 1,
-  chained: 1 << 2
-}
+// var MessageType = Driver.MessageType = {
+//   plaintext: 1 << 1,
+//   chained: 1 << 2
+// }
 
 module.exports = Driver
 util.inherits(Driver, EventEmitter)
@@ -175,32 +175,32 @@ Driver.prototype._onLogWriteError = function (err) {
   throw err
 }
 
-Driver.prototype._processIncoming = function (obj) {
-  debugger
-  var self = this
+// Driver.prototype._processIncoming = function (obj) {
+//   debugger
+//   var self = this
 
-  assert(ROOT_HASH in obj, 'expected ' + ROOT_HASH)
-  var query = pick(obj, ROOT_HASH)
-  var stream = this._logDB.createValueStream({
-      reverse: true
-    })
-    .on('error', rethrow) // TODO: handle
-    .on('data', function (saved) {
-      if (!saved.data) return
+//   assert(ROOT_HASH in obj, 'expected ' + ROOT_HASH)
+//   var query = pick(obj, ROOT_HASH)
+//   var stream = this._logDB.createValueStream({
+//       reverse: true
+//     })
+//     .on('error', rethrow) // TODO: handle
+//     .on('data', function (saved) {
+//       if (!saved.data) return
 
-      saved = normalizeJSON(saved)
-      stream.destroy()
-      if (!bufferEqual(saved.data, obj.data)) return
+//       saved = normalizeJSON(saved)
+//       stream.destroy()
+//       if (!bufferEqual(saved.data, obj.data)) return
 
-      self.emit('saved', obj)
-      self.emit('resolved', obj)
-      saved.status = 'resolved'
+//       self.emit('saved', obj)
+//       self.emit('resolved', obj)
+//       saved.status = 'resolved'
 
-      var update = pick(obj, ['tx', ROOT_HASH, CUR_HASH])
-      update.status = 'resolved'
-      self._log.append(update)
-    })
-}
+//       var update = pick(obj, ['tx', ROOT_HASH, CUR_HASH])
+//       update.status = 'resolved'
+//       self._log.append(update)
+//     })
+// }
 
 Driver.prototype._prepIdentity = function () {
   var self = this
@@ -294,7 +294,19 @@ Driver.prototype._setupLog = function () {
 
   this._logRS.setMaxListeners(0)
 
+  // this._log
+  //   .createReadStream({ live: true })
+  //   .pipe(mapStream(function (data, cb) {
+  //     cb(null, utils.stringify(data))
+  //   }))
+  //   .pipe(process.stdout)
+
   // this._logStream = duplexify(ws, rs)
+
+//   this._logRS.pipe(mapStream(function (data, cb) {
+//     debugger
+//     cb()
+//   }))
 
   this._txStream = this._logRS.pipe(logFilter('tx'))
     .pipe(mapStream(function (data, cb) {
@@ -302,8 +314,8 @@ Driver.prototype._setupLog = function () {
       cb(null, data)
     }))
 
-  var newInbound = this._logRS.pipe(logFilter('new', 'inbound'))
-  newInbound.on('data', this._onInboundMessage)
+  var inbound = this._logRS.pipe(logFilter('inbound'))
+  inbound.on('data', this._onInboundMessage)
   // this._newInboundPlain = this._logRS.pipe(logFilter('plain', 'inbound'))
   // this._newPublicStruct = this._logRS.pipe(logFilter('struct', 'public'))
   // this._
@@ -363,20 +375,23 @@ Driver.prototype._setupLog = function () {
       entry.tx = chainedObj.tx.toBuffer()
       entry[CUR_HASH] = chainedObj.key
       entry[ROOT_HASH] = chainedObj.parsed.data[ROOT_HASH] || entry[CUR_HASH]
+      entry[TYPE] = chainedObj.parsed.data[TYPE]
 
       if (to) entry.to = to[ROOT_HASH]
 
+      self._debug('picked up object from chain', entry)
       cb(null, entry)
     }))
     .pipe(this._logWS)
 }
 
 Driver.prototype._onInboundMessage = function (data) {
-  debugger
+  this.emit('message', data)
 }
 
 Driver.prototype._onInboundStruct = function (data) {
   debugger
+  this.emit('message', data)
 }
 
 // Driver.prototype._onPub = function (data) {
@@ -384,14 +399,22 @@ Driver.prototype._onInboundStruct = function (data) {
 // }
 
 Driver.prototype._onStructChained = function (data) {
-  debugger
-  // if (data._)
-  if (data._l.prev) {
-    this.emit('resolved', data)
-  }
+  var self = this
+  if (!data.data) return
+
+  this.emit('chained', data)
+  Parser.parse(data.data, function (err, parsed) {
+    if (err) return self.emit('error', 'stored invalid struct', err)
+
+    if (parsed.data[TYPE] === Identity.TYPE) {
+      // what about attachments?
+      copyDHTKeys(parsed.data, data)
+      self._addressBook.update(parsed.data)
+    }
+  })
 }
 
-Driver.prototype._onNewOutboundStructMessage = function (obj) {  debugger
+Driver.prototype._onNewOutboundStructMessage = function (obj) {
   var self = this
   var isPublic = hasTag(obj, 'public')
   var builder = new Builder()
@@ -405,7 +428,7 @@ Driver.prototype._onNewOutboundStructMessage = function (obj) {  debugger
     builder.signWith(this.signingKey)
   }
 
-  var lookup = isPublic ? this._getAddress : this._lookupBTCKey
+  var lookup = isPublic ? this._lookupBTCAddress : this._lookupBTCPubKey
   var tasks = [
     Q.ninvoke(builder, 'build')
   ].concat(obj.to.map(lookup))
@@ -414,7 +437,7 @@ Driver.prototype._onNewOutboundStructMessage = function (obj) {  debugger
     'struct',
     'stored',
     'outbound',
-    isPublic ? 'public' : 'private'
+    getPrivacyTag(obj)
   ], obj) // obj is prev
   wrapper.chain = obj.chain // whether to put it on chain
   wrapper.to = obj.to
@@ -436,22 +459,28 @@ Driver.prototype._onNewOutboundStructMessage = function (obj) {  debugger
     })
 }
 
-Driver.prototype._onStoredOutboundStructMessage = function (obj) {
-  if (obj.chain) this.putOnChain(obj)
-}
-
-Driver.prototype._onNewOutboundPlainMessage = function (data) {
+Driver.prototype._sendP2P = function (obj) {
+  // TODO:
+  //   do we log that we sent it?
+  //   do we log when we delivered it? How do we know it was delivered?
   var self = this
-  var msg = toBuffer(pick(obj, ['data']))
-  return Q.allSettled(data.to.map(this.lookupIdentity))
+  var msg = toBuffer({
+    data: obj.data,
+    type: getMsgTypeTag(obj)
+  })
+
+  return Q.allSettled(obj.to.map(this.lookupIdentity))
     .then(function (results) {
       var found = results.filter(function (r) {
-        return r.state === 'fulfilled'
-      })
+          return r.state === 'fulfilled'
+        })
+        .map(function (r) {
+          return r.value
+        })
 
       if (found.length !== results.length) {
         var missing = results.map(function (r, i) {
-          return r.state === 'fulfilled' ? null : data.to[i]
+          return r.state === 'fulfilled' ? null : obj.to[i]
         })
         .filter(notNull)
         .join(', ')
@@ -459,14 +488,23 @@ Driver.prototype._onNewOutboundPlainMessage = function (data) {
         self.emit('warn', 'no identities found for: ' + missing)
       }
 
-      identities.forEach(function (i) {
-        self.p2p.send(msg, getFingerprint(i))
+      found.forEach(function (i) {
+        var fingerprint = getFingerprint(i)
+        self._debug('messaging', fingerprint)
+        self.p2p.send(msg, fingerprint)
       })
     })
+}
 
-    // TODO:
-    //   do we log that we sent it?
-    //   do we log when we delivered it? How do we know it was delivered?
+Driver.prototype._onStoredOutboundStructMessage = function (obj) {
+  if (obj.chain) this.putOnChain(obj)
+  if (hasTag(obj, 'public')) return
+
+  this._sendP2P(obj)
+}
+
+Driver.prototype._onNewOutboundPlainMessage = function (data) {
+  this._sendP2P(data)
 }
 
 // Driver.prototype._onInboundPlaintext = function (data) {
@@ -632,6 +670,8 @@ Driver.prototype.getPrivateKey = function (fingerprint) {
 }
 
 Driver.prototype.lookupIdentity = function (query) {
+  if (query.fingerprint === '80dd7c0eae1faa1531710ba9fa1b759ae670846b') debugger
+
   var self = this
   var me = this.identityJSON
   var valid = !!query.fingerprint ^ !!query[ROOT_HASH]
@@ -651,7 +691,7 @@ Driver.prototype.lookupIdentity = function (query) {
     }
   }
 
-  return this._addressBook.query(query)
+  return Q.ninvoke(this._addressBook, 'query', query)
     .then(function (results) {
       return results[0]
     })
@@ -729,26 +769,26 @@ Driver.prototype._chainWriterWorker = function (task, cb) {
   task = normalizeJSON(task)
   // var promise
 
-  var update
+  var update = {
+    _l: extend(true, {}, task._l),
+    tags: ['struct', 'chained']
+  }
+
   return this.chainwriter.chain()
     .type(task.type)
     .data(task.data)
     .address(task.address)
     .execute()
     .then(function (tx) {
-      update = extend({
-        tx: {
-          body: tx.toBuffer(),
-          id: tx.getId()
-        }
-      }, newLogWrapper(['struct', 'chained'], task))
+      // ugly!
+      update.tx = tx.toBuffer()
 
       copyDHTKeys(update, task)
       return self._logIt(update)
     })
     .then(function () {
       cb()
-      self.emit('chained', task, update)
+//       self.emit('chained', task, update)
     })
     .catch(cb)
     .done()
@@ -771,19 +811,31 @@ Driver.prototype._onmessage = function (msg, fingerprint) {
     return this.emit('warn', 'received message not in JSON format', msg)
   }
 
-  msg.to = this._myRootHash
-  var type = 'permission' in msg ? 'plain' : 'struct'
-  extend(msg, newLogWrapper([type, 'inbound']))
-  this._lookupByFingerprint(fingerprint)
+  this._debug('received msg', msg)
+  var tags = ['inbound']
+  var msgTypeTag
+  if (msg.type !== 'plain' && msg.type !== 'struct') {
+    this.emit('warn', 'unexpected message type: ' + msg.type)
+  } else {
+    tags.push(msg.type)
+  }
+
+  msg = extend({
+    data: msg.data,
+    to: this._myRootHash
+  }, newLogWrapper(tags))
+
+  this.lookupIdentity({ fingerprint: fingerprint })
     .then(function (from) {
       msg.from = from[ROOT_HASH]
     })
     .catch(function (err) {
       self._debug('failed to find identity by fingerprint', fingerprint, err)
     })
-    .done(function () {
-      self._logIt(msg)
+    .finally(function () {
+      return self._logIt(msg)
     })
+    .done()
 
     // ,
     // normalizeMsg.bind(null, msg)
@@ -932,7 +984,7 @@ Driver.prototype.putOnChain = function (obj) {
   copyDHTKeys(options, obj, obj[CUR_HASH])
   recipients.forEach(function (r) {
     var chainOpts = extend(true, {}, options) // copy
-    self._getAddress(r)
+    self._lookupBTCAddress(r)
       .then(function (addr) {
         chainOpts.address = addr
         self.chainwriterq.push(chainOpts)
@@ -952,11 +1004,12 @@ Driver.prototype.sendPlaintext = function (options) {
 
   assert(to && msg, 'missing required arguments')
 
+  validateRecipients(to)
   this._logIt(extend({
     data: msg,
     from: this._myRootHash,
     to: to
-  }, newLogWrapper(['new', 'plain', 'out'])))
+  }, newLogWrapper(['new', 'plain', 'outbound'])))
 }
 
 Driver.prototype.publish = function (options) {
@@ -1024,25 +1077,24 @@ Driver.prototype._lookupBTCKey = function (recipient) {
     .then(function (identity) {
       return find(identity.pubkeys, function (k) {
         return k.type === 'bitcoin' && k.networkName === self.networkName
-      }).value
+      })
     })
 }
 
-Driver.prototype._getAddress = function (recipient) {
-  if (recipient.fingerprint) return Q(recipient.fingerprint)
+Driver.prototype._lookupBTCPubKey = function (recipient) {
+  return this._lookupBTCKey(recipient).then(function(k) {
+    return k.value
+  })
+}
 
-  if (recipient.pubKey) {
-    var addr = bitcoin.ECPubKey.fromHex(recipient.pubKey)
-      .getAddress(bitcoin.networks[this.networkName])
-
-    return Q(addr)
+Driver.prototype._lookupBTCAddress = function (recipient) {
+  if (recipient.fingerprint === constants.IDENTITY_PUBLISH_ADDRESS) {
+    return Q.resolve(recipient.fingerprint)
   }
 
-  if (recipient[ROOT_HASH]) {
-    return this._lookupBTCKey(recipient)
-  }
-
-  return Q.reject(new Error('unable to deduce address'))
+  return this._lookupBTCKey(recipient).then(function(k) {
+    return k.fingerprint
+  })
 }
 
 // Driver.prototype.sendStructured = function (options) {
@@ -1096,29 +1148,19 @@ Driver.prototype._getAddress = function (recipient) {
 //   // })
 // }
 
-Driver.prototype.destroy = function (cb) {
-  var self = this
+Driver.prototype.destroy = function () {
 
   // sync
   this.chainwriter.destroy()
 
   // async
-  // this.keeper.destroy().done(console.log.bind(console, 'keeper dead'))
-  // this.p2p.destroy(console.log.bind(console, 'p2p dead')),
-  // this.chaindb.destroy(console.log.bind(console, 'chaindb dead')),
-  // this.queueDB.close(console.log.bind(console, 'queue dead'))
-
-  parallel([
-    function killKeeper(cb) {
-      self.keeper.destroy().finally(function () {
-        if (cb) cb()
-      })
-    },
-    this.p2p.destroy.bind(this.p2p),
-    this.queueDB.close.bind(this.queueDB),
-    this._identityDB.close.bind(this.queueDB),
-    this._logDB.close.bind(this.queueDB)
-  ], cb)
+  return Q.all([
+    this.keeper.destroy(),
+    Q.ninvoke(this.p2p, 'destroy'),
+    Q.ninvoke(this.queueDB, 'close'),
+    Q.ninvoke(this._addressBook, 'close'),
+    Q.ninvoke(this._logDB, 'close')
+  ])
 }
 
 Driver.prototype._debug = function () {
@@ -1140,6 +1182,7 @@ function caller (method) {
 }
 
 function toBuffer (data) {
+  if (Buffer.isBuffer(data)) return data
   return new Buffer(utils.stringify(data), 'binary')
 }
 
@@ -1162,13 +1205,13 @@ function rethrow (err) {
   if (err) throw err
 }
 
-function validateMsgType (type) {
-  for (var name in MessageType) {
-    if (MessageType[name] === type) return true
-  }
+// function validateMsgType (type) {
+//   for (var name in MessageType) {
+//     if (MessageType[name] === type) return true
+//   }
 
-  return false
-}
+//   return false
+// }
 
 // function toBuffer (obj) {
 //   if (Buffer.isBuffer(obj)) return obj
@@ -1246,6 +1289,20 @@ function logFilter (/* tags */) {
 
 function hasTag (obj, tag) {
   return obj._l.tags.indexOf(tag) !== -1
+}
+
+function getPrivacyTag (obj) {
+  if (hasTag(obj, 'public')) return 'public'
+  if (hasTag(obj, 'private')) return 'private'
+
+  throw new Error('no privacy tag')
+}
+
+function getMsgTypeTag (obj) {
+  if (hasTag(obj, 'plain')) return 'plain'
+  if (hasTag(obj, 'struct')) return 'struct'
+
+  throw new Error('no type tag')
 }
 
 function notNull (o) {

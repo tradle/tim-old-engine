@@ -12,14 +12,14 @@ module.exports = function identityStore (options) {
   }, options))
 
   var byFingerprint = typeStore.createSublevel('byFingerprint')
-  var storedFingerprints = []
+  // var storedFingerprints = []
 
   typeStore.use({
-    _update: function (obj, cb, next) {
+    update: function (obj, cb, next) {
       var rootHash = obj[constants.ROOT_HASH]
-      console.log('stored', rootHash)
+      console.log('storing identity', rootHash)
       var fingerprintBatch = obj.pubkeys.map(function (k) {
-        storedFingerprints.push(k.fingerprint)
+        // storedFingerprints.push(k.fingerprint)
         return { type: 'put', key: k.fingerprint, value: rootHash }
       })
 
@@ -33,12 +33,12 @@ module.exports = function identityStore (options) {
         next(obj, cb)
       })
     },
-    _query: function (query, cb, next) {
+    query: function (query, cb, next) {
       if (!query.fingerprint) return next(query, cb)
 
-      // console.log('has fingerprint', storedFingerprints.indexOf(query.fingerprint) !== -1)
+      // console.log('has fingerprint', query.fingerprint, storedFingerprints.indexOf(query.fingerprint) !== -1)
       byFingerprint.get(query.fingerprint, function (err, match) {
-        query.fingerprint = query.fingerprint
+        console.log(err, match)
         if (err) return cb(err)
 
         typeStore.get(match, function (err, identity) {

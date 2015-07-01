@@ -1,7 +1,6 @@
 
 var assert = require('assert')
 var typeforce = require('typeforce')
-var Q = require('q')
 var levelup = require('levelup')
 var levelQuery = require('level-queryengine')
 var sublevel = require('level-sublevel')
@@ -10,6 +9,7 @@ var externr = require('externr')
 var concat = require('concat-stream')
 var pick = require('object.pick')
 var constants = require('tradle-constants')
+var wipedb = require('./wipedb')
 var ROOT_HASH = constants.ROOT_HASH
 var CUR_HASH = constants.CUR_HASH
 var TYPE = constants.TYPE
@@ -24,7 +24,8 @@ function TypeStore (options) {
   }, options)
 
   this._type = options.type
-  this._db = levelQuery(levelup(options.path, {
+  this._path = options.path
+  this._db = levelQuery(levelup(this._path, {
     db: options.leveldown,
     valueEncoding: 'json'
   }))
@@ -37,7 +38,7 @@ function TypeStore (options) {
   // this._byRootHash = this.createSublevel(constants.rootHash)
   // this._byCurrentHash = this.createSublevel(constants.currentHash)
   this._externs = externr({
-    wrap: [ '_update', '_query' ]
+    wrap: [ 'update', 'query' ]
   })
 
   this._defaultUpdate = this._defaultUpdate.bind(this)
@@ -53,27 +54,27 @@ TypeStore.prototype.createSublevel = function (name) {
   return this._sub.sublevel(name)
 }
 
-TypeStore.prototype.update = function (obj) {
-  return Q.ninvoke(this, '_update', obj)
-}
+// TypeStore.prototype.update = function (obj) {
+//   return Q.ninvoke(this, 'update', obj)
+// }
 
-TypeStore.prototype._update = function (obj, cb) {
+TypeStore.prototype.update = function (obj, cb) {
   assert.equal(obj[TYPE], this._type)
-  this._externs._update(this, [ obj, cb ], this._defaultUpdate)
+  this._externs.update(this, [ obj, cb ], this._defaultUpdate)
 }
 
 TypeStore.prototype.get = function (rootHash, cb) {
   return this._db.get(rootHash, cb)
 }
 
-TypeStore.prototype.query = function (query) {
-  return Q.ninvoke(this, '_query', query)
-}
+// TypeStore.prototype.query = function (query) {
+//   return Q.ninvoke(this, 'query', query)
+// }
 
-TypeStore.prototype._query = function (query, cb) {
+TypeStore.prototype.query = function (query, cb) {
   var self = this
 
-  this._externs._query(this, [ query, cb ], function defQuery (query, cb) {
+  this._externs.query(this, [ query, cb ], function defQuery (query, cb) {
     self._db.query(query)
       .once('error', cb)
       .pipe(concat(function (results) {
@@ -86,4 +87,12 @@ TypeStore.prototype._query = function (query, cb) {
 
 TypeStore.prototype._defaultUpdate = function (obj, cb) {
   this._db.put(obj[ROOT_HASH], obj, cb)
+}
+
+TypeStore.prototype.clear = function (cb) {
+  wipedb(this._db, cb)
+}
+
+TypeStore.prototype.close = function (cb) {
+  this._db.close(cb)
 }
