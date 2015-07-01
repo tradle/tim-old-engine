@@ -17,7 +17,7 @@ module.exports = function identityStore (options) {
   typeStore.use({
     update: function (obj, cb, next) {
       var rootHash = obj[constants.ROOT_HASH]
-      console.log('storing identity', rootHash)
+      // console.log('storing', obj.name.formatted)
       var fingerprintBatch = obj.pubkeys.map(function (k) {
         // storedFingerprints.push(k.fingerprint)
         return { type: 'put', key: k.fingerprint, value: rootHash }
@@ -38,7 +38,6 @@ module.exports = function identityStore (options) {
 
       // console.log('has fingerprint', query.fingerprint, storedFingerprints.indexOf(query.fingerprint) !== -1)
       byFingerprint.get(query.fingerprint, function (err, match) {
-        console.log(err, match)
         if (err) return cb(err)
 
         typeStore.get(match, function (err, identity) {

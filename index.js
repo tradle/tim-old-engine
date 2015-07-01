@@ -391,7 +391,6 @@ Driver.prototype._onInboundMessage = function (data) {
 
 Driver.prototype._onInboundStruct = function (data) {
   debugger
-  this.emit('message', data)
 }
 
 // Driver.prototype._onPub = function (data) {
@@ -402,6 +401,7 @@ Driver.prototype._onStructChained = function (data) {
   var self = this
   if (!data.data) return
 
+  this._debug('chained (read)', data)
   this.emit('chained', data)
   Parser.parse(data.data, function (err, parsed) {
     if (err) return self.emit('error', 'stored invalid struct', err)
@@ -455,6 +455,16 @@ Driver.prototype._onNewOutboundStructMessage = function (obj) {
     })
     .then(function (resp) {
       copyDHTKeys(wrapper, resp.key)
+      if (!isPublic) {
+        wrapper.shares = resp.shares.map(function (share) {
+          return {
+            fingerprint: share.address,
+            data: share.encryptedKey
+          }
+        })
+      }
+
+      self._debug('stored (write)', wrapper[ROOT_HASH])
       return self._logIt(wrapper)
     })
 }
@@ -782,8 +792,8 @@ Driver.prototype._chainWriterWorker = function (task, cb) {
     .then(function (tx) {
       // ugly!
       update.tx = tx.toBuffer()
-
       copyDHTKeys(update, task)
+      self._debug('chained (write)', update)
       return self._logIt(update)
     })
     .then(function () {
@@ -811,6 +821,7 @@ Driver.prototype._onmessage = function (msg, fingerprint) {
     return this.emit('warn', 'received message not in JSON format', msg)
   }
 
+  if (this.pathPrefix === 'bill') debugger
   this._debug('received msg', msg)
   var tags = ['inbound']
   var msgTypeTag
@@ -964,26 +975,25 @@ Driver.prototype.putOnChain = function (obj) {
 
   var isPublic = hasTag(obj, 'public')
   var type = isPublic ? TxData.types.public : TxData.types.permission
-  var options = extend({
-    data: obj[CUR_HASH],
-    type: type
-  }, newLogWrapper([], obj))
+  var options = newLogWrapper([], obj)
+  options.type = type
 
-  var recipients = obj.to
-  if (!recipients && obj.to) {
-    var to = obj.to
-    var pubKey = to.keys({
-      type: 'bitcoin',
-      networkName: this.networkName
-    })[0].pubKeyString()
+  var recipients = isPublic ? obj.to : obj.shares
+  if (!recipients) {
+    throw new Error('no recipients!')
+    // var pubKey = to.keys({
+    //   type: 'bitcoin',
+    //   networkName: this.networkName
+    // })[0].pubKeyString()
 
-    recipients = [pubKey]
+    // recipients = [pubKey]
   }
 
   // TODO: do we really need a separate queue/log for this?
   copyDHTKeys(options, obj, obj[CUR_HASH])
   recipients.forEach(function (r) {
     var chainOpts = extend(true, {}, options) // copy
+    chainOpts.data = isPublic ? obj[CUR_HASH] : r.data
     self._lookupBTCAddress(r)
       .then(function (addr) {
         chainOpts.address = addr

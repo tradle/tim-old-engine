@@ -1,13 +1,14 @@
 
-var test = require('tape')
 var fs = require('fs')
-var find = require('array-find')
 var path = require('path')
+var test = require('tape')
+var find = require('array-find')
 var crypto = require('crypto')
 var bufferEqual = require('buffer-equal')
 var parallel = require('run-parallel')
 var extend = require('extend')
 var memdown = require('memdown')
+var Q = require('q')
 var stringify = require('tradle-utils').stringify
 var DHT = require('bittorrent-dht')
 var ChainedObj = require('chained-obj')
@@ -27,8 +28,8 @@ var TYPE = constants.TYPE
 var ROOT_HASH = constants.ROOT_HASH
 // var tedHash = tedPub[ROOT_HASH] = 'c67905793f6cc0f0ab8d20aecfec441932ffb13d'
 // var billHash = billPub[ROOT_HASH] ='fb07729c0cef307ab7c28cb76088cc60dbc98cdd'
-// var tedHash = 'c67905793f6cc0f0ab8d20aecfec441932ffb13d'
-// var billHash = 'fb07729c0cef307ab7c28cb76088cc60dbc98cdd'
+var tedHash = 'c67905793f6cc0f0ab8d20aecfec441932ffb13d'
+var billHash = 'fb07729c0cef307ab7c28cb76088cc60dbc98cdd'
 var mi = require('midentity')
 var Identity = mi.Identity
 var toKey = mi.toKey
@@ -113,47 +114,48 @@ test('setup', function (t) {
   //   .done()
 })
 
-// test('regular message', function (t) {
-//   t.plan(1)
-//   // t.timeoutAfter(10000)
+test('regular message', function (t) {
+  t.plan(1)
+  // t.timeoutAfter(10000)
 
-//   // regular message
-//   var msg = new Buffer(stringify({
-//     hey: 'ho'
-//   }), 'binary')
+  // regular message
+  var msg = new Buffer(stringify({
+    hey: 'ho'
+  }), 'binary')
 
-//   driverTed.once('message', function (m) {
-//     t.deepEqual(m.data, msg)
-//     driverBill._addressBook.clear(function () {
-//       t.end()
-//     })
-//   })
+  driverTed.once('message', function (m) {
+    t.deepEqual(m.data, msg)
+    driverBill._addressBook.clear(function () {
+      t.end()
+    })
+  })
 
-//   var betterTed = extend(true, {}, tedPub)
-//   var betterBill = extend(true, {}, billPub)
-//   betterTed[ROOT_HASH] = tedHash
-//   betterBill[ROOT_HASH] = billHash
-//   parallel([
-//     function (cb) {
-//       driverBill._addressBook.update(betterTed, cb)
-//     },
-//     function (cb) {
-//       driverTed._addressBook.update(betterBill, cb)
-//     }
-//   ], function (err) {
-//     if (err) throw err
+  var betterTed = extend(true, {}, tedPub)
+  var betterBill = extend(true, {}, billPub)
+  betterTed[ROOT_HASH] = tedHash
+  betterBill[ROOT_HASH] = billHash
+  parallel([
+    function (cb) {
+      driverBill._addressBook.update(betterTed, cb)
+    },
+    function (cb) {
+      driverTed._addressBook.update(betterBill, cb)
+    }
+  ], function (err) {
+    if (err) throw err
 
-//     var tedInfo = {}
-//     tedInfo[ROOT_HASH] = tedHash
-//     driverBill.sendPlaintext({
-//       msg: msg,
-//       to: [tedInfo]
-//     })
-//   })
-// })
+    var tedInfo = {}
+    tedInfo[ROOT_HASH] = tedHash
+    driverBill.sendPlaintext({
+      msg: msg,
+      to: [tedInfo]
+    })
+  })
+})
 
 test('chained message', function (t) {
-  // t.timeoutAfter(15000)
+  t.plan(3)
+  t.timeoutAfter(15000)
 
   // chained msg
   var msg = {
@@ -168,45 +170,53 @@ test('chained message', function (t) {
   driverBill.on('chained', function (obj) {
     Parser.parse(obj.data, function (err, parsed) {
       if (parsed.data[TYPE] === Identity.TYPE) onIdentityChained(parsed.data)
-
-      // t.equal(parsed.data.name.firstName, 'Ted')
+      else checkMessage(parsed.data)
     })
   })
 
-  // driverTed.on('chained', function (obj) {
-  //   Parser.parse(obj.data, function (err, parsed) {
-  //     if (parsed.data[TYPE] === Identity.TYPE) onIdentityChained(parsed.data)
+  driverTed.on('chained', function (obj) {
+    Parser.parse(obj.data, function (err, parsed) {
+      if (parsed.data[TYPE] === Identity.TYPE) onIdentityChained(parsed.data)
+      else checkMessage(parsed.data)
+    })
+  })
 
-  //     // t.equal(parsed.data.name.firstName, 'Bill')
-  //   })
-  // })
+  function checkMessage (m) {
+    if (Buffer.isBuffer(m)) m = JSON.parse(m)
+
+    delete m[constants.SIG]
+    t.deepEqual(m, msg)
+  }
 
   function onIdentityChained (i) {
-    console.log('DETECTED', i.name.formatted)
     if (++identitiesChained !== 4) return // 2 each, because both also detect themselves
 
-    driverTed.on('resolved', function (obj) {
-      debugger
-      t.equal(obj, 'blah')
-      t.end()
-    })
+    // driverTed.on('resolved', function (obj) {
+    //   debugger
+    //   t.equal(obj, 'blah')
+    //   t.end()
+    // })
 
-    driverBill.on('resolved', function (obj) {
-      debugger
-      t.equal(obj, 'blah')
-      t.end()
-    })
+    // driverBill.on('resolved', function (obj) {
+    //   debugger
+    //   t.equal(obj, 'blah')
+    //   t.end()
+    // })
 
     var billInfo = {
       fingerprint: billPub.pubkeys[0].fingerprint
     }
 
-    debugger
     driverTed.sendStructured({
       msg: msg,
       to: [billInfo],
       sign: true,
       chain: true
+    })
+
+    driverBill.on('message', function (obj) {
+      console.log('msg')
+      checkMessage(obj.data)
     })
   }
 
@@ -224,10 +234,13 @@ test('chained message', function (t) {
 })
 
 test('teardown', function (t) {
+  t.timeoutAfter(10000)
   Q.all([
     driverBill.destroy(),
     driverTed.destroy()
-  ]).done(t.end)
+  ]).done(function () {
+    t.end()
+  })
 })
 
 // function publishIdentity (cb) {
