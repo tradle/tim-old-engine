@@ -9,6 +9,7 @@ var externr = require('externr')
 var concat = require('concat-stream')
 var pick = require('object.pick')
 var constants = require('tradle-constants')
+var safe = require('safecb')
 var wipedb = require('./wipedb')
 var ROOT_HASH = constants.ROOT_HASH
 var CUR_HASH = constants.CUR_HASH
@@ -41,6 +42,7 @@ function TypeStore (options) {
     wrap: [ 'update', 'query' ]
   })
 
+  this._lastUpdateId = 0
   this._defaultUpdate = this._defaultUpdate.bind(this)
   this.use = this._externs.$register.bind(this._externs)
 }
@@ -54,13 +56,21 @@ TypeStore.prototype.createSublevel = function (name) {
   return this._sub.sublevel(name)
 }
 
-// TypeStore.prototype.update = function (obj) {
-//   return Q.ninvoke(this, 'update', obj)
-// }
+TypeStore.prototype.update = function (updateId, obj, cb) {
+  var self = this
 
-TypeStore.prototype.update = function (obj, cb) {
-  assert.equal(obj[TYPE], this._type)
-  this._externs.update(this, [ obj, cb ], this._defaultUpdate)
+  typeforce('Number', updateId)
+  typeforce('Object', obj)
+
+  cb = safe(cb)
+
+  if (obj[TYPE] !== this._type) return cb(new Error('invalid type'))
+  if (this._lastUpdateId >= updateId) return cb()
+
+  this._externs.update(this, [ obj, function (err) {
+    self._lastUpdateId = updateId
+    return cb(err, !err) // return true if we updated
+  } ], this._defaultUpdate)
 }
 
 TypeStore.prototype.get = function (rootHash, cb) {

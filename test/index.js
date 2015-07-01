@@ -136,10 +136,10 @@ test('regular message', function (t) {
   betterBill[ROOT_HASH] = billHash
   parallel([
     function (cb) {
-      driverBill._addressBook.update(betterTed, cb)
+      driverBill._addressBook.update(1, betterTed, cb)
     },
     function (cb) {
-      driverTed._addressBook.update(betterBill, cb)
+      driverTed._addressBook.update(1, betterBill, cb)
     }
   ], function (err) {
     if (err) throw err
@@ -234,13 +234,16 @@ test('chained message', function (t) {
 })
 
 test('teardown', function (t) {
-  t.timeoutAfter(10000)
+  // t.timeoutAfter(10000)
+  setTimeout(function () {
+
   Q.all([
     driverBill.destroy(),
     driverTed.destroy()
   ]).done(function () {
     t.end()
   })
+  }, 20000)
 })
 
 // function publishIdentity (cb) {

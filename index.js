@@ -150,16 +150,14 @@ function Driver (options) {
 
   this._fingerprintToIdentity = {} // in-memory cache of recent conversants
   this._setupP2P()
+
   this._setupLog()
-  this._logRS.on('error', this._onLogReadError)
-  this._logWS.on('error', this._onLogWriteError)
-
-  var tasks = [
-    this._prepIdentity(),
-    this._setupTxStream()
-  ]
-
-  Q.all(tasks)
+    .then(function () {
+      return Q.all([
+        self._prepIdentity(),
+        self._setupTxStream()
+      ])
+    })
     .done(function () {
       self.emit('ready')
     })
@@ -282,8 +280,25 @@ Driver.prototype._setupLog = function () {
     next()
   }
 
+  var defer = Q.defer()
+  this._log
+    .createReadStream({ limit: 1, reverse: true, values: false })
+    .pipe(concat(function (results) {
+      self._readLog(results[0])
+      defer.resolve()
+    }))
+
+  return defer.promise
+}
+
+Driver.prototype._readLog = function (startId) {
+  var self = this
+
   this._logRS = this._log
-    .createReadStream({ live: true })
+    .createReadStream({
+      live: true,
+      since: startId || 0
+    })
     .pipe(mapStream(function (data, cb) {
       var id = data.change
       data = normalizeJSON(data.value)
@@ -409,7 +424,7 @@ Driver.prototype._onStructChained = function (data) {
     if (parsed.data[TYPE] === Identity.TYPE) {
       // what about attachments?
       copyDHTKeys(parsed.data, data)
-      self._addressBook.update(parsed.data)
+      self._addressBook.update(data._l.id, parsed.data)
     }
   })
 }
