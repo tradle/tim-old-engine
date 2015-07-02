@@ -30,6 +30,7 @@
     "levelup": "^0.18.0",
     "map-stream": "0.0.6",
     "midentity": "git://github.com/tradle/identity#master",
+    "object.omit": "^1.1.0",
     "object.pick": "^1.1.1",
     "pad": "^0.1.0",
     "pend": "^1.2.0",

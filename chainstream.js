@@ -50,13 +50,13 @@ module.exports = function chainstream (options) {
     //   this.push(txInfo.tx)
     //   done()
     // }),
-    through2.obj(function (txInfo, enc, done) {
+    through2.obj(function (txEntry, enc, done) {
       var self = this
-      chainloader.load(txInfo.tx)
+      chainloader.load(txEntry.get('tx'))
         .then(function (chainedObjs) {
           var obj = chainedObjs && chainedObjs[0]
           if (obj) {
-            obj = extend({}, obj, txInfo)
+            obj = extend({}, obj, txEntry.toJSON())
             self.push(obj)
           }
         })
