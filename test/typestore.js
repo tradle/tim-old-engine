@@ -1,11 +1,9 @@
 
 var test = require('tape')
-var crypto = require('crypto')
 var leveldown = require('memdown')
 var extend = require('extend')
 var TypeStore = require('../typestore')
 var identityStore = require('../identityStore')
-var Identity = require('midentity').Identity
 var pick = require('object.pick')
 var constants = require('tradle-constants')
 var ted = require('./fixtures/ted-pub')

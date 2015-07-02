@@ -49,6 +49,10 @@ OneBlockDB.prototype.height = function () {
   return this._currentHeight
 }
 
+OneBlockDB.prototype.destroy = function (cb) {
+  this._db.close(cb)
+}
+
 OneBlockDB.prototype._write = function (txInfo, enc, next) {
   var self = this
 

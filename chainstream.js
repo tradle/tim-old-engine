@@ -8,8 +8,6 @@ var Parser = require('chained-obj').Parser
 var Identity = require('midentity').Identity
 var Verifier = require('tradle-verifier')
 var CONSTANTS = require('tradle-constants')
-var ROOT_HASH = CONSTANTS.ROOT_HASH
-var CUR_HASH = CONSTANTS.CUR_HASH
 var TYPE = CONSTANTS.TYPE
 var plugins = Verifier.plugins
 var DEFAULT_PLUGINS = [
@@ -23,10 +21,10 @@ var DEFAULT_PLUGINS = [
  * @param  {[type]} options [description]
  * @return {[type]}         [description]
  */
-module.exports = function chainstream(options) {
+module.exports = function chainstream (options) {
   typeforce({
     lookup: 'Function',
-    chainloader: 'Object',
+    chainloader: 'Object'
   }, options)
 
   var chainloader = options.chainloader
@@ -68,6 +66,7 @@ module.exports = function chainstream(options) {
         .finally(function () {
           done()
         })
+        .done()
     }),
     // options.chainloader,
     mkParser(),

@@ -4,7 +4,7 @@
   "description": "",
   "main": "index.js",
   "scripts": {
-    "test": "node test"
+    "test": "node test/*.js"
   },
   "author": "Mark Vayngrib <mark.vayngrib@lablz.com> (http://github.com/mvayngrib)",
   "license": "ISC",
@@ -16,7 +16,6 @@
     "bitkeeper-js": "git://github.com/tradle/bitkeeper-js.git",
     "bittorrent-dht": "git://github.com/tradle/bittorrent-dht",
     "blockloader": "git://github.com/mvayngrib/blockloader.git",
-    "bluebird": "^2.9.26",
     "cb-streams": "git://github.com/mvayngrib/cb-streams",
     "chained-obj": "git://github.com/tradle/chained-obj.git",
     "chainloader": "git://github.com/mvayngrib/chainloader",
@@ -31,7 +30,6 @@
     "levelup": "^0.18.0",
     "map-stream": "0.0.6",
     "midentity": "git://github.com/tradle/identity",
-    "object.omit": "^1.1.0",
     "object.pick": "^1.1.1",
     "pad": "^0.1.0",
     "pend": "^1.2.0",
@@ -50,7 +48,6 @@
     "zlorp": "git://github.com/mvayngrib/zlorp.git"
   },
   "devDependencies": {
-    "buffer-equal": "0.0.1",
     "cb-blockr": "git://github.com/tradle/cb-blockr",
     "leveldown": "^0.10.0",
     "memdown": "^1.0.0",

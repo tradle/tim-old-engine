@@ -1,5 +1,4 @@
 
-var assert = require('assert')
 var typeforce = require('typeforce')
 var levelup = require('levelup')
 var levelQuery = require('level-queryengine')
@@ -7,7 +6,6 @@ var sublevel = require('level-sublevel')
 var jsonqueryEngine = require('jsonquery-engine')
 var externr = require('externr')
 var concat = require('concat-stream')
-var pick = require('object.pick')
 var constants = require('tradle-constants')
 var safe = require('safecb')
 var wipedb = require('./wipedb')

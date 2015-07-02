@@ -1,14 +1,12 @@
 
-var util = require('util')
 var extend = require('extend')
-var pick = require('object.pick')
 var Identity = require('midentity').Identity
 var constants = require('tradle-constants')
 var TypeStore = require('./typestore')
 
 module.exports = function identityStore (options) {
   var typeStore = new TypeStore(extend({
-    type: Identity.TYPE,
+    type: Identity.TYPE
   }, options))
 
   var byFingerprint = typeStore.createSublevel('byFingerprint')
