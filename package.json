@@ -16,7 +16,7 @@
     "bitkeeper-js": "git://github.com/tradle/bitkeeper-js.git",
     "bittorrent-dht": "git://github.com/tradle/bittorrent-dht",
     "blockloader": "git://github.com/mvayngrib/blockloader.git",
-    "cb-streams": "git://github.com/mvayngrib/cb-streams",
+    "cb-streams": "^1.0.0",
     "chained-obj": "git://github.com/tradle/chained-obj.git",
     "chainloader": "git://github.com/mvayngrib/chainloader",
     "changes-feed": "git://github.com/mvayngrib/changes-feed",
@@ -29,7 +29,7 @@
     "level-sublevel": "^6.4.6",
     "levelup": "^0.18.0",
     "map-stream": "0.0.6",
-    "midentity": "git://github.com/tradle/identity",
+    "midentity": "git://github.com/tradle/identity#master",
     "object.pick": "^1.1.1",
     "pad": "^0.1.0",
     "pend": "^1.2.0",
@@ -45,7 +45,7 @@
     "tradle-utils": "git://github.com/tradle/tradle-utils",
     "tradle-verifier": "git://github.com/mvayngrib/tradle-verifier",
     "typeforce": "^1.1.2",
-    "zlorp": "git://github.com/mvayngrib/zlorp.git"
+    "zlorp": "0.0.4"
   },
   "devDependencies": {
     "cb-blockr": "git://github.com/tradle/cb-blockr",
