@@ -40,7 +40,7 @@
     "simple-wallet": "git://github.com/mvayngrib/simple-wallet",
     "stream-combiner2": "^1.0.2",
     "through2": "^2.0.0",
-    "tradle-constants": "git://github.com/mvayngrib/tradle-constants",
+    "tradle-constants": "^1.0.0",
     "tradle-tx-data": "git://github.com/mvayngrib/tx-data",
     "tradle-utils": "^0.1.3",
     "tradle-verifier": "git://github.com/mvayngrib/tradle-verifier",
