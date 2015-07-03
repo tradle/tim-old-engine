@@ -131,6 +131,11 @@ function Driver (options) {
     lookup: this.getKeyAndIdentity2
   })
 
+  this.addressBook = identityStore({
+    path: this._prefix('identities.db'),
+    leveldown: this.leveldown
+  })
+
   // in-memory cache of recent conversants
   this._fingerprintToIdentity = {}
   this._setupP2P()
@@ -325,11 +330,6 @@ Driver.prototype._readLog = function (startId) {
   var structChained = this._logRS.pipe(logFilter('struct', 'from-chain'))
   structChained.on('data', this._onStructChained)
 
-  this._addressBook = identityStore({
-    path: this._prefix('identities.db'),
-    leveldown: this.leveldown
-  })
-
   var objStream = chainstream({
     chainloader: this.chainloader,
     lookup: this.lookupByDHTKey
@@ -408,7 +408,7 @@ Driver.prototype._onStructChained = function (entry) {
     if (parsed.data[TYPE] === Identity.TYPE) {
       // what about attachments?
       copyDHTKeys(parsed.data, entry)
-      self._addressBook.update(entry.id(), parsed.data)
+      self.addressBook.update(entry.id(), parsed.data)
     }
   })
 }
@@ -599,7 +599,7 @@ Driver.prototype.lookupIdentity = function (query) {
     }
   }
 
-  return Q.ninvoke(this._addressBook, 'query', query)
+  return Q.ninvoke(this.addressBook, 'query', query)
     .then(function (results) {
       return results[0]
     })
@@ -839,7 +839,7 @@ Driver.prototype.destroy = function () {
     this.keeper.destroy(),
     Q.ninvoke(this.p2p, 'destroy'),
     Q.ninvoke(this.queueDB, 'close'),
-    Q.ninvoke(this._addressBook, 'close'),
+    Q.ninvoke(this.addressBook, 'close'),
     Q.ninvoke(this._logDB, 'close'),
     Q.ninvoke(this._lastBlock, 'destroy')
   ])
