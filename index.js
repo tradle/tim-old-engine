@@ -90,10 +90,10 @@ function Driver (options) {
   var wallet = this.wallet = this.wallet || new Wallet({
     networkName: networkName,
     blockchain: blockchain,
-    priv: identity.keys({
+    priv: this.getPrivateKey({
       networkName: networkName,
       type: 'bitcoin'
-    })[0].priv()
+    }).priv
   })
 
   this.p2p = new Zlorp({
@@ -573,9 +573,15 @@ Driver.prototype.getPublicKey = function (fingerprint, identity) {
   })
 }
 
-Driver.prototype.getPrivateKey = function (fingerprint) {
+Driver.prototype.getPrivateKey = function (where) {
+  if (typeof where === 'string') where = { fingerprint: where }
+
   return find(this.identityKeys, function (k) {
-    return k.fingerprint === fingerprint
+    for (var p in where) {
+      if (where[p] !== k[p]) return
+    }
+
+    return true
   })
 }
 
