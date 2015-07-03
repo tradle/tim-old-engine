@@ -5,7 +5,7 @@
   "main": "index.js",
   "scripts": {
     "test": "node test/*.js",
-    "postinstall": "postInstall.js"
+    "postinstall": "./postInstall.js"
   },
   "author": "Mark Vayngrib <mark.vayngrib@lablz.com> (http://github.com/mvayngrib)",
   "license": "ISC",

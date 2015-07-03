@@ -384,7 +384,6 @@ Driver.prototype._onInboundStruct = function (entry) {
       }
     })
     .on('close', function () {
-      debugger
       if (entry.hasTag('from-chain')) {
         if (other) {
           self.emit('resolved', entry.toJSON())
