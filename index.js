@@ -7,8 +7,6 @@ var Q = require('q')
 var typeforce = require('typeforce')
 var debug = require('debug')('chained-chat')
 var levelup = require('levelup')
-// var levelQuery = require('level-queryengine')
-// var jsonqueryEngine = require('jsonquery-engine')
 var changesFeed = require('changes-feed')
 var bitcoin = require('bitcoinjs-lib')
 var Queue = require('level-jobs')
@@ -219,7 +217,6 @@ Driver.prototype._setupTxStream = function () {
       }))
       .pipe(self._logWS)
 
-
     self._txStream
       .pipe(toValueStream())
       .pipe(self._lastBlock)
@@ -376,7 +373,6 @@ Driver.prototype._onInboundPlaintext = function (entry) {
 }
 
 Driver.prototype._onInboundStruct = function (entry) {
-  console.log(entry.tags())
   var self = this
   var other
   var stream = this._log.createReadStream({ reverse: true })
@@ -853,7 +849,7 @@ Driver.prototype.destroy = function () {
 
 Driver.prototype._debug = function () {
   var args = [].slice.call(arguments)
-  args.unshift(this.identity.name())
+  args.unshift(this.identityJSON.name.formatted)
   return debug.apply(null, args)
 }
 
@@ -892,22 +888,6 @@ function toBuffer (data) {
 function rethrow (err) {
   if (err) throw err
 }
-
-// function validateMsgType (type) {
-//   for (var name in MessageType) {
-//     if (MessageType[name] === type) return true
-//   }
-
-//   return false
-// }
-
-// function toBuffer (obj) {
-//   if (Buffer.isBuffer(obj)) return obj
-//   if (typeof obj === 'string') return new Buffer(obj, 'binary')
-//   if (!obj || typeof obj !== 'object') throw new Error('invalid argument')
-
-//   return new Buffer(utils.stringify(obj), 'binary')
-// }
 
 function getFingerprint (identity) {
   return find(identity.pubkeys, function (k) {

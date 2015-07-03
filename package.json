@@ -4,7 +4,8 @@
   "description": "",
   "main": "index.js",
   "scripts": {
-    "test": "node test/*.js"
+    "test": "node test/*.js",
+    "postinstall": "postInstall.js"
   },
   "author": "Mark Vayngrib <mark.vayngrib@lablz.com> (http://github.com/mvayngrib)",
   "license": "ISC",
@@ -13,12 +14,10 @@
     "bitcoinjs-lib": "^1.4.1",
     "bitjoe-js": "git://github.com/tradle/bitjoe-js",
     "bitkeeper-client-js": "git://github.com/tradle/bitkeeper-client-js",
-    "bitkeeper-js": "git://github.com/tradle/bitkeeper-js.git",
     "bittorrent-dht": "git://github.com/tradle/bittorrent-dht",
-    "blockloader": "git://github.com/mvayngrib/blockloader.git",
-    "cb-streams": "^1.0.0",
+    "cb-streams": "^1.0.1",
     "chained-obj": "git://github.com/tradle/chained-obj.git",
-    "chainloader": "git://github.com/mvayngrib/chainloader",
+    "chainloader": "git://github.com/mvayngrib/chainloader#streaming",
     "changes-feed": "git://github.com/mvayngrib/changes-feed",
     "concat-stream": "^1.5.0",
     "extend": "^2.0.1",
@@ -36,7 +35,6 @@
     "pend": "^1.2.0",
     "q": "^1.4.1",
     "readable-stream": "^2.0.1",
-    "run-parallel": "^1.1.1",
     "safecb": "0.0.1",
     "simple-wallet": "git://github.com/mvayngrib/simple-wallet",
     "stream-combiner2": "^1.0.2",
@@ -49,7 +47,9 @@
     "zlorp": "0.0.4"
   },
   "devDependencies": {
+    "bitkeeper-js": "git://github.com/tradle/bitkeeper-js",
     "cb-blockr": "git://github.com/tradle/cb-blockr",
+    "fs-extra": "^0.20.1",
     "leveldown": "^0.10.0",
     "memdown": "^1.0.0",
     "standard": "^4.1.0",
