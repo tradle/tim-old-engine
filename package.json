@@ -15,7 +15,7 @@
     "bitjoe-js": "git://github.com/tradle/bitjoe-js",
     "bitkeeper-client-js": "git://github.com/tradle/bitkeeper-client-js",
     "bittorrent-dht": "git://github.com/tradle/bittorrent-dht",
-    "cb-streams": "^1.0.1",
+    "cb-streams": "^1.0.2",
     "chained-obj": "^1.0.0",
     "chainloader": "git://github.com/mvayngrib/chainloader",
     "changes-feed": "git://github.com/mvayngrib/changes-feed",
