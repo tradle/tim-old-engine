@@ -41,10 +41,6 @@ var ROOT_HASH = constants.ROOT_HASH
 var CUR_HASH = constants.CUR_HASH
 var PREFIX = constants.OP_RETURN_PREFIX
 
-// var normalizeStream = mapStream.bind(null, function (data, cb) {
-//   cb(null, normalizeJSON(data))
-// })
-
 // var MessageType = Driver.MessageType = {
 //   plaintext: 1 << 1,
 //   chained: 1 << 2
@@ -148,8 +144,13 @@ function Driver (options) {
       ])
     })
     .done(function () {
+      self._ready = true
       self.emit('ready')
     })
+}
+
+Driver.prototype.isReady = function () {
+  return this._ready
 }
 
 Driver.prototype._onLogReadError = function (err) {
@@ -242,6 +243,21 @@ Driver.prototype._setupLog = function () {
 
   this._log = changesFeed(this._logDB)
 
+  var createReadStream = this._log.createReadStream
+  this._log.createReadStream = function (options) {
+    return createReadStream.apply(self._log, arguments)
+      .pipe(mapStream(function (data, cb) {
+        var hasKeys = !options || options.keys !== false
+        var hasValues = !options || options.values !== false
+        if (hasValues) {
+          if (hasKeys) data.value = normalizeJSON(data.value)
+          else data = normalizeJSON(data)
+        }
+
+        cb(null, data)
+      }))
+  }
+
   this._logWS = new Writable({ objectMode: true })
   this._logWS._write = function (chunk, enc, next) {
     if (chunk instanceof LogEntry) chunk = chunk.toJSON()
@@ -270,7 +286,7 @@ Driver.prototype._readLog = function (startId) {
     })
     .pipe(mapStream(function (data, cb) {
       var id = data.change
-      data = normalizeJSON(data.value)
+      data = data.value
       // so whoever processes this can refer to this entry
       var entry = LogEntry.fromJSON(data)
         .id(id)
@@ -374,16 +390,20 @@ Driver.prototype._onInboundPlaintext = function (entry) {
 
 Driver.prototype._onInboundStruct = function (entry) {
   var self = this
+  var destroyed = false
   var other
   var stream = this._log.createReadStream({ reverse: true })
     .on('data', function (d) {
+      if (destroyed) return
+
       var old = LogEntry.fromJSON(d.value)
       if (old.get(CUR_HASH) === entry.get(CUR_HASH)) {
         other = old
+        destroyed = true
         stream.destroy()
       }
     })
-    .on('close', function () {
+    .once('close', function () {
       if (entry.hasTag('from-chain')) {
         if (other) {
           self.emit('resolved', entry.toJSON())
@@ -456,7 +476,8 @@ Driver.prototype._onNewOutboundStructMessage = function (entry) {
         entry.set('shares', resp.shares.map(function (share) {
           return {
             fingerprint: share.address,
-            data: share.encryptedKey
+            data: share.encryptedKey,
+            permission: share.value
           }
         }))
       }
@@ -624,9 +645,6 @@ Driver.prototype._logIt = function (obj) {
 Driver.prototype._chainWriterWorker = function (task, cb) {
   var self = this
 
-  task = normalizeJSON(task)
-  // var promise
-
   var chainEntry = LogEntry.fromJSON(task)
   return this.chainwriter.chain()
     .type(task.type)
@@ -660,7 +678,7 @@ Driver.prototype._onmessage = function (msg, fingerprint) {
   var self = this
 
   try {
-    msg = normalizeJSON(JSON.parse(msg))
+    msg = JSON.parse(msg)
   } catch (err) {
     return this.emit('warn', 'received message not in JSON format', msg)
   }

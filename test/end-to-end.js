@@ -109,39 +109,39 @@ test('setup', function (t) {
   //   .done()
 })
 
-test('regular message', function (t) {
-  t.plan(1)
-  // t.timeoutAfter(10000)
+// test('regular message', function (t) {
+//   t.plan(1)
+//   // t.timeoutAfter(10000)
 
-  // regular message
-  var msg = new Buffer(stringify({
-    dude: 'seriously'
-  }), 'binary')
+//   // regular message
+//   var msg = new Buffer(stringify({
+//     dude: 'seriously'
+//   }), 'binary')
 
-  driverTed.once('message', function (m) {
-    t.deepEqual(m.data, msg)
-    driverBill.addressBook.clear(function () {
-      t.end()
-    })
-  })
+//   driverTed.once('message', function (m) {
+//     t.deepEqual(m.data, msg)
+//     driverBill.addressBook.clear(function () {
+//       t.end()
+//     })
+//   })
 
-  var betterTed = extend(true, {}, tedPub)
-  var betterBill = extend(true, {}, billPub)
-  betterTed[ROOT_HASH] = tedHash
-  betterBill[ROOT_HASH] = billHash
-  Q.all([
-      Q.ninvoke(driverBill.addressBook, 'update', 1, betterTed),
-      Q.ninvoke(driverTed.addressBook, 'update', 1, betterBill)
-    ])
-    .done(function () {
-      var tedInfo = {}
-      tedInfo[ROOT_HASH] = tedHash
-      driverBill.sendPlaintext({
-        msg: msg,
-        to: [tedInfo]
-      })
-    })
-})
+//   var betterTed = extend(true, {}, tedPub)
+//   var betterBill = extend(true, {}, billPub)
+//   betterTed[ROOT_HASH] = tedHash
+//   betterBill[ROOT_HASH] = billHash
+//   Q.all([
+//       Q.ninvoke(driverBill.addressBook, 'update', 1, betterTed),
+//       Q.ninvoke(driverTed.addressBook, 'update', 1, betterBill)
+//     ])
+//     .done(function () {
+//       var tedInfo = {}
+//       tedInfo[ROOT_HASH] = tedHash
+//       driverBill.sendPlaintext({
+//         msg: msg,
+//         to: [tedInfo]
+//       })
+//     })
+// })
 
 test('chained message', function (t) {
   t.plan(4)
@@ -175,7 +175,6 @@ test('chained message', function (t) {
     if (Buffer.isBuffer(m)) m = JSON.parse(m)
 
     delete m[constants.SIG]
-    // console.log(JSON.stringify(m))
     t.deepEqual(m, msg)
   }
 
@@ -194,12 +193,10 @@ test('chained message', function (t) {
     })
 
     driverBill.on('message', function (obj) {
-      console.log('message')
       checkMessage(obj.data)
     })
 
     driverBill.on('resolved', function (obj) {
-      console.log('resolved')
       checkMessage(obj.data)
     })
   }
