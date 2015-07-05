@@ -20,7 +20,7 @@ function LogEntry (id) {
 }
 
 LogEntry.prototype.metadata = function () {
-  return extend(true, {}, metadata)
+  return extend(true, {}, this._metadata)
 }
 
 LogEntry.prototype.hasTag = function (tag) {
@@ -86,7 +86,6 @@ LogEntry.prototype.set = function (name, value) {
 LogEntry.prototype.copy = function (props) {
   if (arguments.length === 1) this.set(props)
   else {
-    var src = props
     for (var i = 1; i < arguments.length; i++) {
       var prop = arguments[i]
       this._props[prop] = getProp(props, prop)

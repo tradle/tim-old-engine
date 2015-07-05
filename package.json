@@ -4,9 +4,14 @@
   "description": "",
   "main": "index.js",
   "scripts": {
-    "test": "node test/*.js",
-    "postinstall": "./postInstall.js"
+    "test": "node test",
+    "postinstall": "./postInstall.js",
+    "style": "standard"
   },
+  "pre-commit": [
+    "style",
+    "test"
+  ],
   "author": "Mark Vayngrib <mark.vayngrib@lablz.com> (http://github.com/mvayngrib)",
   "license": "ISC",
   "dependencies": {
@@ -52,7 +57,8 @@
     "cb-blockr": "git://github.com/tradle/cb-blockr",
     "leveldown": "^0.10.0",
     "memdown": "^1.0.0",
-    "standard": "^4.1.0",
+    "pre-commit": "^1.0.10",
+    "standard": "^4.5.2",
     "tape": "^4.0.0",
     "tradle-test-helpers": "git://github.com/tradle/test-helpers"
   }

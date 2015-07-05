@@ -4,10 +4,10 @@ var crypto = require('crypto')
 var extend = require('extend')
 var memdown = require('memdown')
 var Q = require('q')
-var stringify = require('tradle-utils').stringify
 var DHT = require('bittorrent-dht')
 var ChainedObj = require('chained-obj')
 var Parser = ChainedObj.Parser
+var stringify = require('tradle-utils').stringify
 // var CreateReq = require('bitjoe-js/lib/requests/create')
 // CreateReq.prototype._generateSymmetricKey = function () {
 //   return new Buffer('1111111111111111111111111111111111111111111111111111111111111111')
@@ -109,39 +109,39 @@ test('setup', function (t) {
   //   .done()
 })
 
-// test('regular message', function (t) {
-//   t.plan(1)
-//   // t.timeoutAfter(10000)
+test('regular message', function (t) {
+  t.plan(1)
+  // t.timeoutAfter(10000)
 
-//   // regular message
-//   var msg = new Buffer(stringify({
-//     dude: 'seriously'
-//   }), 'binary')
+  // regular message
+  var msg = new Buffer(stringify({
+    dude: 'seriously'
+  }), 'binary')
 
-//   driverTed.once('message', function (m) {
-//     t.deepEqual(m.data, msg)
-//     driverBill.addressBook.clear(function () {
-//       t.end()
-//     })
-//   })
+  driverTed.once('message', function (m) {
+    t.deepEqual(m.data, msg)
+    driverBill.addressBook.clear(function () {
+      t.end()
+    })
+  })
 
-//   var betterTed = extend(true, {}, tedPub)
-//   var betterBill = extend(true, {}, billPub)
-//   betterTed[ROOT_HASH] = tedHash
-//   betterBill[ROOT_HASH] = billHash
-//   Q.all([
-//       Q.ninvoke(driverBill.addressBook, 'update', 1, betterTed),
-//       Q.ninvoke(driverTed.addressBook, 'update', 1, betterBill)
-//     ])
-//     .done(function () {
-//       var tedInfo = {}
-//       tedInfo[ROOT_HASH] = tedHash
-//       driverBill.sendPlaintext({
-//         msg: msg,
-//         to: [tedInfo]
-//       })
-//     })
-// })
+  var betterTed = extend(true, {}, tedPub)
+  var betterBill = extend(true, {}, billPub)
+  betterTed[ROOT_HASH] = tedHash
+  betterBill[ROOT_HASH] = billHash
+  Q.all([
+      Q.ninvoke(driverBill.addressBook, 'update', 1, betterTed),
+      Q.ninvoke(driverTed.addressBook, 'update', 1, betterBill)
+    ])
+    .done(function () {
+      var tedInfo = {}
+      tedInfo[ROOT_HASH] = tedHash
+      driverBill.sendPlaintext({
+        msg: msg,
+        to: [tedInfo]
+      })
+    })
+})
 
 test('chained message', function (t) {
   t.plan(4)

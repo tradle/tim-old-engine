@@ -11,7 +11,6 @@ var changesFeed = require('changes-feed')
 var bitcoin = require('bitcoinjs-lib')
 var Queue = require('level-jobs')
 var extend = require('extend')
-var pick = require('object.pick')
 var utils = require('tradle-utils')
 var concat = require('concat-stream')
 var mapStream = require('map-stream')
@@ -36,6 +35,7 @@ var identityStore = require('./identityStore')
 var getDHTKey = require('./getDHTKey')
 var LogEntry = require('./logEntry')
 var constants = require('tradle-constants')
+var noop = function () {}
 var TYPE = constants.TYPE
 var ROOT_HASH = constants.ROOT_HASH
 var CUR_HASH = constants.CUR_HASH
@@ -48,6 +48,7 @@ var PREFIX = constants.OP_RETURN_PREFIX
 
 module.exports = Driver
 util.inherits(Driver, EventEmitter)
+Driver.LogEntry = LogEntry
 
 function Driver (options) {
   var self = this
@@ -116,7 +117,6 @@ function Driver (options) {
 
   this.chainwriterq = Queue(this.queueDB, this._chainWriterWorker, 1)
   this.chainwriterq.on('error', function (err) {
-    debugger
     self.emit('error', err)
   })
 
@@ -154,12 +154,10 @@ Driver.prototype.isReady = function () {
 }
 
 Driver.prototype._onLogReadError = function (err) {
-  debugger
   throw err
 }
 
 Driver.prototype._onLogWriteError = function (err) {
-  debugger
   throw err
 }
 
@@ -258,9 +256,16 @@ Driver.prototype._setupLog = function () {
       }))
   }
 
+  var append = this._log.append
+  this._log.append = function (entry, cb) {
+    typeforce('LogEntry', entry)
+    entry.validate()
+    return append.call(self._log, entry.toJSON(), cb || noop)
+  }
+
   this._logWS = new Writable({ objectMode: true })
+  this._logWS.on('error', this._onLogWriteError)
   this._logWS._write = function (chunk, enc, next) {
-    if (chunk instanceof LogEntry) chunk = chunk.toJSON()
     self._log.append(chunk)
     next()
   }
@@ -284,6 +289,7 @@ Driver.prototype._readLog = function (startId) {
       live: true,
       since: startId || 0
     })
+    .on('error', this._onLogReadError)
     .pipe(mapStream(function (data, cb) {
       var id = data.change
       data = data.value
@@ -342,7 +348,7 @@ Driver.prototype._readLog = function (startId) {
   // this._newPlainInbound.on('data', this._onInboundPlain)
 
   // this._newStructured = this._logRS.pipe(logFilter('new', 'struct'))
-  var structStored = this._logRS.pipe(logFilter('struct', 'stored'))
+  // var structStored = this._logRS.pipe(logFilter('struct', 'stored'))
   var structChained = this._logRS.pipe(logFilter('struct', 'from-chain'))
   structChained.on('data', this._onStructChained)
 
@@ -414,10 +420,6 @@ Driver.prototype._onInboundStruct = function (entry) {
     })
 }
 
-// Driver.prototype._onPub = function (entry) {
-//   debugger
-// }
-
 Driver.prototype._onStructChained = function (entry) {
   var self = this
   this._debug('chained (read)', entry)
@@ -453,7 +455,7 @@ Driver.prototype._onNewOutboundStructMessage = function (entry) {
     Q.ninvoke(builder, 'build')
   ].concat(entry.get('to').map(lookup))
 
-  var entry = new LogEntry()
+  var ssEntry = new LogEntry()
     .tag('struct', 'stored', 'outbound', getPrivacyTag(entry))
     .prev(entry)
     .copy(entry, 'chain', 'to', 'sign')
@@ -463,7 +465,7 @@ Driver.prototype._onNewOutboundStructMessage = function (entry) {
       var build = results[0]
       var buf = build.form
       var recipients = results.slice(1)
-      entry.set('data', buf)
+      ssEntry.set('data', buf)
       return self.chainwriter.create()
         .data(buf)
         .setPublic(isPublic)
@@ -471,9 +473,9 @@ Driver.prototype._onNewOutboundStructMessage = function (entry) {
         .execute()
     })
     .then(function (resp) {
-      copyDHTKeys(entry, resp.key)
+      copyDHTKeys(ssEntry, resp.key)
       if (!isPublic) {
-        entry.set('shares', resp.shares.map(function (share) {
+        ssEntry.set('shares', resp.shares.map(function (share) {
           return {
             fingerprint: share.address,
             data: share.encryptedKey,
@@ -482,9 +484,10 @@ Driver.prototype._onNewOutboundStructMessage = function (entry) {
         }))
       }
 
-      self._debug('stored (write)', entry.get(ROOT_HASH))
-      return self._logIt(entry)
+      self._debug('stored (write)', ssEntry.get(ROOT_HASH))
+      return self.log(ssEntry)
     })
+    .done()
 }
 
 Driver.prototype._sendP2P = function (entry) {
@@ -618,8 +621,7 @@ Driver.prototype.lookupIdentity = function (query) {
     if (query[ROOT_HASH] === this._myRootHash) {
       return Q.resolve(me)
     }
-  }
-  else if (query.fingerprint) {
+  } else if (query.fingerprint) {
     var pub = this.getPublicKey(query.fingerprint)
     if (pub) {
       return Q.resolve(me)
@@ -636,10 +638,8 @@ Driver.prototype.lookupIdentity = function (query) {
     })
 }
 
-Driver.prototype._logIt = function (obj) {
-  if (obj instanceof LogEntry) obj = obj.toJSON()
-
-  return Q.ninvoke(this._log, 'append', obj)
+Driver.prototype.log = function (entry) {
+  return Q.ninvoke(this._log, 'append', entry)
 }
 
 Driver.prototype._chainWriterWorker = function (task, cb) {
@@ -656,7 +656,7 @@ Driver.prototype._chainWriterWorker = function (task, cb) {
       chainEntry.set('tx', tx.toBuffer())
       copyDHTKeys(chainEntry, task)
       self._debug('chained (write)', chainEntry)
-      return self._logIt(chainEntry)
+      return self.log(chainEntry)
     })
     .then(function () {
       cb()
@@ -685,7 +685,6 @@ Driver.prototype._onmessage = function (msg, fingerprint) {
 
   this._debug('received msg', msg)
   var tags = ['inbound', 'private']
-  var msgTypeTag
   if (msg.type !== 'plain' && msg.type !== 'struct') {
     this.emit('warn', 'unexpected message type: ' + msg.type)
   } else {
@@ -707,7 +706,7 @@ Driver.prototype._onmessage = function (msg, fingerprint) {
       self._debug('failed to find identity by fingerprint', fingerprint, err)
     })
     .finally(function () {
-      return self._logIt(entry)
+      return self.log(entry)
     })
     .done()
 }
@@ -746,7 +745,6 @@ Driver.prototype.putOnChain = function (entry) {
         self.chainwriterq.push(chainEntry.toJSON())
       })
       .catch(function (err) {
-        debugger
         self._debug('unable to find on-chain recipient\'s address', err)
       })
       .done()
@@ -769,7 +767,7 @@ Driver.prototype.sendPlaintext = function (options) {
     })
     .tag('new', 'plain', 'outbound')
 
-  this._logIt(entry)
+  this.log(entry)
 }
 
 Driver.prototype.publish = function (options) {
@@ -822,7 +820,7 @@ Driver.prototype.sendStructured = function (options) {
 
   validateRecipients(to)
   entry.set('to', to)
-  this._logIt(entry)
+  this.log(entry)
 }
 
 Driver.prototype.lookupBTCKey = function (recipient) {
@@ -836,7 +834,7 @@ Driver.prototype.lookupBTCKey = function (recipient) {
 }
 
 Driver.prototype.lookupBTCPubKey = function (recipient) {
-  return this.lookupBTCKey(recipient).then(function(k) {
+  return this.lookupBTCKey(recipient).then(function (k) {
     return k.value
   })
 }
@@ -846,7 +844,7 @@ Driver.prototype.lookupBTCAddress = function (recipient) {
     return Q.resolve(recipient.fingerprint)
   }
 
-  return this.lookupBTCKey(recipient).then(function(k) {
+  return this.lookupBTCKey(recipient).then(function (k) {
     return k.fingerprint
   })
 }
@@ -867,7 +865,8 @@ Driver.prototype.destroy = function () {
     Q.ninvoke(this._logDB, 'close'),
     Q.ninvoke(this._lastBlock, 'destroy')
   ])
-  .done(console.log.bind(console, this.pathPrefix + ' is dead'))
+  .done()
+  // .done(console.log.bind(console, this.pathPrefix + ' is dead'))
 }
 
 Driver.prototype._debug = function () {
@@ -876,17 +875,17 @@ Driver.prototype._debug = function () {
   return debug.apply(null, args)
 }
 
-function call (method) {
-  return function (obj) {
-    return obj[method]()
-  }
-}
+// function call (method) {
+//   return function (obj) {
+//     return obj[method]()
+//   }
+// }
 
-function caller (method) {
-  return function (obj) {
-    return obj[method].bind(obj)
-  }
-}
+// function caller (method) {
+//   return function (obj) {
+//     return obj[method].bind(obj)
+//   }
+// }
 
 function toBuffer (data) {
   if (Buffer.isBuffer(data)) return data
@@ -908,9 +907,9 @@ function toBuffer (data) {
 //   }
 // }
 
-function rethrow (err) {
-  if (err) throw err
-}
+// function rethrow (err) {
+//   if (err) throw err
+// }
 
 function getFingerprint (identity) {
   return find(identity.pubkeys, function (k) {

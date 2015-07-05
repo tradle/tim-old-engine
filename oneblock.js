@@ -32,6 +32,7 @@ function OneBlockDB (options) {
 
   this._db.createReadStream()
     .pipe(concat(function (txs) {
+      options = options
       self._currentHeight = txs.reduce(function (h, txInfo) {
         return Math.max(h, txInfo.height)
       }, 0)
@@ -97,7 +98,7 @@ OneBlockDB.prototype._processTx = function (txInfo, cb) {
     })
     .pipe(concat(function (batch) {
       debug('deleting ' + batch.length + ' txs: block ' + prevHeight)
-      var batch = batch.map(function (data) {
+      batch = batch.map(function (data) {
         return { type: 'del', key: data.key }
       })
 

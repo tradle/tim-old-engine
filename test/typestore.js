@@ -13,7 +13,7 @@ var TYPE = constants.TYPE
 
 test('typestore', function (t) {
   var num = 3
-  t.plan(2 + num * 4)
+  // t.plan(2 + num * 4)
 
   var type = 'blah'
   var store = new TypeStore({
@@ -47,14 +47,12 @@ test('typestore', function (t) {
   var first = num
   update(first, true, function () {
     for (var i = 0; i < num * 2; i++) {
-      update(i, i > first)
+      update(i, i > first, i === num * 2 - 1 ? t.end : null)
     }
   })
 })
 
 test('identity store', function (t) {
-  t.plan(1)
-
   var store = identityStore({
     path: 'identitystore',
     leveldown: leveldown
@@ -73,6 +71,7 @@ test('identity store', function (t) {
       if (err) throw err
 
       t.deepEqual(identities[0], obj)
+      t.end()
     })
   })
 })

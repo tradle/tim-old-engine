@@ -5,8 +5,6 @@ var leveldown = require('memdown')
 var OneBlock = require('../oneblock')
 
 test('one block', function (t) {
-  t.plan(1)
-
   var block = new OneBlock({
     path: 'block.db',
     leveldown: leveldown
@@ -14,6 +12,7 @@ test('one block', function (t) {
 
   block.on('finish', function () {
     t.equal(block.height(), 5)
+    block.destroy(t.end)
   })
 
   for (var i = 0; i <= 10; i++) {
@@ -32,7 +31,7 @@ test('one block', function (t) {
     return crypto.randomBytes(20).toString('hex')
   }
 
-  function toHex() {
+  function toHex () {
     return 'abc'
   }
 })
