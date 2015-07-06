@@ -6,7 +6,7 @@ _this module is used by [Tradle](https://github.com/tradle/about/wiki)_
 
 This module comprises a wrapper around and an API to a number of Tradle components, and a datalog of all activity.  A UI is developed separately. Currently we focus on [React Native based UI](https://github.com/pgmemk/TiM) (on iOS and hopefully soon on Android). Prior to that we developed a [Chrome App UI](https://github.com/tradle/chromeapp). And prior to that we developed a node-webkit UI, but it is very much behind now. Let us know if you are interested in these environments.
 
-## TiM wraps the following Tradle components:
+## TiM uses the following Tradle components:
 
 ### zlorp
 
