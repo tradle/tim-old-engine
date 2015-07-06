@@ -10,15 +10,15 @@ This module comprises a wrapper around and an API to a number of Tradle componen
 
 ### zlorp
 
-Peer-to-peer OTR-based chat. Discovery via bittorrent-dht, hole-punching, and chat via rUDP (later via UTP).
+[Zlorp](https://github.com/tradle/zlorp) is just the core chat module. It uses OTR for secure sessions (later will add support for Axolotl, which is used by TextSecure and Pond). Peer discovery today is done via bittorrent-dht (later via BEP 44 and other means). Zlorp provides UDP NAT traversal (firewall hole-punching), and a chat via rUDP reliable channel (later via uTP).
 
 ### bitkeeper-js
 
-A module that uses [WebTorrent](https://github.com/feross/webtorrent) for storing and ensuring replication of arbitrary files. In Tradle, bitkeeper is used to store the original (encrypted) versions of on-chain files.
+[Bitkeeper](https://github.com/tradle/bitkeeper-js) module uses [WebTorrent](https://github.com/feross/webtorrent) for storing and ensuring replication of arbitrary files. In Tradle, bitkeeper is used to store the original (encrypted) versions of on-chain objects (structured messages).
 
 ### chained-obj
 
-An on-chain object builder and parser. Currently uses multipart to store arbitrary JSON data + attachments.
+[Chained-obj](https://github.com/tradle/chained-obj) is object builder and parser. Currently uses multipart to store arbitrary JSON data + attachments. These objects are later encrypted and put on-chain.
 
 ### bitjoe-js (to be renamed to: chainwriter)
 
@@ -32,9 +32,9 @@ Wait for it...a bunch of constants
 
 A small set of crypto and torrent-related functions used by a number of Tradle components
 
-### midentity
+### Identity
 
-A wrapper around an OpenName-compatible Identity schema. Used for building/parsing/validating identity objects.
+[Identity](https://github.com/tradle/identity) is wrapper around an OpenName-compatible Identity schema. Used for building/parsing/validating identity objects.
 
 ### chainloader
 
