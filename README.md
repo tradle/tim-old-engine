@@ -10,7 +10,7 @@ This module comprises a wrapper around and an API to a number of Tradle componen
 
 ### zlorp
 
-[Zlorp](https://github.com/tradle/zlorp) is just the core chat module. It uses OTR for secure sessions (later will add support for Axolotl, which is used by TextSecure and Pond). Peer discovery today is done via bittorrent-dht (later via BEP 44 and other means). Zlorp provides UDP NAT traversal (firewall hole-punching), and a chat via rUDP reliable channel (later via uTP).
+[Zlorp](https://github.com/tradle/zlorp) is just the core chat module. It uses OTR for secure sessions (later will add support for Axolotl, used in [TextSecure](https://github.com/WhisperSystems/TextSecure/) and [Pond](https://pond.imperialviolet.org/)). Peer discovery today is done via bittorrent-dht. But it's announce messages leak IP/Port, so we will try to use BEP 44 instead. Zlorp provides UDP NAT traversal (firewall hole-punching), and a direct connection via rUDP (later via uTP). We plan to further investigate anonymous packet delivery, possibly via I2P (TOR does not support UDP).
 
 ### bitkeeper-js
 
