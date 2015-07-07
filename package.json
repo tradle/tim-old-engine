@@ -18,7 +18,6 @@
     "array-find": "^1.0.0",
     "bitcoinjs-lib": "^1.4.1",
     "bitjoe-js": "git://github.com/tradle/bitjoe-js",
-    "bitkeeper-client-js": "git://github.com/tradle/bitkeeper-client-js",
     "bittorrent-dht": "git://github.com/tradle/bittorrent-dht",
     "cb-streams": "^1.0.2",
     "chained-obj": "^1.0.2",
@@ -55,7 +54,6 @@
   "devDependencies": {
     "bitkeeper-js": "git://github.com/tradle/bitkeeper-js",
     "cb-blockr": "git://github.com/tradle/cb-blockr",
-    "leveldown": "^0.10.0",
     "memdown": "^1.0.0",
     "pre-commit": "^1.0.10",
     "standard": "^4.5.2",
