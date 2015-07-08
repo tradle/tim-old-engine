@@ -14,6 +14,7 @@ var extend = require('extend')
 var utils = require('tradle-utils')
 var concat = require('concat-stream')
 var mapStream = require('map-stream')
+var pump = require('pump')
 var typeforce = require('typeforce')
 var find = require('array-find')
 var ChainedObj = require('chained-obj')
@@ -30,16 +31,18 @@ var Parser = ChainedObj.Parser
 var Builder = ChainedObj.Builder
 var normalizeJSON = require('./normalizeJSON')
 var chainstream = require('./chainstream')
-var OneBlock = require('./oneblock')
+// var OneBlock = require('./oneblock')
 var identityStore = require('./identityStore')
 var getDHTKey = require('./getDHTKey')
 var LogEntry = require('./logEntry')
 var constants = require('tradle-constants')
+var Tags = require('./tags')
 var noop = function () {}
 var TYPE = constants.TYPE
 var ROOT_HASH = constants.ROOT_HASH
 var CUR_HASH = constants.CUR_HASH
 var PREFIX = constants.OP_RETURN_PREFIX
+var ArrayProto = Array.prototype
 
 // var MessageType = Driver.MessageType = {
 //   plaintext: 1 << 1,
@@ -191,44 +194,63 @@ Driver.prototype._setupP2P = function () {
 Driver.prototype._setupTxStream = function () {
   var self = this
   var defer = Q.defer()
+  var lastBlock
+  var lastBlockTxIds = []
 
-  this._lastBlock = new OneBlock({
-    path: this._prefix('lastBlock.db'),
-    leveldown: this.leveldown
-  })
-
-  this._lastBlock.once('ready', function () {
-    self._rawTxStream = cbstreams.stream.txs({
-        live: true,
-        interval: self.syncInterval || 60000,
-        api: self.blockchain,
-        height: self._lastBlock.height(),
-        addresses: [
-          self.wallet.addressString,
-          constants.IDENTITY_PUBLISH_ADDRESS
-        ]
-      })
-
-    self._rawTxStream
-      .pipe(mapStream(function (txInfo, done) {
-        var copy = extend({}, txInfo)
-        var entry = new LogEntry()
-          .copy(copy)
-          .set('tx', copy.tx.toBuffer())
-          .tag('tx')
-
-        done(null, entry)
-      }))
-      .pipe(self._logWS)
-
-    self._txStream
-      .pipe(toValueStream())
-      .pipe(self._lastBlock)
-
-    defer.resolve()
-  })
+  var rs = this._log.createReadStream({ reverse: true })
+    .pipe(logFilter(Tags.fromChain))
+    .on('data', function (data) {
+      var txId = bitcoin.Transaction.fromBuffer(data.tx).getId()
+      lastBlockTxIds.unshift(txId)
+      if (typeof lastBlock === 'undefined') {
+        lastBlock = data.height
+      } else {
+        if (data.height < lastBlock) {
+          rs.destroy()
+        }
+      }
+    })
+    .once('close', function () {
+      self._streamTxs(lastBlock, lastBlockTxIds)
+      defer.resolve()
+    })
 
   return defer.promise
+}
+
+Driver.prototype._streamTxs = function (fromHeight, skipIds) {
+  if (!fromHeight) fromHeight = 0
+
+  this._rawTxStream = cbstreams.stream.txs({
+    live: true,
+    interval: this.syncInterval || 60000,
+    api: this.blockchain,
+    height: fromHeight,
+    addresses: [
+      this.wallet.addressString,
+      constants.IDENTITY_PUBLISH_ADDRESS
+    ]
+  })
+
+  pump(
+    this._rawTxStream,
+    mapStream(function (txInfo, cb) {
+      var id = txInfo.tx.getId()
+      if (txInfo.height < fromHeight ||
+        (txInfo.height === fromHeight && skipIds.indexOf(id) === -1)) {
+        return cb()
+      }
+
+      var copy = extend({}, txInfo)
+      var entry = new LogEntry()
+        .copy(copy)
+        .set('tx', copy.tx.toBuffer())
+        .tag(Tags.tx)
+
+      cb(null, entry)
+    }),
+    this._logWS
+  )
 }
 
 Driver.prototype._setupLog = function () {
@@ -243,8 +265,9 @@ Driver.prototype._setupLog = function () {
 
   var createReadStream = this._log.createReadStream
   this._log.createReadStream = function (options) {
-    return createReadStream.apply(self._log, arguments)
-      .pipe(mapStream(function (data, cb) {
+    return pump(
+      createReadStream.apply(self._log, arguments),
+      mapStream(function (data, cb) {
         var hasKeys = !options || options.keys !== false
         var hasValues = !options || options.values !== false
         if (hasValues) {
@@ -253,7 +276,8 @@ Driver.prototype._setupLog = function () {
         }
 
         cb(null, data)
-      }))
+      })
+    )
   }
 
   var append = this._log.append
@@ -282,8 +306,6 @@ Driver.prototype._setupLog = function () {
 }
 
 Driver.prototype._readLog = function (startId) {
-  var self = this
-
   this._logRS = this._log
     .createReadStream({
       live: true,
@@ -311,45 +333,45 @@ Driver.prototype._readLog = function (startId) {
 
   // this._logStream = duplexify(ws, rs)
 
-  this._txStream = this._logRS.pipe(logFilter('tx'))
+  this._txStream = this._logRS.pipe(logFilter(Tags.tx))
     .pipe(mapStream(function (entry, cb) {
       var tx = bitcoin.Transaction.fromBuffer(entry.get('tx'))
       entry.set('tx', tx)
       cb(null, entry)
     }))
 
-  // var inbound = this._logRS.pipe(logFilter('inbound'))
+  // var inbound = this._logRS.pipe(logFilter(Tags.inbound))
   // inbound.on('data', this._onInboundMessage)
 
-  var inboundPlain = this._logRS.pipe(logFilter('inbound', 'plain'))
+  var inboundPlain = this._logRS.pipe(logFilter(Tags.inbound, Tags.plain))
   inboundPlain.on('data', this._onInboundPlaintext)
 
-  // this._newInboundPlain = this._logRS.pipe(logFilter('plain', 'inbound'))
-  // this._newPublicStruct = this._logRS.pipe(logFilter('struct', 'public'))
+  // this._newInboundPlain = this._logRS.pipe(logFilter(Tags.plain, Tags.inbound))
+  // this._newPublicStruct = this._logRS.pipe(logFilter(Tags.struct, Tags.public))
   // this._
 
-  var inboundStruct = this._logRS.pipe(logFilter('struct', 'inbound', 'private'))
+  var inboundStruct = this._logRS.pipe(logFilter(Tags.struct, Tags.inbound, Tags.private))
   inboundStruct.on('data', this._onInboundStruct)
 
-  var newOutboundPlain = this._logRS.pipe(logFilter('new', 'plain', 'outbound'))
+  var newOutboundPlain = this._logRS.pipe(logFilter(Tags.new, Tags.plain, Tags.outbound))
   newOutboundPlain.on('data', this._onNewOutboundPlainMessage)
 
-  var newOutboundStruct = this._logRS.pipe(logFilter('new', 'struct', 'outbound'))
+  var newOutboundStruct = this._logRS.pipe(logFilter(Tags.new, Tags.struct, Tags.outbound))
   newOutboundStruct.on('data', this._onNewOutboundStructMessage)
 
-  var storedOutboundStruct = this._logRS.pipe(logFilter('struct', 'outbound', 'stored'))
+  var storedOutboundStruct = this._logRS.pipe(logFilter(Tags.struct, Tags.outbound, Tags.stored))
   storedOutboundStruct.on('data', this._onStoredOutboundStructMessage)
 
   // this._newOutbound.on('data', this._onNewOutboundMessage)
 
-  // this._newPlain = this._logRS.pipe(logFilter('new', 'plain'))
+  // this._newPlain = this._logRS.pipe(logFilter(Tags.new, Tags.plain))
 
-  // this._newPlainInbound = this._newPlain.pipe(logFilter('inbound'))
+  // this._newPlainInbound = this._newPlain.pipe(logFilter(Tags.inbound))
   // this._newPlainInbound.on('data', this._onInboundPlain)
 
-  // this._newStructured = this._logRS.pipe(logFilter('new', 'struct'))
-  // var structStored = this._logRS.pipe(logFilter('struct', 'stored'))
-  var structChained = this._logRS.pipe(logFilter('struct', 'from-chain'))
+  // this._newStructured = this._logRS.pipe(logFilter(Tags.new, Tags.struct))
+  // var structStored = this._logRS.pipe(logFilter(Tags.struct, Tags.stored))
+  var structChained = this._logRS.pipe(logFilter(Tags.struct, Tags.fromChain))
   structChained.on('data', this._onStructChained)
 
   var objStream = chainstream({
@@ -357,37 +379,55 @@ Driver.prototype._readLog = function (startId) {
     lookup: this.lookupByDHTKey
   })
 
-  this._txStream
-    .pipe(objStream)
-    .pipe(mapStream(function (chainedObj, cb) {
-      // how do we know prev?
-      // necessary? maybe just write this straight to log
-      var from = chainedObj.from.getOriginalJSON()
-      var to = chainedObj.to && chainedObj.to.getOriginalJSON()
+  pump(
+    this._txStream,
+    objStream,
+    mapStream(this._postProcessChainedObj.bind(this)),
+    this._logWS
+  )
+}
 
-      self._debug('picked up object from chain', chainedObj)
-      var entry = new LogEntry()
-        .copy(chainedObj, 'height', 'data')
-        .set({
-          from: from[ROOT_HASH],
-          tx: chainedObj.tx.toBuffer()
-        })
-        .set(CUR_HASH, chainedObj.key)
-        .set(ROOT_HASH, chainedObj.parsed.data[ROOT_HASH] || chainedObj.key)
-        .set(TYPE, chainedObj.parsed.data[TYPE])
-        .tag(
-          'struct',
-          'from-chain',
-          from[ROOT_HASH] === self._myRootHash ? 'outbound' : 'inbound',
-          chainedObj.type === 'public' ? 'public' : 'private'
-        )
-        .prev(chainedObj)
+Driver.prototype._postProcessChainedObj = function (chainedObj, cb) {
+  var entry
+  if (!chainedObj.parsed || chainedObj.errors.length) {
+    entry = new LogEntry()
+      .copy(chainedObj)
+      .set('tx', chainedObj.tx.toBuffer())
+      .tag(
+        Tags.fromChain,
+        Tags.nonData
+      )
+      .prev(chainedObj)
 
-      if (to) entry.set('to', to[ROOT_HASH])
+    return cb(null, entry)
+  }
 
-      cb(null, entry)
-    }))
-    .pipe(this._logWS)
+  // how do we know prev?
+  // necessary? maybe just write this straight to log
+  var from = chainedObj.from.getOriginalJSON()
+  var to = chainedObj.to && chainedObj.to.getOriginalJSON()
+
+  this._debug('picked up object from chain', chainedObj)
+  entry = new LogEntry()
+    .copy(chainedObj, 'height', 'data')
+    .set({
+      from: from[ROOT_HASH],
+      tx: chainedObj.tx.toBuffer()
+    })
+    .set(CUR_HASH, chainedObj.key)
+    .set(ROOT_HASH, chainedObj.parsed.data[ROOT_HASH] || chainedObj.key)
+    .set(TYPE, chainedObj.parsed.data[TYPE])
+    .tag(
+      Tags.struct,
+      Tags.fromChain,
+      from[ROOT_HASH] === this._myRootHash ? Tags.outbound : Tags.inbound,
+      chainedObj.type === 'public' ? Tags.public : Tags.private
+    )
+    .prev(chainedObj)
+
+  if (to) entry.set('to', to[ROOT_HASH])
+
+  cb(null, entry)
 }
 
 Driver.prototype._onInboundPlaintext = function (entry) {
@@ -410,7 +450,7 @@ Driver.prototype._onInboundStruct = function (entry) {
       }
     })
     .once('close', function () {
-      if (entry.hasTag('from-chain')) {
+      if (entry.hasTag(Tags.fromChain)) {
         if (other) {
           self.emit('resolved', entry.toJSON())
         }
@@ -437,7 +477,7 @@ Driver.prototype._onStructChained = function (entry) {
 
 Driver.prototype._onNewOutboundStructMessage = function (entry) {
   var self = this
-  var isPublic = entry.hasTag('public')
+  var isPublic = entry.hasTag(Tags.public)
   var builder = new Builder()
     .data(entry.get('data'))
 
@@ -456,7 +496,7 @@ Driver.prototype._onNewOutboundStructMessage = function (entry) {
   ].concat(entry.get('to').map(lookup))
 
   var ssEntry = new LogEntry()
-    .tag('struct', 'stored', 'outbound', getPrivacyTag(entry))
+    .tag(Tags.struct, Tags.stored, Tags.outbound, getPrivacyTag(entry))
     .prev(entry)
     .copy(entry, 'chain', 'to', 'sign')
 
@@ -532,7 +572,7 @@ Driver.prototype._sendP2P = function (entry) {
 
 Driver.prototype._onStoredOutboundStructMessage = function (entry) {
   if (entry.get('chain')) this.putOnChain(entry)
-  if (entry.hasTag('public')) return
+  if (entry.hasTag(Tags.public)) return
 
   this._sendP2P(entry)
 }
@@ -684,8 +724,8 @@ Driver.prototype._onmessage = function (msg, fingerprint) {
   }
 
   this._debug('received msg', msg)
-  var tags = ['inbound', 'private']
-  if (msg.type !== 'plain' && msg.type !== 'struct') {
+  var tags = [Tags.inbound, Tags.private]
+  if (msg.type !== Tags.plain && msg.type !== Tags.struct) {
     this.emit('warn', 'unexpected message type: ' + msg.type)
   } else {
     tags.push(msg.type)
@@ -715,7 +755,7 @@ Driver.prototype.putOnChain = function (entry) {
   var self = this
   assert(entry.get(ROOT_HASH) && entry.get(CUR_HASH))
 
-  var isPublic = entry.hasTag('public')
+  var isPublic = entry.hasTag(Tags.public)
   var type = isPublic ? TxData.types.public : TxData.types.permission
   var recipients = entry.get(isPublic ? 'to' : 'shares')
   if (!recipients) {
@@ -734,7 +774,7 @@ Driver.prototype.putOnChain = function (entry) {
     // queue up this entry
     var chainEntry = new LogEntry()
       .prev(entry)
-      .tag('struct', 'to-chain', 'outbound')
+      .tag(Tags.struct, 'to-chain', Tags.outbound)
       .set('type', type)
       .set('data', isPublic ? curHash : r.data)
 
@@ -765,7 +805,7 @@ Driver.prototype.sendPlaintext = function (options) {
       from: this._myRootHash,
       to: to
     })
-    .tag('new', 'plain', 'outbound')
+    .tag(Tags.new, Tags.plain, Tags.outbound)
 
   this.log(entry)
 }
@@ -801,7 +841,7 @@ Driver.prototype.sendStructured = function (options) {
       from: this._myRootHash
     })
     .copy(options, 'to', 'attachments', 'sign', 'chain')
-    .tag('new', 'struct', 'outbound', isPublic ? 'public' : 'private')
+    .tag(Tags.new, Tags.struct, Tags.outbound, isPublic ? Tags.public : Tags.private)
 
   var to
   if (isPublic) {
@@ -862,8 +902,7 @@ Driver.prototype.destroy = function () {
     Q.ninvoke(this.p2p, 'destroy'),
     Q.ninvoke(this.queueDB, 'close'),
     Q.ninvoke(this.addressBook, 'close'),
-    Q.ninvoke(this._logDB, 'close'),
-    Q.ninvoke(this._lastBlock, 'destroy')
+    Q.ninvoke(this._logDB, 'close')
   ])
   .done()
   // .done(console.log.bind(console, this.pathPrefix + ' is dead'))
@@ -974,25 +1013,21 @@ function logFilter (/* tags */) {
 }
 
 function getPrivacyTag (entry) {
-  if (entry.hasTag('public')) return 'public'
-  if (entry.hasTag('private')) return 'private'
-
-  throw new Error('no privacy tag')
+  return getTaggedWith(entry, Tags.public, Tags.private)
 }
 
 function getMsgTypeTag (entry) {
-  if (entry.hasTag('plain')) return 'plain'
-  if (entry.hasTag('struct')) return 'struct'
+  return getTaggedWith(entry, Tags.plain, Tags.struct)
+}
 
-  throw new Error('no type tag')
+function getTaggedWith (entry /*, tags */) {
+  var tags = ArrayProto.concat.apply([], ArrayProto.slice.call(arguments, 1))
+  var tag = find(tags, entry.hasTag, entry)
+  if (tag) return tag
+
+  throw new Error('tag not found')
 }
 
 function notNull (o) {
   return !!o
-}
-
-function toValueStream () {
-  return mapStream(function (data, cb) {
-    cb(null, data.value)
-  })
 }

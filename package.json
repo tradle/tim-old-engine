@@ -18,6 +18,7 @@
     "blockchain",
     "p2p",
     "webtorrent",
+    "bittorrent",
     "otr",
     "messaging",
     "chat"
@@ -52,6 +53,7 @@
     "object.pick": "^1.1.1",
     "pad": "^0.1.0",
     "pend": "^1.2.0",
+    "pump": "^1.0.0",
     "q": "^1.4.1",
     "readable-stream": "^2.0.1",
     "safecb": "0.0.1",

@@ -1,5 +1,5 @@
 
-var through2 = require('through2')
+var mapStream = require('map-stream')
 var debug = require('debug')('chainstream')
 var extend = require('extend')
 var combine = require('stream-combiner2')
@@ -43,72 +43,102 @@ module.exports = function chainstream (options) {
 
   verifier.use(plugins)
 
-  var trans = combine(
-    // through2.obj(function (txInfo, enc, done) {
-    //   // var tx = txInfo.tx
-    //   // tx.height = txInfo.height
-    //   this.push(txInfo.tx)
-    //   done()
-    // }),
-    through2.obj(function (txEntry, enc, done) {
-      var self = this
+  return combine.obj(
+    mapStream(function (txEntry, done) {
+      var processed = txEntry.toJSON()
+      processed.errors = []
       chainloader.load(txEntry.get('tx'))
         .then(function (chainedObjs) {
           var obj = chainedObjs && chainedObjs[0]
-          if (obj) {
-            obj = extend({}, obj, txEntry.toJSON())
-            self.push(obj)
-          }
+          if (obj) extend(processed, obj)
         })
         .catch(function (err) {
           debug('nothing to load in tx?', err)
+          processed.errors.push(err)
         })
-        .finally(function () {
-          done()
+        .done(function () {
+          extend(processed, txEntry.toJSON())
+          done(null, processed)
         })
-        .done()
     }),
-    // options.chainloader,
     mkParser(),
     basicIdCheck(),
-    verifier
+    verify(verifier)
   )
 
-  return trans
+  // var full = txProcessor
+  //   .pipe(mapStream(function (chainedObj, cb) {
+  //     if (chainedObj.data) cb(null, chainedObj)
+  //     else cb()
+  //   }))
+  //   .pipe(mkParser())
+  //   .pipe(basicIdCheck())
+  //   .pipe(verifier)
+
+  // var empty = txProcessor
+  //   .pipe(mapStream(function (chainedObj, cb) {
+  //     if (chainedObj.data) cb()
+  //     else cb(null, chainedObj)
+  //   }))
+
+  // var passThrough = new PassThrough({ objectMode: true })
+  // full.pipe(passThrough)
+  // empty.pipe(passThrough)
+  // return combine(
+  //   txProcessor,
+  //   passThrough
+  // )
 }
 
 function mkParser () {
-  return through2.obj(function (chainedObj, enc, done) {
-    var self = this
+  return mapStream(function (chainedObj, done) {
+    if (!chainedObj.data) return done(null, chainedObj)
+
     Parser.parse(chainedObj.data, function (err, parsed) {
       if (err) {
         debug('invalid chained-obj', chainedObj.key)
-        return done()
+        chainedObj.errors.push(err)
+      } else {
+        chainedObj.parsed = parsed
       }
 
-      chainedObj.parsed = parsed
-      self.push(chainedObj)
-      done()
+      done(null, chainedObj)
     })
 
   })
 }
 
 function basicIdCheck () {
-  return through2.obj(function (chainedObj, enc, done) {
+  return mapStream(function (chainedObj, done) {
+    if (!chainedObj.parsed) return done(null, chainedObj)
+
     var parsed = chainedObj.parsed
     var json = parsed.data
     var isIdentity = json[TYPE] === Identity.TYPE
     var from = chainedObj.from
     // only identities are allowed to be created without an identity
-    if (!from && !isIdentity) return done()
+    if (from || isIdentity) {
+      if (from) chainedObj.from = from.identity
+      else if (isIdentity) chainedObj.from = Identity.fromJSON(json)
 
-    if (from) chainedObj.from = from.identity
-    else if (isIdentity) chainedObj.from = Identity.fromJSON(json)
+      if (chainedObj.to) chainedObj.to = chainedObj.to.identity
+    }
 
-    if (chainedObj.to) chainedObj.to = chainedObj.to.identity
+    done(null, chainedObj)
+  })
+}
 
-    this.push(chainedObj)
-    done()
+function verify (verifier) {
+  return mapStream(function (chainedObj, cb) {
+    if (!chainedObj.parsed) return cb(null, chainedObj)
+
+    verifier.verify(chainedObj, function (err) {
+      if (err) {
+        chainedObj.errors.push(err)
+        debug('failed to verify', chainedObj.key, err)
+      }
+
+      cb(null, chainedObj)
+    })
   })
 }

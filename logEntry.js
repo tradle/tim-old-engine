@@ -3,6 +3,7 @@ var typeforce = require('typeforce')
 var extend = require('extend')
 var omit = require('object.omit')
 var ArrayProto = Array.prototype
+var Tags = require('./tags')
 
 module.exports = LogEntry
 
@@ -24,12 +25,14 @@ LogEntry.prototype.metadata = function () {
 }
 
 LogEntry.prototype.hasTag = function (tag) {
+  validateTag(tag)
   return this._metadata.tags.indexOf(tag) !== -1
 }
 
 LogEntry.prototype.tag = function (tags) {
   var myTags = this._metadata.tags
   tags = ArrayProto.concat.apply([], arguments)
+  tags.forEach(validateTag)
   tags.forEach(function (tag) {
     if (myTags.indexOf(tag) === -1) {
       myTags.push(tag)
@@ -123,4 +126,12 @@ LogEntry.fromJSON = function (json) {
 
 function getProp (obj, name) {
   return obj instanceof LogEntry ? obj.get(name) : obj[name]
+}
+
+function validateTag (tag) {
+  for (var t in Tags) {
+    if (Tags[t] === tag) return true
+  }
+
+  throw new Error(tag + ' is not a known log tag')
 }

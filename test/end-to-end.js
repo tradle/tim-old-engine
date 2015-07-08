@@ -155,6 +155,11 @@ test('chained message', function (t) {
   msg[TYPE] = 'blahblah'
   var identitiesChained = 0
 
+  billWallet.send()
+    .to(tedWallet.addressString, 10000)
+    .change(billWallet.addressString)
+    .execute()
+
   driverBill.on('chained', function (obj) {
     Parser.parse(obj.data, function (err, parsed) {
       if (err) throw err
