@@ -972,22 +972,22 @@ function copyDHTKeys (dest, src, curHash) {
   if (typeof curHash === 'undefined') {
     if (typeof src === 'string') curHash = src
     else {
-      curHash = getProp(src, CUR_HASH) || getProp(src, ROOT_HASH)
+      curHash = getLogEntryProp(src, CUR_HASH) || getLogEntryProp(src, ROOT_HASH)
     }
 
     src = dest
   }
 
-  var rh = getProp(src, ROOT_HASH) || curHash
-  setProp(dest, ROOT_HASH, rh)
-  setProp(dest, CUR_HASH, curHash)
+  var rh = getLogEntryProp(src, ROOT_HASH) || curHash
+  setLogEntryProp(dest, ROOT_HASH, rh)
+  setLogEntryProp(dest, CUR_HASH, curHash)
 }
 
-function getProp (obj, name) {
+function getLogEntryProp (obj, name) {
   return obj instanceof LogEntry ? obj.get(name) : obj[name]
 }
 
-function setProp (obj, name, val) {
+function setLogEntryProp (obj, name, val) {
   if (obj instanceof LogEntry) obj.set(name, val)
   else obj[name] = val
 }
