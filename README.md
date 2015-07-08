@@ -2,7 +2,7 @@
 
 Tradle's P2P chat with plaintext and structured messages, and the ability to externalize messages onto a blockchain (currently bitcoin's).
 
-_this module is used by [Tradle](https://github.com/tradle/about/wiki)_
+_this module is used by [Tradle](https://github.com/tradle/about/wiki)_  
 _this npm module's name was graciously donated by [Sean Robertson](https://www.npmjs.com/~spro)_
 
 This module comprises a wrapper around and an API to a number of Tradle components, and a datalog of all activity.  A UI is developed separately. Currently we focus on [React Native based UI](https://github.com/pgmemk/TiM) (on iOS and hopefully soon on Android), see the [preview](https://www.youtube.com/watch?v=S66T0dPNn5I). Prior to that we developed a [Chrome App UI](https://github.com/tradle/chromeapp). And prior to that we developed a node-webkit UI, but it is very much behind now. Let us know if you are interested in these environments.
