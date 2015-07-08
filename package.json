@@ -12,6 +12,10 @@
     "style",
     "test"
   ],
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/tradle/tim.git"
+  },
   "author": "Mark Vayngrib <mark.vayngrib@lablz.com> (http://github.com/mvayngrib)",
   "license": "ISC",
   "dependencies": {
