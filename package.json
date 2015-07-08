@@ -12,6 +12,16 @@
     "style",
     "test"
   ],
+  "keywords": [
+    "tradle",
+    "bitcoin",
+    "blockchain",
+    "p2p",
+    "webtorrent",
+    "otr",
+    "messaging",
+    "chat"
+  ],
   "repository": {
     "type": "git",
     "url": "https://github.com/tradle/tim.git"
