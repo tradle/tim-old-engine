@@ -1,5 +1,5 @@
 
-var mapStream = require('map-stream')
+var map = require('map-stream')
 var debug = require('debug')('chainstream')
 var extend = require('extend')
 var combine = require('stream-combiner2')
@@ -44,7 +44,7 @@ module.exports = function chainstream (options) {
   verifier.use(plugins)
 
   return combine.obj(
-    mapStream(function (txEntry, done) {
+    map(function (txEntry, done) {
       var processed = txEntry.toJSON()
       processed.errors = []
       chainloader.load(txEntry.get('tx'))
@@ -67,7 +67,7 @@ module.exports = function chainstream (options) {
   )
 
   // var full = txProcessor
-  //   .pipe(mapStream(function (chainedObj, cb) {
+  //   .pipe(map(function (chainedObj, cb) {
   //     if (chainedObj.data) cb(null, chainedObj)
   //     else cb()
   //   }))
@@ -76,7 +76,7 @@ module.exports = function chainstream (options) {
   //   .pipe(verifier)
 
   // var empty = txProcessor
-  //   .pipe(mapStream(function (chainedObj, cb) {
+  //   .pipe(map(function (chainedObj, cb) {
   //     if (chainedObj.data) cb()
   //     else cb(null, chainedObj)
   //   }))
@@ -91,7 +91,7 @@ module.exports = function chainstream (options) {
 }
 
 function mkParser () {
-  return mapStream(function (chainedObj, done) {
+  return map(function (chainedObj, done) {
     if (!chainedObj.data) return done(null, chainedObj)
 
     Parser.parse(chainedObj.data, function (err, parsed) {
@@ -109,7 +109,7 @@ function mkParser () {
 }
 
 function basicIdCheck () {
-  return mapStream(function (chainedObj, done) {
+  return map(function (chainedObj, done) {
     if (!chainedObj.parsed) return done(null, chainedObj)
 
     var parsed = chainedObj.parsed
@@ -129,7 +129,7 @@ function basicIdCheck () {
 }
 
 function verify (verifier) {
-  return mapStream(function (chainedObj, cb) {
+  return map(function (chainedObj, cb) {
     if (!chainedObj.parsed) return cb(null, chainedObj)
 
     verifier.verify(chainedObj, function (err) {
