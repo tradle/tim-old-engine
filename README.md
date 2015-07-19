@@ -11,47 +11,47 @@ Prior to React Native UI for Tim we developed a [Chrome App UI](https://github.c
 
 ## TiM uses the following Tradle components:
 
-### zlorp
+### [zlorp](https://github.com/tradle/zlorp)
 
 [Zlorp](https://github.com/tradle/zlorp) is just the core chat module. It uses OTR for secure sessions (later will add support for Axolotl, used in [TextSecure](https://github.com/WhisperSystems/TextSecure/) and [Pond](https://pond.imperialviolet.org/)). Peer discovery today is done via bittorrent-dht. But DHT's regular announce messages leak IP/Port, so we will see if we can use BEP 44 to encrypt them. Zlorp provides UDP NAT traversal (firewall hole-punching), and a direct connection via rUDP (later via uTP). We plan to further investigate anonymous packet delivery, possibly via I2P (TOR does not support UDP).
 
-### bitkeeper-js
+### [bitkeeper-js](https://github.com/tradle/bitkeeper-js)
 
 [Bitkeeper](https://github.com/tradle/bitkeeper-js) module uses [WebTorrent](https://github.com/feross/webtorrent) for storing and ensuring replication of arbitrary files. In Tradle, bitkeeper is used to store the original (encrypted) versions of on-chain objects (structured messages).
 
-### chained-obj
+### [chained-obj](https://github.com/tradle/chained-obj)
 
 [Chained-obj](https://github.com/tradle/chained-obj) is object builder and parser. Currently uses multipart to store arbitrary JSON data + attachments. These objects are later encrypted and put on-chain.
 
-### bitjoe-js (to be renamed to: chainwriter)
+### [bitjoe-js](https://github.com/tradle/bitjoe-js) (to be renamed to: chainwriter)
 
 A collection of requests that can be used to put an object "on chain": encrypt an object for its recipients, store/seed it from a bitkeeper node and put private links on blockchain.
 
-### tradle-constants
+### [tradle-constants](https://github.com/tradle/tradle-constants)
 
 Wait for it...a bunch of constants
 
-### tradle-utils
+### [tradle-utils](https://github.com/tradle/tradle-utils)
 
 A small set of crypto and torrent-related functions used by a number of Tradle components
 
-### Identity
+### [Identity](https://github.com/tradle/identity)
 
 [Identity](https://github.com/tradle/identity) is wrapper around an OpenName-compatible Identity schema. Used for building/parsing/validating identity objects.
 
-### chainloader
+### [chainloader](https://github.com/tradle/chainloader)
 
 Parses bitcoin transactions, attempts to process embedded links, loads intermediate files and original files from a bitkeeper node, decrypts and returns files and metadata. Implements stream.Transform.
 
-### simple-wallet
+### [simple-wallet](https://github.com/tradle/simple-wallet)
 
 One-key [common blockchain](https://github.com/common-blockchain/common-blockchain) based wallet.
 
-### tradle-tx-data
+### [tradle-tx-data](https://github.com/tradle/tx-data)
 
 For building/parsing bitcoin-transaction-embedded data
 
-### tradle-verifier
+### [tradle-verifier](https://github.com/tradle/tradle-verifier)
 
 Plugin-based verifier for on-chain objects. Implements several default plugins:  
     Signature Check  
