@@ -1,4 +1,5 @@
 
+var bitcoin = require('bitcoinjs-lib')
 var map = require('map-stream')
 var debug = require('debug')('chainstream')
 var extend = require('extend')
@@ -45,9 +46,10 @@ module.exports = function chainstream (options) {
 
   return combine.obj(
     map(function (txEntry, done) {
-      var processed = txEntry.toJSON()
+      var processed = extend({}, txEntry)
       processed.errors = []
-      chainloader.load(txEntry.get('tx'))
+      var tx = bitcoin.Transaction.fromBuffer(txEntry.tx)
+      chainloader.load(tx)
         .then(function (chainedObjs) {
           var obj = chainedObjs && chainedObjs[0]
           if (obj) extend(processed, obj)
@@ -57,7 +59,6 @@ module.exports = function chainstream (options) {
           processed.errors.push(err)
         })
         .done(function () {
-          extend(processed, txEntry.toJSON())
           done(null, processed)
         })
     }),

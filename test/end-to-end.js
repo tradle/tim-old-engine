@@ -6,6 +6,7 @@ var memdown = require('memdown')
 var Q = require('q')
 var DHT = require('bittorrent-dht')
 var ChainedObj = require('chained-obj')
+var Builder = ChainedObj.Builder
 var Parser = ChainedObj.Parser
 var stringify = require('tradle-utils').stringify
 // var CreateReq = require('bitjoe-js/lib/requests/create')
@@ -20,12 +21,14 @@ var tedPriv = require('./fixtures/ted-priv')
 var constants = require('tradle-constants')
 var TYPE = constants.TYPE
 var ROOT_HASH = constants.ROOT_HASH
+var CUR_HASH = constants.CUR_HASH
 // var tedHash = tedPub[ROOT_HASH] = 'c67905793f6cc0f0ab8d20aecfec441932ffb13d'
 // var billHash = billPub[ROOT_HASH] ='fb07729c0cef307ab7c28cb76088cc60dbc98cdd'
 var tedHash = 'c67905793f6cc0f0ab8d20aecfec441932ffb13d'
 var billHash = 'fb07729c0cef307ab7c28cb76088cc60dbc98cdd'
 var mi = require('midentity')
 var Identity = mi.Identity
+var toKey = mi.toKey
 var help = require('tradle-test-helpers')
 var FakeKeeper = help.FakeKeeper
 var fakeWallet = help.fakeWallet
@@ -109,112 +112,134 @@ test('setup', function (t) {
   //   .done()
 })
 
-test('regular message', function (t) {
-  t.plan(1)
-  // t.timeoutAfter(10000)
+// test('regular message', function (t) {
+//   t.plan(1)
+//   // t.timeoutAfter(10000)
 
-  // regular message
-  var msg = new Buffer(stringify({
-    dude: 'seriously'
-  }), 'binary')
+//   // regular message
+//   var msg = new Buffer(stringify({
+//     dude: 'seriously'
+//   }), 'binary')
 
-  driverTed.once('message', function (m) {
-    t.deepEqual(m.data, msg)
-    driverBill.addressBook.clear(function () {
-      t.end()
-    })
-  })
+//   driverTed.once('message', function (m) {
+//     t.deepEqual(m.data, msg)
+//     driverBill.addressBook.clear(function () {
+//       t.end()
+//     })
+//   })
 
-  var betterTed = extend(true, {}, tedPub)
-  var betterBill = extend(true, {}, billPub)
-  betterTed[ROOT_HASH] = tedHash
-  betterBill[ROOT_HASH] = billHash
-  Q.all([
-      Q.ninvoke(driverBill.addressBook, 'update', 1, betterTed),
-      Q.ninvoke(driverTed.addressBook, 'update', 1, betterBill)
-    ])
-    .done(function () {
-      var tedInfo = {}
-      tedInfo[ROOT_HASH] = tedHash
-      driverBill.sendPlaintext({
-        msg: msg,
-        to: [tedInfo]
-      })
-    })
-})
+//   var betterTed = extend(true, {}, tedPub)
+//   var betterBill = extend(true, {}, billPub)
+//   betterTed[ROOT_HASH] = tedHash
+//   betterBill[ROOT_HASH] = billHash
+//   Q.all([
+//       Q.ninvoke(driverBill.addressBook, 'update', 1, betterTed),
+//       Q.ninvoke(driverTed.addressBook, 'update', 1, betterBill)
+//     ])
+//     .done(function () {
+//       var tedInfo = {}
+//       tedInfo[ROOT_HASH] = tedHash
+//       driverBill.sendPlaintext({
+//         msg: msg,
+//         to: [tedInfo]
+//       })
+//     })
+// })
 
 test('chained message', function (t) {
   t.plan(4)
   // t.timeoutAfter(15000)
 
-  // chained msg
-  var msg = {
-    hey: 'ho'
+  Builder()
+    .data(tedPub)
+    .signWith(getSigningKey(tedPriv))
+    .build(function (err, result) {
+      if (err) throw err
+
+      driverTed.publish({
+        msg: result.form,
+        to: [{ fingerprint: constants.IDENTITY_PUBLISH_ADDRESS }]
+      }).done()
+    })
+
+  Builder()
+    .data(billPub)
+    .signWith(getSigningKey(billPriv))
+    .build(function (err, result) {
+      if (err) throw err
+
+      driverBill.publish({
+        msg: result.form,
+        to: [{ fingerprint: constants.IDENTITY_PUBLISH_ADDRESS }]
+      }).done()
+    })
+
+  driverTed.on('unchained', onUnchained.bind(driverTed))
+  driverBill.on('unchained', onUnchained.bind(driverBill))
+
+  // driverTed.on('chained', function (entry) {
+  //   // t.equal(entry[CUR_HASH], tedHash)
+  //   console.log('ted chained', entry[CUR_HASH])
+  // })
+
+  // driverBill.on('chained', function (entry) {
+  //   console.log('bill chained', entry[CUR_HASH])
+  // })
+
+  driverBill.on('message', function (obj) {
+    checkMessage(obj.data)
+  })
+
+  driverBill.on('resolved', function (obj) {
+    checkMessage(obj.data)
+  })
+
+  var billCoords = {
+    fingerprint: billPub.pubkeys[0].fingerprint
   }
 
+  var msg = { hey: 'ho' }
   msg[TYPE] = 'blahblah'
+
   var identitiesChained = 0
 
-  billWallet.send()
-    .to(tedWallet.addressString, 10000)
-    .change(billWallet.addressString)
-    .execute()
-
-  driverBill.on('chained', function (obj) {
-    Parser.parse(obj.data, function (err, parsed) {
-      if (err) throw err
-      if (parsed.data[TYPE] === Identity.TYPE) onIdentityChained(parsed.data)
-      else checkMessage(parsed.data)
-    })
-  })
-
-  driverTed.on('chained', function (obj) {
-    Parser.parse(obj.data, function (err, parsed) {
-      if (err) throw err
-      if (parsed.data[TYPE] === Identity.TYPE) onIdentityChained(parsed.data)
-      else checkMessage(parsed.data)
-    })
-  })
+  function onUnchained (info) {
+    var self = this
+    this.lookupChainedObj(info)
+      .then(function (chainedObj) {
+        var parsed = chainedObj.parsed
+        if (parsed.data[TYPE] === Identity.TYPE) {
+          console.log(self.identityJSON.name.formatted, 'unchained', parsed.data.name.formatted)
+          onIdentityChained(parsed.data)
+        }
+        else checkMessage(parsed.data)
+      })
+      .done()
+  }
 
   function checkMessage (m) {
     if (Buffer.isBuffer(m)) m = JSON.parse(m)
 
-    delete m[constants.SIG]
+    // delete m[constants.SIG]
     t.deepEqual(m, msg)
   }
 
   function onIdentityChained (i) {
     if (++identitiesChained !== 4) return // 2 each, because both also detect themselves
 
-    var billInfo = {
-      fingerprint: billPub.pubkeys[0].fingerprint
-    }
+    Builder()
+      .data(msg)
+      .signWith(getSigningKey(tedPriv))
+      .build(function (err, result) {
+        if (err) throw err
 
-    driverTed.sendStructured({
-      msg: msg,
-      to: [billInfo],
-      sign: true,
-      chain: true
-    })
-
-    driverBill.on('message', function (obj) {
-      checkMessage(obj.data)
-    })
-
-    driverBill.on('resolved', function (obj) {
-      checkMessage(obj.data)
-    })
+        driverTed.send({
+          msg: result.form,
+          to: [billCoords],
+          chain: true
+        }).done()
+      })
   }
-
-  driverTed.publish({
-    msg: tedPub,
-    sign: true
-  })
-
-  driverBill.publish({
-    msg: billPub,
-    sign: true
-  })
 })
 
 test('teardown', function (t) {
@@ -255,4 +280,12 @@ function walletFor (keys) {
 
 function rethrow (err) {
   if (err) throw err
+}
+
+function getSigningKey (keys) {
+  var key = find(keys, function (k) {
+    return k.type === 'ec' && k.purpose === 'sign'
+  })
+
+  return key && toKey(key)
 }

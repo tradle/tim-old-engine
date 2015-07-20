@@ -1,2 +1,3 @@
 require('./end-to-end')
-require('./typestore')
+require('./identityDB')
+// require('./typestore')
