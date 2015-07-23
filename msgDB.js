@@ -13,7 +13,6 @@ var lb = require('logbase')
 var Entry = lb.Entry
 var LogBase = lb.Simple
 var EventType = require('./eventType')
-var filter = require('./filterStream')
 var toObj = require('./toObj')
 
 module.exports = function createMsgDB (path, options) {
@@ -47,7 +46,6 @@ module.exports = function createMsgDB (path, options) {
         return putAndReturnVal(getKey(entry), entry.toJSON(), cb)
       case EventType.msg.receivedValid:
       case EventType.msg.receivedInvalid:
-        if (entry.get('received')) debugger
         entry.set('received', true)
         return updateByCurHash({
           entry: entry,
@@ -77,7 +75,7 @@ module.exports = function createMsgDB (path, options) {
     }
   }
 
-  function callbackWithEmit(cb, event) {
+  function callbackWithEmit (cb, event) {
     return function (err, result) {
       if (err) return cb(err)
 
@@ -160,7 +158,6 @@ module.exports = function createMsgDB (path, options) {
   }
 
   function putAndReturnVal (key, val, cb) {
-    console.log('putting', key, val.prev, val.id)
     delete val.type
     db.put(key, val, function (err) {
       if (err) return cb(err)

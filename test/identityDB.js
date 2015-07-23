@@ -10,7 +10,6 @@ var createIdentityDB = require('../identityDB')
 var ted = require('./fixtures/ted-pub')
 var ROOT_HASH = constants.ROOT_HASH
 var CUR_HASH = constants.CUR_HASH
-var TYPE = constants.TYPE
 
 test('identity store', function (t) {
   var log = new Log('log.db', {
@@ -20,7 +19,7 @@ test('identity store', function (t) {
   var keeperMap = {}
   var hash = ted[ROOT_HASH] = ted[CUR_HASH] = 'abc'
   keeperMap[hash] = ted
-  var entry = new Entry(ted)
+  var entry = new Entry(extend({ type: 'someEntryType' }, ted))
   log.append(entry)
   entry.set('name', 'bill')
   log.append(entry)
