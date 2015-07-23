@@ -7,7 +7,6 @@ var Q = require('q')
 var DHT = require('bittorrent-dht')
 var ChainedObj = require('chained-obj')
 var Builder = ChainedObj.Builder
-var Parser = ChainedObj.Parser
 var stringify = require('tradle-utils').stringify
 // var CreateReq = require('bitjoe-js/lib/requests/create')
 // CreateReq.prototype._generateSymmetricKey = function () {
@@ -30,7 +29,7 @@ var mi = require('midentity')
 var Identity = mi.Identity
 var toKey = mi.toKey
 var help = require('tradle-test-helpers')
-var FakeKeeper = help.FakeKeeper
+var fakeKeeper = help.fakeKeeper
 var fakeWallet = help.fakeWallet
 var bill = Identity.fromJSON(billPub)
 var ted = Identity.fromJSON(tedPub)
@@ -39,7 +38,7 @@ var ted = Identity.fromJSON(tedPub)
 var networkName = 'testnet'
 // var blockchain = new Fakechain({ networkName: networkName })
 var Driver = require('../')
-var keeper = FakeKeeper.empty()
+var keeper = fakeKeeper.empty()
 var billPort = 51086
 var tedPort = 51087
 
@@ -91,13 +90,15 @@ var driverTed = new Driver(extend({
   driverTed.on(bad, rethrow)
 })
 
-// driverTed.on('message', function (msg) {
-//   console.log('message', msg)
-// })
+driverTed.on('message', function (msg) {
+  debugger
+  console.log('message', msg)
+})
 
-// driverTed.on('resolved', function (chainedObj) {
-//   console.log('resolved', chainedObj)
-// })
+driverTed.on('resolved', function (chainedObj) {
+  debugger
+  console.log('resolved', chainedObj)
+})
 
 test('setup', function (t) {
   t.plan(2)
@@ -187,11 +188,19 @@ test('chained message', function (t) {
   // })
 
   driverBill.on('message', function (obj) {
-    checkMessage(obj.data)
+    driverBill.lookupChainedObj(obj)
+      .then(function (chainedObj) {
+        checkMessage(chainedObj.data)
+      })
+      .done()
   })
 
   driverBill.on('resolved', function (obj) {
-    checkMessage(obj.data)
+    driverBill.lookupChainedObj(obj)
+      .then(function (chainedObj) {
+        checkMessage(chainedObj.data)
+      })
+      .done()
   })
 
   var billCoords = {
@@ -208,16 +217,18 @@ test('chained message', function (t) {
     this.lookupChainedObj(info)
       .then(function (chainedObj) {
         var parsed = chainedObj.parsed
+        console.log(self.identityJSON.name.formatted, 'unchained', parsed.data[TYPE])
         if (parsed.data[TYPE] === Identity.TYPE) {
-          console.log(self.identityJSON.name.formatted, 'unchained', parsed.data.name.formatted)
           onIdentityChained(parsed.data)
+        } else {
+          checkMessage(parsed.data)
         }
-        else checkMessage(parsed.data)
       })
       .done()
   }
 
   function checkMessage (m) {
+    console.log('check')
     if (Buffer.isBuffer(m)) m = JSON.parse(m)
 
     // delete m[constants.SIG]

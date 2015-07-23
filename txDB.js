@@ -24,11 +24,10 @@ module.exports = function createTxDB (path, options) {
     valueEncoding: 'json'
   })
 
+  db = Base(db, options.log, processEntry)
   db = levelQuery(db)
   db.query.use(jsonQueryEngine())
   LiveStream.install(db)
-
-  Base(db, options.log, processEntry)
 
   function processEntry (entry, cb) {
     var eType = entry.get('type')
@@ -51,6 +50,7 @@ module.exports = function createTxDB (path, options) {
   function update (entry, cb) {
     var key = getKey(entry)
     return db.get(key, function (err, root) {
+      if (!db.isOpen()) return cb()
       if (err) return cb(err)
 
       // wtf is this?

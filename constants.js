@@ -1,4 +1,3 @@
-
 module.exports = {
   IDENTITY_PUBLISH_ADDRESS: 'mhKnKtPFCbYpC61buDMgSBB57mqiWvXCUo',
   prevHash: '_p',

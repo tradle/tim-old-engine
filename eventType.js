@@ -1,4 +1,3 @@
-
 var groupOffset = 0
 var types = module.exports = {}
 
@@ -10,9 +9,11 @@ addGroup({
   msg: {
     new: 0,
     stored: 1,
-    sent: 2,
-    delivered: 3,
-    received: 4
+    sendSuccess: 2,
+    sendError: 3,
+    delivered: 4,
+    receivedValid: 5,
+    receivedInvalid: 6
   }
 })
 
