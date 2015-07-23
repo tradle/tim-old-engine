@@ -1,9 +1,7 @@
 var assert = require('assert')
 var util = require('util')
 var EventEmitter = require('events').EventEmitter
-var collect = require('stream-collector')
 var omit = require('object.omit')
-var pick = require('object.pick')
 var Q = require('q')
 var typeforce = require('typeforce')
 var debug = require('debug')('tim')
@@ -46,7 +44,6 @@ var CUR_HASH = constants.CUR_HASH
 var PREFIX = constants.OP_RETURN_PREFIX
 var MAX_CHAIN_RETRIES = 3
 var MAX_RESEND_RETRIES = 10
-var ArrayProto = Array.prototype
 var MSG_SCHEMA = {
   txData: 'Buffer',
   txType: 'Number',
@@ -231,8 +228,12 @@ Driver.prototype._readFromChain = function () {
     //   return true
     // }),
     this._log,
-    rethrow
+    this._rethrow
   )
+}
+
+Driver.prototype._rethrow = function (err) {
+  if (!this._destroyed && err) throw err
 }
 
 Driver.prototype.chainedObjToEntry = function (chainedObj) {
@@ -270,7 +271,7 @@ Driver.prototype._getToChainStream = function () {
               entry.dir === Dir.outbound &&
               (!entry.errors || entry.errors.length < MAX_CHAIN_RETRIES)
     }),
-    rethrow
+    this._rethrow
   )
 }
 
@@ -299,7 +300,7 @@ Driver.prototype._writeToChain = function () {
     //   return true
     // }),
     this._log,
-    rethrow
+    this._rethrow
   )
 }
 
@@ -325,7 +326,7 @@ Driver.prototype._getUnsentStream = function () {
 
       return true
     }),
-    rethrow
+    this._rethrow
   )
 }
 
@@ -342,7 +343,7 @@ Driver.prototype._getFromChainStream = function () {
 
       return true
     }),
-    rethrow
+    this._rethrow
   )
 }
 
@@ -374,7 +375,7 @@ Driver.prototype._getFromChainStream = function () {
 //         self.emit('resolved', entry)
 //       }
 //     }),
-//     rethrow
+//     this._rethrow
 //   )
 // }
 
@@ -419,12 +420,12 @@ Driver.prototype._sendTheUnsent = function () {
           cb(null, nextEntry)
         })
     }),
-    filter(function (data) {
-      console.log('after sendTheUnsent', data.toJSON())
-      return true
-    }),
+    // filter(function (data) {
+    //   console.log('after sendTheUnsent', data.toJSON())
+    //   return true
+    // }),
     this._log,
-    rethrow
+    this._rethrow
   )
 }
 
@@ -452,7 +453,7 @@ Driver.prototype._setupTxStream = function () {
         }
       }
     })
-    .on('error', rethrow)
+    .on('error', this._rethrow)
     .once('close', function () {
       self._streamTxs(lastBlock, lastBlockTxIds)
       defer.resolve()
@@ -495,7 +496,7 @@ Driver.prototype._streamTxs = function (fromHeight, skipIds) {
       cb(null, new Entry(props))
     }),
     this._log,
-    rethrow
+    this._rethrow
   )
 }
 
@@ -709,23 +710,11 @@ Driver.prototype._onmessage = function (buf, fingerprint) {
 
   this._debug('received msg', msg)
 
-  if (!validateMsg(msg)) {
-    var badMsgEntry = new Entry({
-      type: EventType.msg.receivedInvalid,
-      msg: msg,
-      from: {
-        fingerprint: fingerprint
-      },
-      to: [toObj(ROOT_HASH, this._myRootHash)],
-      dir: Dir.inbound
-    })
-
-    return this.log(badMsgEntry)
-  }
-
   // this thing repeats work all over the place
   var txInfo
-  this.lookupIdentity({ fingerprint: fingerprint })
+  var valid = validateMsg(msg)
+  Q[valid ? 'resolve' : 'reject']()
+    .then(this.lookupIdentity.bind(this, { fingerprint: fingerprint }))
     .then(function (identity) {
       var fromKey = find(identity.pubkeys, function (k) {
         return k.type === 'bitcoin' && k.purpose === 'messaging'
@@ -758,34 +747,36 @@ Driver.prototype._onmessage = function (buf, fingerprint) {
     .then(function (chainedObj) {
       chainedObj.from = chainedObj.from && chainedObj.from.identity
       chainedObj.to = chainedObj.to && chainedObj.to.identity
-      var entry = self.chainedObjToEntry(chainedObj)
+      return self.chainedObjToEntry(chainedObj)
         .set({
           type: EventType.msg.receivedValid,
           dir: Dir.inbound
         })
-
-      return self.log(entry)
     })
     .catch(function (err) {
-      self._debug('failed to find identity by fingerprint', fingerprint, err)
-      debugger
+      self._debug('failed to process inbound msg', err)
+      return new Entry({
+        type: EventType.msg.receivedInvalid,
+        msg: msg,
+        from: {
+          fingerprint: fingerprint
+        },
+        to: [toObj(ROOT_HASH, this._myRootHash)],
+        dir: Dir.inbound,
+        errors: [err]
+      })
     })
-    // .finally(function () {
-    //   entry.set('from', from)
-    //   return self.log(entry)
-    // })
-    .done()
+    .done(function (entry) {
+      return self._log.append(entry)
+    })
 }
 
 Driver.prototype.putOnChain = function (entry) {
   var self = this
   assert(entry.get(ROOT_HASH) && entry.get(CUR_HASH), 'missing required fields')
 
-  var curHash = entry.get(CUR_HASH)
-  var isPublic = entry.get('public')
   var type = entry.get('txType')
   var data = entry.get('txData')
-  var to = entry.get('to')
   var nextEntry = new Entry()
     .prev(entry)
     .set(ROOT_HASH, entry.get(ROOT_HASH))
@@ -860,7 +851,6 @@ Driver.prototype.send = function (options) {
   var isPublic = !!options.public
   // assert(isPublic ^ !!options.to, 'private msgs must have recipients, public msgs cannot')
 
-  var type = data[TYPE]
   var to = options.to
   if (!to && isPublic) {
     var me = toObj(ROOT_HASH, this._myRootHash)
@@ -954,6 +944,7 @@ Driver.prototype.lookupBTCAddress = function (recipient) {
 
 Driver.prototype.destroy = function () {
   delete this._fingerprintToIdentity
+  this._destroyed = true
 
   // sync
   this.chainwriter.destroy()
@@ -961,13 +952,13 @@ Driver.prototype.destroy = function () {
 
   // async
   return Q.all([
-    this.keeper.destroy(),
-    Q.ninvoke(this.p2p, 'destroy'),
-    Q.ninvoke(this.addressBook, 'close'),
-    Q.ninvoke(this.msgDB, 'close'),
-    Q.ninvoke(this.txDB, 'close'),
-    Q.ninvoke(this._log, 'close')
-  ])
+      this.keeper.destroy(),
+      Q.ninvoke(this.p2p, 'destroy'),
+      Q.ninvoke(this.addressBook, 'close'),
+      Q.ninvoke(this.msgDB, 'close'),
+      Q.ninvoke(this.txDB, 'close'),
+      Q.ninvoke(this._log, 'close')
+    ])
     .done()
 // .done(console.log.bind(console, this.pathPrefix + ' is dead'))
 }
@@ -1034,14 +1025,9 @@ function bufferToMsg (buf) {
 
 function toBuffer (data, enc) {
   if (Buffer.isBuffer(data)) return data
-  if (typeof data === 'object')
+  if (typeof data === 'object') data = utils.stringify(data)
 
-  data = utils.stringify(data)
   return new Buffer(data, enc || 'binary')
-}
-
-function rethrow (err) {
-  if (err) throw err
 }
 
 function getFingerprint (identity) {

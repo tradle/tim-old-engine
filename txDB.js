@@ -1,15 +1,12 @@
 
-var omit = require('object.omit')
 var typeforce = require('typeforce')
 var levelup = require('levelup')
 var levelQuery = require('level-queryengine')
 var jsonQueryEngine = require('jsonquery-engine')
-var constants = require('tradle-constants')
 var LiveStream = require('level-live-stream')
 // var CUR_HASH = constants.CUR_HASH
 var lb = require('logbase')
-var Entry = lb.Entry
-var Base = lb.Simple
+var LogBase = lb.Simple
 var EventType = require('./eventType')
 
 module.exports = function createTxDB (path, options) {
@@ -24,7 +21,7 @@ module.exports = function createTxDB (path, options) {
     valueEncoding: 'json'
   })
 
-  db = Base(db, options.log, processEntry)
+  db = LogBase(db, options.log, processEntry)
   db = levelQuery(db)
   db.query.use(jsonQueryEngine())
   LiveStream.install(db)
