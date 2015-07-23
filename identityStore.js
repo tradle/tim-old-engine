@@ -1,4 +1,3 @@
-
 var extend = require('extend')
 var Identity = require('midentity').Identity
 var constants = require('tradle-constants')

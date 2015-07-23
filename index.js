@@ -1,19 +1,16 @@
-
 var assert = require('assert')
 var util = require('util')
 var EventEmitter = require('events').EventEmitter
-var Writable = require('readable-stream').Writable
+var collect = require('stream-collector')
 var omit = require('object.omit')
 var pick = require('object.pick')
 var Q = require('q')
 var typeforce = require('typeforce')
 var debug = require('debug')('tim')
-var levelup = require('levelup')
 var reemit = require('re-emitter')
 var bitcoin = require('bitcoinjs-lib')
 var extend = require('extend')
 var utils = require('tradle-utils')
-var concat = require('concat-stream')
 var map = require('map-stream')
 var pump = require('pump')
 var typeforce = require('typeforce')
@@ -22,6 +19,7 @@ var ChainedObj = require('chained-obj')
 var TxData = require('tradle-tx-data').TxData
 var ChainWriter = require('bitjoe-js')
 var ChainLoader = require('chainloader')
+var Permission = require('tradle-permission')
 var Wallet = require('simple-wallet')
 var cbstreams = require('cb-streams')
 var Zlorp = require('zlorp')
@@ -29,27 +27,32 @@ var mi = require('midentity')
 var Identity = mi.Identity
 var toKey = mi.toKey
 var Parser = ChainedObj.Parser
-var Builder = ChainedObj.Builder
 var lb = require('logbase')
+var rebuf = lb.rebuf
 var Entry = lb.Entry
 var unchainer = require('./unchainer')
-// var OneBlock = require('./oneblock')
-// var identityStore = require('./identityStore')
 var filter = require('./filterStream')
 var getDHTKey = require('./getDHTKey')
-// var filterByTag = require('./filterByTag')
 var constants = require('tradle-constants')
 var EventType = require('./eventType')
 var Dir = require('./dir')
 var createIdentityDB = require('./identityDB')
 var createMsgDB = require('./msgDB')
 var createTxDB = require('./txDB')
-var noop = function () {}
+var toObj = require('./toObj')
 var TYPE = constants.TYPE
 var ROOT_HASH = constants.ROOT_HASH
 var CUR_HASH = constants.CUR_HASH
 var PREFIX = constants.OP_RETURN_PREFIX
+var MAX_CHAIN_RETRIES = 3
+var MAX_RESEND_RETRIES = 10
 var ArrayProto = Array.prototype
+var MSG_SCHEMA = {
+  txData: 'Buffer',
+  txType: 'Number',
+  encryptedPermission: 'Buffer',
+  encryptedData: 'Buffer'
+}
 
 // var MessageType = Driver.MessageType = {
 //   plaintext: 1 << 1,
@@ -102,10 +105,7 @@ function Driver (options) {
   var wallet = this.wallet = this.wallet || new Wallet({
     networkName: networkName,
     blockchain: blockchain,
-    priv: this.getPrivateKey({
-      networkName: networkName,
-      type: 'bitcoin'
-    }).priv
+    priv: this.getBlockchainKey().priv
   })
 
   this.p2p = new Zlorp({
@@ -141,7 +141,7 @@ function Driver (options) {
   this._fingerprintToIdentity = {}
   this._setupP2P()
 
-  this._setupLog()
+  this._setupDBs()
   Q.all([
       self._prepIdentity(),
       self._setupTxStream()
@@ -149,9 +149,10 @@ function Driver (options) {
     .done(function () {
       self._ready = true
       self.emit('ready')
-      self._chainTheUnchained()
-      self._unchainTheChained()
+      self._writeToChain()
+      self._readFromChain()
       self._sendTheUnsent()
+      // self._watchMsgStatuses()
     })
 }
 
@@ -197,24 +198,19 @@ Driver.prototype._setupP2P = function () {
 /**
  * read from chain
  */
-Driver.prototype._unchainTheChained = function () {
+Driver.prototype._readFromChain = function () {
   var self = this
-  var db = this.txDB
 
-  if (!db.isLive()) return db.once('live', this._unchainTheChained)
+  if (!this.txDB.isLive()) {
+    return this.txDB.once('live', this._readFromChain)
+  }
+
   if (this._unchaining) return
 
   this._unchaining = true
 
   pump(
-    db.liveStream({
-      old: true,
-      tail: true
-    }),
-    toObjectStream(),
-    filter(function (entry) {
-      return !entry[CUR_HASH]
-    }),
+    this._getFromChainStream(),
     this.unchainer,
     map(function (chainedObj, cb) {
       self._debug('unchained (read)', chainedObj.key)
@@ -225,83 +221,183 @@ Driver.prototype._unchainTheChained = function () {
         EventType.chain.readError :
         EventType.chain.readSuccess
 
-      var tx = chainedObj.tx
-      tx.body = tx.body.toBuffer()
-      var from = chainedObj.from.getOriginalJSON()
-      var to = chainedObj.to && chainedObj.to.getOriginalJSON()
-      var entry = new Entry(omit(chainedObj, ['parsed', 'key', 'data', 'type'])) // data is stored in keeper
-        .set(CUR_HASH, chainedObj.key)
-        .set(ROOT_HASH, chainedObj.parsed.data[ROOT_HASH] || chainedObj.key)
-        .set(TYPE, chainedObj.parsed.data[TYPE])
-        .set({
-          type: type,
-          public: chainedObj.type === 'public',
-          from: from[ROOT_HASH],
-          to: to && to[ROOT_HASH]
-        })
-        .prev(chainedObj.id)
+      var entry = self.chainedObjToEntry(chainedObj)
+        .set('type', type)
 
       cb(null, entry)
     }),
-    this._log
-  ).on('error', rethrow)
+    // filter(function (data) {
+    //   console.log('after chain read')
+    //   return true
+    // }),
+    this._log,
+    rethrow
+  )
+}
+
+Driver.prototype.chainedObjToEntry = function (chainedObj) {
+  var from = chainedObj.from.getOriginalJSON()
+  var to = chainedObj.to && chainedObj.to.getOriginalJSON()
+
+  var entry = new Entry(omit(chainedObj, ['parsed', 'key', 'data', 'type'])) // data is stored in keeper
+    .set(CUR_HASH, chainedObj.key)
+    .set(ROOT_HASH, chainedObj.parsed.data[ROOT_HASH] || chainedObj.key)
+    .set(TYPE, chainedObj.parsed.data[TYPE])
+    .set({
+      public: chainedObj.type === TxData.types.public,
+      from: from[ROOT_HASH],
+      to: to && toObj(ROOT_HASH, to[ROOT_HASH])
+    })
+
+  if ('id' in chainedObj) {
+    entry.prev(chainedObj.id)
+  }
+
+  return entry
+}
+
+Driver.prototype._getToChainStream = function () {
+  return pump(
+    this.msgDB.liveStream({
+      old: true,
+      tail: true
+    }),
+    toObjectStream(),
+    filter(function (entry) {
+      return !entry.tx &&
+              entry.chain &&
+             !entry.chained &&
+              entry.dir === Dir.outbound &&
+              (!entry.errors || entry.errors.length < MAX_CHAIN_RETRIES)
+    }),
+    rethrow
+  )
 }
 
 /**
  * write to chain
  */
-Driver.prototype._chainTheUnchained = function () {
+Driver.prototype._writeToChain = function () {
   var self = this
   var db = this.msgDB
 
-  if (!db.isLive()) return db.once('live', this._chainTheUnchained)
+  if (!db.isLive()) return db.once('live', this._writeToChain)
   if (this._chaining) return
 
   this._chaining = true
 
   pump(
-    db.liveStream({
-      old: true,
-      tail: true
-    }),
-    toObjectStream(),
+    this._getToChainStream(),
     map(function (entry, cb) {
-      if (!entry.chain ||
-          entry.chained ||
-          entry.dir !== Dir.outbound) {
-        return
-      }
-
       self.putOnChain(new Entry(entry))
         .done(function (nextEntry) {
           cb(null, nextEntry)
         })
     }),
-    this._log
-  ).on('error', rethrow)
+    // filter(function (data) {
+    //   console.log('after chain write', data.toJSON())
+    //   return true
+    // }),
+    this._log,
+    rethrow
+  )
 }
+
+Driver.prototype._getUnsentStream = function () {
+  var self = this
+  return pump(
+    this.msgDB.liveStream({
+      tail: true,
+      old: true
+    }),
+    toObjectStream(),
+    filter(function (entry) {
+      if (entry.sent ||
+          entry.txType === TxData.types.public ||
+          !entry.to ||
+          entry.dir !== Dir.outbound ||
+          self._currentlySending.indexOf(entry.id) !== -1) return
+
+      if (entry.errors && entry.errors.length > MAX_RESEND_RETRIES) {
+        self._debug('giving up on sending message', entry)
+        return
+      }
+
+      return true
+    }),
+    rethrow
+  )
+}
+
+Driver.prototype._getFromChainStream = function () {
+  return pump(
+    this.txDB.liveStream({
+      old: true,
+      tail: true
+    }),
+    toObjectStream(),
+    filter(function (entry) {
+      if (entry[CUR_HASH]) return
+      if (entry.errors && entry.errors.length) return
+
+      return true
+    }),
+    rethrow
+  )
+}
+
+// Driver.prototype._watchMsgStatuses = function () {
+//   var self = this
+
+//   if (this._watching) return
+
+//   this._watching = true
+
+//   pump(
+//     this.msgDB.liveStream({
+//       old: false, // only new
+//       tail: true
+//     }),
+//     toObjectStream(),
+//     map(function (entry, cb) {
+//       if (entry.received) {
+//         if (entry[CUR_HASH]) { // actually loaded
+//           self.emit('received', entry)
+//           if (entry.chained) {
+
+//           }
+//         }
+//       }
+
+//       self.emit('received', entry)
+//       if (entry.get('chained')) {
+//         self.emit('resolved', entry)
+//       }
+//     }),
+//     rethrow
+//   )
+// }
 
 Driver.prototype._sendTheUnsent = function () {
   var self = this
   var db = this.msgDB
 
-  if (!db.isLive()) return db.once('live', this._chainTheUnchained)
+  if (!db.isLive()) return db.once('live', this._sendTheUnsent)
+
+  if (this._sending) return
+
+  this._sending = true
+  this._currentlySending = []
+  this.msgDB.on('sent', function (entry) {
+    var id = entry.prev[0]
+    var idx = self._currentlySending.indexOf(id)
+    self._currentlySending.splice(idx, 1)
+  })
 
   pump(
-    db.liveStream({
-      tail: true,
-      old: true
-    }),
-    toObjectStream(),
+    this._getUnsentStream(),
     map(function (entry, cb) {
-      if (entry.sent || entry.public) return cb()
-
-      if (entry.errors && entry.errors.length > MAX_CHAIN_RETRIES) {
-        self._debug('giving up on chaining', entry)
-        return cb()
-      }
-
-      debugger
+      self._currentlySending.push(entry.id)
       self._sendP2P(entry)
         .then(function () {
           return new Entry({
@@ -310,19 +406,26 @@ Driver.prototype._sendTheUnsent = function () {
         })
         .catch(function (err) {
           var errEntry = new Entry({
-              type: EventType.msg.sendError
-            })
+            type: EventType.msg.sendError,
+            errors: entry.errors || []
+          })
 
           addError(errEntry, err)
           return errEntry
         })
         .done(function (nextEntry) {
-          nextEntry.prev(entry)
+          var prev = entry.prev.concat(entry.id)
+          nextEntry.prev(prev)
           cb(null, nextEntry)
         })
     }),
-    this._log
-  ).on('error', rethrow)
+    filter(function (data) {
+      console.log('after sendTheUnsent', data.toJSON())
+      return true
+    }),
+    this._log,
+    rethrow
+  )
 }
 
 Driver.prototype._setupTxStream = function () {
@@ -391,11 +494,12 @@ Driver.prototype._streamTxs = function (fromHeight, skipIds) {
 
       cb(null, new Entry(props))
     }),
-    this._log
-  ).on('error', rethrow)
+    this._log,
+    rethrow
+  )
 }
 
-Driver.prototype._setupLog = function () {
+Driver.prototype._setupDBs = function () {
   var self = this
 
   this._log = new lb.Log(this._prefix('msg-log.db'), {
@@ -422,6 +526,18 @@ Driver.prototype._setupLog = function () {
     'unchained'
   ])
 
+  this.msgDB.on('received', function (msg) {
+    self.emit('message', msg)
+  })
+
+  ;['received', 'unchained'].forEach(function (event) {
+    self.msgDB.on(event, function (entry) {
+      if (entry.tx && entry.received) {
+        self.emit('resolved', entry)
+      }
+    })
+  })
+
   this.txDB = createTxDB(this._prefix('txs.db'), {
     leveldown: this.leveldown,
     log: this._log
@@ -436,28 +552,30 @@ Driver.prototype._sendP2P = function (info) {
   //   do we log when we delivered it? How do we know it was delivered?
   var self = this
 
-  return this.lookupIdentity(info.to)
-    .then(function (identity) {
+  return Q.all([
+      this.lookupIdentity(info.to),
+      this.lookupChainedObj(info)
+    ])
+    .spread(function (identity, chainedObj) {
       var fingerprint = getFingerprint(identity)
       self._debug('messaging', fingerprint)
-      debugger
-      var msg = toBuffer(pick(info, [
-        'data',
-        'type'
-      ]))
-
+      var msg = msgToBuffer(getMsgProps(chainedObj))
       self.p2p.send(msg, fingerprint)
     })
 }
 
 Driver.prototype.lookupChainedObj = function (info) {
-  typeforce({
-    tx: 'Object'
-  }, info)
+  // this duplicates part of unchainer.js
+  if (!info.txData) {
+    if (info.tx) {
+      info = bitcoin.Transaction.fromBuffer(info.tx)
+    } else {
+      throw new Error('missing required info to lookup chained obj')
+    }
+  }
 
-  var tx = bitcoin.Transaction.fromBuffer(info.tx.body)
   var chainedObj
-  return this.chainloader.load(tx)
+  return this.chainloader.load(info)
     .then(function (objs) {
       chainedObj = objs[0]
       return Q.ninvoke(Parser, 'parse', chainedObj.data)
@@ -536,8 +654,15 @@ Driver.prototype.getPrivateKey = function (where) {
   })
 }
 
+Driver.prototype.getBlockchainKey = function () {
+  return this.getPrivateKey({
+    networkName: this.networkName,
+    type: 'bitcoin',
+    purpose: 'messaging'
+  })
+}
+
 Driver.prototype.lookupIdentity = function (query) {
-  var self = this
   var me = this.identityJSON
   var valid = !!query.fingerprint ^ !!query[ROOT_HASH]
   if (!valid) {
@@ -572,95 +697,135 @@ Driver.prototype._prefix = function (path) {
   return this.pathPrefix + '-' + path
 }
 
-Driver.prototype._onmessage = function (msg, fingerprint) {
+Driver.prototype._onmessage = function (buf, fingerprint) {
   var self = this
+  var msg
 
-  debugger
   try {
-    msg = JSON.parse(msg)
+    msg = bufferToMsg(buf)
   } catch (err) {
-    return this.emit('warn', 'received message not in JSON format', msg)
+    return this.emit('warn', 'received message not in JSON format', buf)
   }
 
   this._debug('received msg', msg)
 
-  var entry = new Entry({
-    type: EventType.msg.received,
-    data: msg.data,
-    to: this._myRootHash,
-    dir: Dir.inbound
-    // public: false
-  })
+  if (!validateMsg(msg)) {
+    var badMsgEntry = new Entry({
+      type: EventType.msg.receivedInvalid,
+      msg: msg,
+      from: {
+        fingerprint: fingerprint
+      },
+      to: [toObj(ROOT_HASH, this._myRootHash)],
+      dir: Dir.inbound
+    })
 
-  var from = {}
+    return this.log(badMsgEntry)
+  }
+
+  // this thing repeats work all over the place
+  var txInfo
   this.lookupIdentity({ fingerprint: fingerprint })
     .then(function (identity) {
-      from[ROOT_HASH] = identity[ROOT_HASH]
+      var fromKey = find(identity.pubkeys, function (k) {
+        return k.type === 'bitcoin' && k.purpose === 'messaging'
+      })
+
+      txInfo = {
+        addressesFrom: [fromKey.fingerprint],
+        addressesTo: [self.wallet.addressString],
+        txData: msg.txData,
+        txType: msg.txType
+      }
+
+      // TODO: rethink how chainloader should work
+      // this doesn't look right
+      return self.chainloader._processTxInfo(txInfo)
     })
-    .catch(function (err) {
-      from.fingerprint = fingerprint
-      self._debug('failed to find identity by fingerprint', fingerprint, err)
+    .then(function (parsed) {
+      var permission = Permission.recover(msg.encryptedPermission, parsed.sharedKey)
+      return Q.all([
+        self.keeper.put(parsed.permissionKey.toString('hex'), msg.encryptedPermission),
+        self.keeper.put(permission.fileKeyString(), msg.encryptedData)
+      ])
     })
-    .finally(function () {
-      entry.set('from', from)
+    .then(function () {
+      // yes, it repeats work
+      // but it makes the code simpler
+      // TODO optimize
+      return self.lookupChainedObj(txInfo)
+    })
+    .then(function (chainedObj) {
+      chainedObj.from = chainedObj.from && chainedObj.from.identity
+      chainedObj.to = chainedObj.to && chainedObj.to.identity
+      var entry = self.chainedObjToEntry(chainedObj)
+        .set({
+          type: EventType.msg.receivedValid,
+          dir: Dir.inbound
+        })
+
       return self.log(entry)
     })
+    .catch(function (err) {
+      self._debug('failed to find identity by fingerprint', fingerprint, err)
+      debugger
+    })
+    // .finally(function () {
+    //   entry.set('from', from)
+    //   return self.log(entry)
+    // })
     .done()
 }
 
 Driver.prototype.putOnChain = function (entry) {
   var self = this
-  assert(entry.get(ROOT_HASH) && entry.get(CUR_HASH))
+  assert(entry.get(ROOT_HASH) && entry.get(CUR_HASH), 'missing required fields')
 
   var curHash = entry.get(CUR_HASH)
   var isPublic = entry.get('public')
-  var type = isPublic ? TxData.types.public : TxData.types.permission
-  var share = entry.get('share')
-  var data = isPublic ? curHash : share.data
+  var type = entry.get('txType')
+  var data = entry.get('txData')
   var to = entry.get('to')
   var nextEntry = new Entry()
     .prev(entry)
     .set(ROOT_HASH, entry.get(ROOT_HASH))
     .set(CUR_HASH, entry.get(CUR_HASH))
     .set({
-      public: isPublic,
+      txType: type,
       chain: true,
       dir: Dir.outbound
     })
 
-  return this.lookupBTCAddress(to)
-    .then(shareWith)
+//   return this.lookupBTCAddress(to)
+//     .then(shareWith)
+  var addr = entry.get('addressesTo')[0]
+  return self.chainwriter.chain()
+    .type(type)
+    .data(data)
+    .address(addr)
+    .execute()
+    .then(function (tx) {
+      // ugly!
+      nextEntry
+        .set({
+          type: EventType.chain.writeSuccess,
+          tx: tx.toBuffer(),
+          txId: tx.getId()
+        })
+
+      self._debug('chained (write)', nextEntry.get(CUR_HASH), 'tx: ' + nextEntry.get('txId'))
+      return nextEntry
+    })
     .catch(function (err) {
       self._debug('chaining failed', err)
       var errEntry = new Entry({
-          type: EventType.chain.writeError
-        })
+        type: EventType.chain.writeError
+      })
         .prev(entry)
 
       addError(errEntry, err)
       return errEntry
     })
-
-  function shareWith (addr) {
-    nextEntry.set('address', addr)
-    return self.chainwriter.chain()
-      .type(type)
-      .data(data)
-      .address(addr)
-      .execute()
-      .then(function (tx) {
-        // ugly!
-        nextEntry
-          .set({
-            type: EventType.chain.writeSuccess,
-            tx: tx.toBuffer(),
-            txId: tx.getId()
-          })
-
-        self._debug('chained (write)', nextEntry.get(CUR_HASH), 'tx: ' + nextEntry.get('txId'))
-        return nextEntry
-      })
-  }
 }
 
 Driver.prototype.publish = function (options) {
@@ -683,7 +848,7 @@ Driver.prototype.send = function (options) {
 
   typeforce({
     msg: 'Buffer',
-    to: '?Array',
+    to: 'Array',
     public: '?Boolean',
     chain: '?Boolean'
   }, options)
@@ -698,8 +863,7 @@ Driver.prototype.send = function (options) {
   var type = data[TYPE]
   var to = options.to
   if (!to && isPublic) {
-    var me = {}
-    me[ROOT_HASH] = this._myRootHash
+    var me = toObj(ROOT_HASH, this._myRootHash)
     to = [me]
   }
 
@@ -710,7 +874,7 @@ Driver.prototype.send = function (options) {
     dir: Dir.outbound,
     public: isPublic,
     chain: !!options.chain,
-    from: this._myRootHash,
+    from: toObj(ROOT_HASH, this._myRootHash),
     to: to
   })
 
@@ -719,10 +883,6 @@ Driver.prototype.send = function (options) {
   var validate = options.chain ? Q.ninvoke(Parser, 'parse', data) : Q.resolve()
 
   return validate
-    .catch(function (err) {
-      debugger
-      throw err
-    })
     .then(function () {
       return Q.all(to.map(lookup))
     })
@@ -737,23 +897,32 @@ Driver.prototype.send = function (options) {
     .then(function (resp) {
       copyDHTKeys(entry, resp.key)
       self._debug('stored (write)', entry.get(ROOT_HASH))
+      var entries
       if (isPublic) {
-        entry.set('to', to[0])
-        return self.log(entry)
+        entries = to.map(function (addr, i) {
+          return entry.clone().set({
+            to: {
+              fingerprint: addr
+            },
+            addressesFrom: [self.wallet.addressString],
+            addressesTo: [recipients[i]],
+            txType: TxData.types.public,
+            txData: toBuffer(resp.key, 'hex')
+          })
+        })
+      } else {
+        entries = resp.shares.map(function (share, i) {
+          return entry.clone().set({
+            to: to[i],
+            addressesTo: [share.address],
+            addressesFrom: [self.wallet.addressString],
+            txType: TxData.types.permission,
+            txData: toBuffer(share.encryptedKey, 'hex')
+          })
+        })
       }
 
-      return Q.all(resp.shares.map(function (share, i) {
-        entry = entry.clone().set({
-          to: to[i],
-          share: {
-            fingerprint: share.address,
-            data: share.encryptedKey,
-            permission: share.value
-          }
-        })
-
-        return self.log(entry)
-      }))
+      return Q.all(entries.map(self.log, self))
     })
 }
 
@@ -799,8 +968,8 @@ Driver.prototype.destroy = function () {
     Q.ninvoke(this.txDB, 'close'),
     Q.ninvoke(this._log, 'close')
   ])
-  .done()
-  // .done(console.log.bind(console, this.pathPrefix + ' is dead'))
+    .done()
+// .done(console.log.bind(console, this.pathPrefix + ' is dead'))
 }
 
 Driver.prototype._debug = function () {
@@ -819,9 +988,56 @@ Driver.prototype._getTxDir = function (tx) {
   return isOutbound ? Dir.outbound : Dir.inbound
 }
 
-function toBuffer (data) {
+function validateMsg (msg) {
+  try {
+    typeforce(MSG_SCHEMA, msg)
+    return true
+  } catch (err) {
+    return false
+  }
+}
+
+function getMsgProps (info) {
+  return {
+    txData: info.encryptedKey,
+    txType: info.txType, // no need to send this really
+    encryptedPermission: info.encryptedPermission,
+    encryptedData: info.encryptedData
+  }
+}
+
+function msgToBuffer (msg) {
+  if (!validateMsg(msg)) throw new Error('invalid msg')
+
+  msg = extend({}, msg)
+  for (var p in MSG_SCHEMA) {
+    var type = MSG_SCHEMA[p]
+    if (type === 'Buffer') {
+      msg[p] = msg[p].toString('base64')
+    }
+  }
+
+  return toBuffer(msg, 'binary')
+}
+
+function bufferToMsg (buf) {
+  var msg = JSON.parse(buf.toString('binary'))
+  for (var p in MSG_SCHEMA) {
+    var type = MSG_SCHEMA[p]
+    if (type === 'Buffer') {
+      msg[p] = new Buffer(msg[p], 'base64')
+    }
+  }
+
+  return msg
+}
+
+function toBuffer (data, enc) {
   if (Buffer.isBuffer(data)) return data
-  return new Buffer(utils.stringify(data), 'binary')
+  if (typeof data === 'object')
+
+  data = utils.stringify(data)
+  return new Buffer(data, enc || 'binary')
 }
 
 function rethrow (err) {
@@ -842,8 +1058,9 @@ function keyForFingerprint (identityJSON, fingerprint) {
 
 function copyDHTKeys (dest, src, curHash) {
   if (typeof curHash === 'undefined') {
-    if (typeof src === 'string') curHash = src
-    else {
+    if (typeof src === 'string') {
+      curHash = src
+    } else {
       curHash = getEntryProp(src, CUR_HASH) || getEntryProp(src, ROOT_HASH)
     }
 
@@ -869,21 +1086,17 @@ function validateRecipients (recipients) {
 
   recipients.every(function (r) {
     assert(r.fingerprint || r.pubKey || r[ROOT_HASH],
-    '"recipient" must specify "fingerprint", "pubKey" or identity.' + ROOT_HASH +
-    ' (root hash of recipient identity)')
+      '"recipient" must specify "fingerprint", "pubKey" or identity.' + ROOT_HASH +
+      ' (root hash of recipient identity)')
   })
-}
-
-function notNull (o) {
-  return !!o
 }
 
 function toErrJSON (err) {
   var json = {}
 
   Object.getOwnPropertyNames(err).forEach(function (key) {
-    json[key] = err[key];
-  });
+    json[key] = err[key]
+  })
 
   delete json.stack
   return json
@@ -895,17 +1108,10 @@ function addError (entry, err) {
   entry.set('errors', errs)
 }
 
-function filterByEventTypes (types) {
-  types = ArrayProto.concat.apply([], arguments)
-  return function (entry, cb) {
-    return types.indexOf(entry.get('type')) !== -1
-  }
-}
-
 var toObjectStream = map.bind(null, function (data, cb) {
   if (data.type !== 'put' || typeof data.value !== 'object') {
     return cb()
   }
 
-  cb(null, data.value)
+  cb(null, rebuf(data.value))
 })

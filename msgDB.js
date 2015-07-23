@@ -1,8 +1,7 @@
-
 var typeforce = require('typeforce')
+var uniq = require('uniq')
 var lexint = require('lexicographic-integer')
 var collect = require('stream-collector')
-var filter = require('./filterStream')
 var levelup = require('levelup')
 var levelQuery = require('level-queryengine')
 var jsonQueryEngine = require('jsonquery-engine')
@@ -12,8 +11,10 @@ var CUR_HASH = constants.CUR_HASH
 var ROOT_HASH = constants.ROOT_HASH
 var lb = require('logbase')
 var Entry = lb.Entry
-var Base = lb.Simple
+var LogBase = lb.Simple
 var EventType = require('./eventType')
+var filter = require('./filterStream')
+var toObj = require('./toObj')
 
 module.exports = function createMsgDB (path, options) {
   typeforce('String', path)
@@ -22,86 +23,115 @@ module.exports = function createMsgDB (path, options) {
     log: 'Log'
   }, options)
 
-  var db = levelQuery(levelup(options.path, {
+  var db = levelup(options.path, {
     db: options.leveldown,
     valueEncoding: 'json'
-  }))
+  })
 
+  db = LogBase(db, options.log, processEntry)
+  db = levelQuery(db)
   db.query.use(jsonQueryEngine())
   db.ensureIndex(CUR_HASH)
   db.ensureIndex(ROOT_HASH)
   LiveStream.install(db)
-  Base(db, options.log, processEntry)
 
-  // var db = new Base({
-  //   log: options.log,
-  //   db: db
-  // })
-
-  // db.query = db.query.bind(db)
-  // db.query = function (q) {
-  //   console.log('querying')
-  //   return db.createReadStream()
-  //     .pipe(filter(function (data) {
-  //       var val = data.value
-  //       for (var p in q) {
-  //         // var pVal = q[p]
-  //         if (val[p] !== q[p]) {
-  //           console.log('not equal: ', q[p], val[p])
-  //           return false
-  //         }
-  //       }
-
-  //       return true
-  //     }))
-  // }
-
-  // var mainDB = db.db()
-  // db.liveStream = mainDB.liveStream.bind(mainDB)
-
-  // var put = db.db().put
-  // db.db().put = function () {
-  //   console.log('put', arguments)
-  //   return put.apply(this, arguments)
-  // }
+  db.setMaxListeners(0)
+  return db
 
   function processEntry (entry, cb) {
     var eType = entry.get('type')
-    entry = entry.clone().unset('type')
+    entry = entry.clone()
 
     switch (eType) {
       case EventType.msg.new:
-        return db.put(getKey(entry), entry.toJSON(), cb)
-      case EventType.msg.sent:
+        return putAndReturnVal(getKey(entry), entry.toJSON(), cb)
+      case EventType.msg.receivedValid:
+      case EventType.msg.receivedInvalid:
+        if (entry.get('received')) debugger
+        entry.set('received', true)
+        return updateByCurHash({
+          entry: entry,
+          createIfMissing: true
+        }, function (err, result) {
+          if (err) return cb(err)
+
+          cb()
+          if (eType === EventType.msg.receivedValid) {
+            db.emit('received', result)
+          }
+        })
+      case EventType.msg.sendSuccess:
         entry.set('sent', true)
+        return update(entry, callbackWithEmit(cb, 'sent'))
+      case EventType.msg.sendError:
         return update(entry, cb)
       case EventType.chain.writeSuccess:
         entry.set('chained', true)
-        db.emit('chained', entry.toJSON())
-        return update(entry, cb)
+        return update(entry, callbackWithEmit(cb, 'chained'))
       case EventType.chain.writeError:
         return update(entry, cb)
       case EventType.chain.readSuccess:
-        db.emit('unchained', entry.toJSON())
-        return onChainReadSuccess(entry, cb)
+        return onChainReadSuccess(entry, callbackWithEmit(cb, 'unchained'))
       default:
         return cb()
     }
   }
 
-  db.setMaxListeners(0)
-  return db
+  function callbackWithEmit(cb, event) {
+    return function (err, result) {
+      if (err) return cb(err)
+
+      cb()
+      db.emit(event, result)
+    }
+  }
+
+  function updateByCurHash (options, cb) {
+    var entry = options.entry.clone()
+    var curHash = entry.get(CUR_HASH)
+    collect(db.query(toObj(CUR_HASH, curHash)), function (err, results) {
+      if (err) return cb(err)
+      if (!db.isOpen()) return cb()
+      if (!results.length) {
+        if (!options.createIfMissing) return cb(new Error('not found'))
+
+        var saved = entry.toJSON()
+        return putAndReturnVal(getKey(entry), saved, cb)
+      }
+
+      entry.prev(getHistory(results[0]))
+      return update(entry, cb)
+    })
+  }
+
+  function getHistory (entry) {
+    return uniq(entry.prev.concat(entry.id || [])).sort(function (a, b) {
+      return a - b
+    })
+  }
+
+  function setHistory (latest, previous) {
+    var h = getHistory(latest)
+    if (previous) {
+      h = getHistory(previous).concat(h)
+    }
+
+    latest.prev = h
+    latest.id = h[0]
+  }
 
   function update (entry, cb) {
     var rootId = entry.get('prev')[0]
     return db.get(getKey(rootId), function (err, root) {
       if (err) return cb(err)
+      if (!db.isOpen()) return cb()
 
       var newEntry = Entry.fromJSON(root)
         .set(entry.toJSON())
-        .prev(entry)
 
-      db.put(getKey(newEntry), newEntry.toJSON(), cb)
+      var updated = newEntry.toJSON()
+      setHistory(updated)
+      putAndReturnVal(getKey(newEntry), updated, cb)
     })
   }
 
@@ -110,8 +140,10 @@ module.exports = function createMsgDB (path, options) {
     var query = toObj(CUR_HASH, curHash)
 
     collect(db.query(query), function (err, vals) {
+      if (!db.isOpen()) return cb()
+
       if (err || !vals.length) {
-        return db.put(getKey(entry), entry.toJSON(), cb)
+        return putAndReturnVal(getKey(entry), entry.toJSON(), cb)
       }
 
       if (vals.length > 1) {
@@ -119,27 +151,33 @@ module.exports = function createMsgDB (path, options) {
       }
 
       var stored = Entry.fromJSON(vals[0])
-      var prev = stored.prev()
-      prev.push(stored.id(), entry.id())
-
       stored.set(entry.toJSON())
-        .prev(prev)
 
-      db.put(getKey(stored), stored.toJSON(), cb)
+      var saved = stored.toJSON()
+      setHistory(saved, vals[0])
+      putAndReturnVal(getKey(stored), saved, cb)
+    })
+  }
+
+  function putAndReturnVal (key, val, cb) {
+    console.log('putting', key, val.prev, val.id)
+    delete val.type
+    db.put(key, val, function (err) {
+      if (err) return cb(err)
+
+      cb(null, val)
     })
   }
 }
 
-function toObj (/* k1, v1, k2, v2... */) {
-  var obj = {}
-  for (var i = 0; i < arguments.length; i+=2) {
-    obj[arguments[i]] = arguments[i + 1]
-  }
-
-  return obj
+function getProp (entry, prop) {
+  return entry instanceof Entry ? entry.get(prop) : entry[prop]
 }
 
 function getKey (entry) {
-  var id = typeof entry === 'number' ? entry : entry.prev()[0] || entry.id()
+  var id = typeof entry === 'number' ?
+    entry :
+    getProp(entry, 'prev')[0] || getProp(entry, 'id')
+
   return lexint.pack(id, 'hex')
 }

@@ -1,4 +1,3 @@
-
 var map = require('map-stream')
 
 module.exports = function filterStream (filter) {

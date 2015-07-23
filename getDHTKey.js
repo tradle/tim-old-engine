@@ -1,4 +1,3 @@
-
 var utils = require('tradle-utils')
 var Builder = require('chained-obj').Builder
 

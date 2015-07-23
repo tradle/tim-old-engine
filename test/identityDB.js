@@ -5,7 +5,8 @@ var leveldown = require('memdown')
 var constants = require('tradle-constants')
 var Log = require('logbase').Log
 var Entry = require('logbase').Entry
-var identityDB = require('../identityDB')
+var fakeKeeper = require('tradle-test-helpers').fakeKeeper
+var createIdentityDB = require('../identityDB')
 var ted = require('./fixtures/ted-pub')
 var ROOT_HASH = constants.ROOT_HASH
 var CUR_HASH = constants.CUR_HASH
@@ -16,19 +17,19 @@ test('identity store', function (t) {
     db: leveldown
   })
 
-  ted[ROOT_HASH] = 'abc'
-  var entry = new Entry()
-    .set(ted)
-
+  var keeperMap = {}
+  var hash = ted[ROOT_HASH] = ted[CUR_HASH] = 'abc'
+  keeperMap[hash] = ted
+  var entry = new Entry(ted)
   log.append(entry)
-  var originalName = ted.name
-  ted.name = 'bill'
-  entry.set(ted)
+  entry.set('name', 'bill')
   log.append(entry)
 
-  var identities = identityDB('identities.db', {
-    db: leveldown,
-    log: log
+  var keeper = fakeKeeper.forMap(keeperMap)
+  var identities = createIdentityDB('identities.db', {
+    leveldown: leveldown,
+    log: log,
+    keeper: keeper
   })
 
   identities.on('change', function (id) {
