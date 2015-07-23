@@ -1,5 +1,7 @@
 #!/usr/bin/env node
 
+// BS hack to dedupe git dependencies (which npm doesn't do for us)
+
 var path = require('path')
 var fs = require('fs-extra')
 var path = require('path')
