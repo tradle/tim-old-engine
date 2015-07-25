@@ -46,6 +46,7 @@ module.exports = function createMsgDB (path, options) {
         return putAndReturnVal(getKey(entry), entry.toJSON(), cb)
       case EventType.msg.receivedValid:
       case EventType.msg.receivedInvalid:
+        entry.set('dateReceived', now())
         entry.set('received', true)
         return updateByCurHash({
           entry: entry,
@@ -59,16 +60,19 @@ module.exports = function createMsgDB (path, options) {
           }
         })
       case EventType.msg.sendSuccess:
+        entry.set('dateSent', now())
         entry.set('sent', true)
         return update(entry, callbackWithEmit(cb, 'sent'))
       case EventType.msg.sendError:
         return update(entry, cb)
       case EventType.chain.writeSuccess:
+        entry.set('dateChained', now())
         entry.set('chained', true)
         return update(entry, callbackWithEmit(cb, 'chained'))
       case EventType.chain.writeError:
         return update(entry, cb)
       case EventType.chain.readSuccess:
+        entry.set('dateUnchained', now())
         return onChainReadSuccess(entry, callbackWithEmit(cb, 'unchained'))
       default:
         return cb()
@@ -153,7 +157,7 @@ module.exports = function createMsgDB (path, options) {
 
       var saved = stored.toJSON()
       setHistory(saved, vals[0])
-      putAndReturnVal(getKey(stored), saved, cb)
+      putAndReturnVal(getKey(saved), saved, cb)
     })
   }
 
@@ -177,4 +181,8 @@ function getKey (entry) {
     getProp(entry, 'prev')[0] || getProp(entry, 'id')
 
   return lexint.pack(id, 'hex')
+}
+
+function now () {
+  return Date.now()
 }

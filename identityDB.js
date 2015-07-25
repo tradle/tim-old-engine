@@ -1,6 +1,8 @@
 var debug = require('debug')('identityDB')
 var typeforce = require('typeforce')
 var levelup = require('levelup')
+var levelQuery = require('level-queryengine')
+var jsonQueryEngine = require('jsonquery-engine')
 var Identity = require('midentity').Identity
 var constants = require('tradle-constants')
 var TYPE = constants.TYPE
@@ -23,6 +25,8 @@ module.exports = function mkIdentityDB (path, options) {
   })
 
   db = Simple(db, log, processEntry)
+  db = levelQuery(db)
+  db.query.use(jsonQueryEngine())
   var main = db.sublevel('main')
   var byFingerprint = db.sublevel('fingerprint')
   var fingers = []
@@ -48,10 +52,7 @@ module.exports = function mkIdentityDB (path, options) {
         var curHash = entry.get(CUR_HASH)
         keeper.getOne(curHash)
           .then(function (buf) {
-            var ident = toJSON(buf)
-            ident[CUR_HASH] = curHash
-            ident[ROOT_HASH] = rootHash
-            cb(null, ident)
+            cb(null, toJSON(buf))
           })
           .catch(cb)
           .done()
