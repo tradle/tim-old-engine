@@ -60,7 +60,7 @@ reinitAndTest('self publish, edit, republish', function (t) {
   function publish (next) {
     driverBill.publishMyIdentity()
     driverTed.once('unchained', function (info) {
-      driverTed.lookupChainedObj(info)
+      driverTed.lookupObject(info)
         .done(function (chainedObj) {
           t.deepEqual(chainedObj.parsed.data, driverBill.identityJSON)
           next()
@@ -83,7 +83,7 @@ reinitAndTest('self publish, edit, republish', function (t) {
     driverBill.identityJSON.name.firstName = 'blah'
     driverBill.publishMyIdentity()
     driverTed.once('unchained', function (info) {
-      driverTed.lookupChainedObj(info)
+      driverTed.lookupObject(info)
         .done(function (chainedObj) {
           var loaded = chainedObj.parsed.data
           t.equal(loaded[PREV_HASH], driverBill.identityMeta[PREV_HASH])
@@ -128,7 +128,7 @@ reinitAndTest('chained message', function (t) {
   driverBill.on('unchained', onUnchained.bind(driverBill))
 
   driverBill.on('message', function (obj) {
-    driverBill.lookupChainedObj(obj)
+    driverBill.lookupObject(obj)
       .then(function (chainedObj) {
         checkMessage(chainedObj.data)
       })
@@ -136,7 +136,7 @@ reinitAndTest('chained message', function (t) {
   })
 
   driverBill.on('resolved', function (obj) {
-    driverBill.lookupChainedObj(obj)
+    driverBill.lookupObject(obj)
       .then(function (chainedObj) {
         checkMessage(chainedObj.data)
       })
@@ -154,7 +154,7 @@ reinitAndTest('chained message', function (t) {
   var messagesChained = 0
 
   function onUnchained (info) {
-    this.lookupChainedObj(info)
+    this.lookupObject(info)
       .then(function (chainedObj) {
         var parsed = chainedObj.parsed
         // console.log(self.identityJSON.name.formatted, 'unchained', parsed.data[TYPE])
@@ -255,7 +255,7 @@ function init (cb) {
 
   driverBill = new Driver(extend({
     pathPrefix: 'bill' + reinitCount,
-    identityJSON: billPub,
+    identity: bill,
     identityKeys: billPriv,
     // kiki: kiki.kiki(billPriv),
     wallet: billWallet,
@@ -265,7 +265,7 @@ function init (cb) {
 
   driverTed = new Driver(extend({
     pathPrefix: 'ted' + reinitCount,
-    identityJSON: tedPub,
+    identity: ted,
     identityKeys: tedPriv,
     // kiki: kiki.kiki(tedPriv),
     wallet: tedWallet,

@@ -4,25 +4,31 @@
 
 var path = require('path')
 var fs = require('fs-extra')
-var path = require('path')
 var nmDir = path.join(__dirname, 'node_modules/')
 
 var zlorpOtrDir = nmDir + 'zlorp/node_modules/otr'
-fs.exists(zlorpOtrDir, function (exists) {
-  if (exists) {
-    fs.move(zlorpOtrDir, nmDir + 'otr', function (err) {
+fs.exists(nmDir + 'otr', function (exists) {
+  if (exists) clean()
+  else {
+    raiseOTR(function (err) {
       if (err) throw err
 
-      clean()
+      clean
     })
-  } else clean()
+  }
 })
+
+function raiseOTR (cb) {
+  fs.exists(zlorpOtrDir, function (exists) {
+    if (exists) {
+      fs.move(zlorpOtrDir, nmDir + 'otr', cb)
+    } else cb()
+  })
+}
 
 function clean () {
   ;[
-    nmDir + 'midentity/node_modules/otr',
-    nmDir + 'tradle-verifier/node_modules/midentity',
-    nmDir + 'tradle-verifier/node_modules/chained-obj'
+    nmDir + 'kiki/node_modules/otr'
   ].forEach(function (dir) {
     fs.exists(dir, function (exists) {
       if (exists) fs.remove(dir, rethrow)

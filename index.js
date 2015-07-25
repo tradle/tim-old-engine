@@ -14,7 +14,6 @@ var map = require('map-stream')
 var collect = require('stream-collector')
 var levelErrs = require('level-errors')
 var pump = require('pump')
-var typeforce = require('typeforce')
 var find = require('array-find')
 var ChainedObj = require('chained-obj')
 var TxData = require('tradle-tx-data').TxData
@@ -74,7 +73,7 @@ function Driver (options) {
     // maybe allow read-only mode if this is missing
     // TODO: replace with kiki (will need to adjust otr, zlorp for async APIs)
     identityKeys: 'Array',
-    identityJSON: 'Object',
+    identity: 'Identity',
     blockchain: 'Object',
     networkName: 'String',
     keeper: 'Object',
@@ -82,7 +81,7 @@ function Driver (options) {
     leveldown: 'Function',
     port: 'Number',
     pathPrefix: 'String',
-    syncInterval: 'Number'
+    syncInterval: '?Number'
   }, options)
 
   EventEmitter.call(this)
@@ -104,7 +103,7 @@ function Driver (options) {
   )
 
   // copy
-  this.identityJSON = extend(true, {}, this.identityJSON)
+  this.identityJSON = options.identity.toJSON()
   this.identityMeta = {}
   var networkName = this.networkName
   var keeper = this.keeper
@@ -359,7 +358,7 @@ Driver.prototype.messages = function (cb) {
     }),
     map(function (data, cb) {
       data = rebuf(data)
-      self.lookupChainedObj(data)
+      self.lookupObject(data)
         .nodeify(cb)
     })
   )
@@ -485,38 +484,6 @@ Driver.prototype._getFromChainStream = function () {
     this._rethrow
   )
 }
-
-// Driver.prototype._watchMsgStatuses = function () {
-//   var self = this
-
-//   if (this._watching) return
-
-//   this._watching = true
-
-//   pump(
-//     this.msgDB.liveStream({
-//       old: false, // only new
-//       tail: true
-//     }),
-//     toObjectStream(),
-//     map(function (entry, cb) {
-//       if (entry.received) {
-//         if (entry[CUR_HASH]) { // actually loaded
-//           self.emit('received', entry)
-//           if (entry.chained) {
-
-//           }
-//         }
-//       }
-
-//       self.emit('received', entry)
-//       if (entry.get('chained')) {
-//         self.emit('resolved', entry)
-//       }
-//     }),
-//     this._rethrow
-//   )
-// }
 
 Driver.prototype._sendTheUnsent = function () {
   var self = this
@@ -713,7 +680,7 @@ Driver.prototype._sendP2P = function (info) {
 
   return Q.all([
       this.lookupIdentity(info.to),
-      this.lookupChainedObj(info)
+      this.lookupObject(info)
     ])
     .spread(function (identity, chainedObj) {
       var fingerprint = getFingerprint(identity)
@@ -723,7 +690,7 @@ Driver.prototype._sendP2P = function (info) {
     })
 }
 
-Driver.prototype.lookupChainedObj = function (info) {
+Driver.prototype.lookupObject = function (info) {
   // this duplicates part of unchainer.js
   if (!info.txData) {
     if (info.tx) {
@@ -807,7 +774,7 @@ Driver.prototype.lookupByDHTKey = function (key, cb) {
   this._lookupMsgs(toObj(CUR_HASH, key), function (err, entries) {
     if (err) return cb(err)
 
-    self.lookupChainedObj(entries.pop())
+    self.lookupObject(entries.pop())
       .nodeify(cb)
   })
 }
@@ -910,7 +877,7 @@ Driver.prototype._onmessage = function (buf, fingerprint) {
       // yes, it repeats work
       // but it makes the code simpler
       // TODO optimize
-      return self.lookupChainedObj(txInfo)
+      return self.lookupObject(txInfo)
     })
     .then(function (chainedObj) {
       chainedObj.from = chainedObj.from && chainedObj.from.identity

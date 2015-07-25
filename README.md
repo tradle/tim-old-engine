@@ -39,6 +39,10 @@ A small set of crypto and torrent-related functions used by a number of Tradle c
 
 [Identity](https://github.com/tradle/identity) is wrapper around an OpenName-compatible Identity schema. Used for building/parsing/validating identity objects.
 
+### [kiki](https://github.com/tradle/kiki)
+
+[kiki](https://github.com/tradle/kiki) Wrappers for DSA, EC, Bitcoin and other keys to provide a common API for signing/verifying/importing/exporting.
+
 ### [chainloader](https://github.com/tradle/chainloader)
 
 Parses bitcoin transactions, attempts to process embedded links, loads intermediate files and original files from a bitkeeper node, decrypts and returns files and metadata. Implements stream.Transform.
@@ -62,7 +66,7 @@ Plugin-based verifier for on-chain objects. Implements several default plugins:
 
 ### Datalog
 
-This module uses a datalog, a log-based database of experienced activity that you can write to and use to bootstrap your own databases from. Details will follow...
+This module uses a datalog, a log-based database of experienced activity that you can write to and use to bootstrap your own databases from.
 
 ### Messaging API
 
@@ -70,4 +74,128 @@ Details to follow
 
 ## Usage
 
-See test/live.js for an example
+### Initialization
+
+```js
+var leveldown = require('leveldown') // or asyncstorage-down or whatever you're using
+var DHT = require('bittorrent-dht') // use tradle/bittorrent-dht fork
+var Blockchain = require('cb-blockr') // use tradle/cb-blockr fork
+var Identity = require('midentity').Identity
+var Bitkeeper = require('bitkeeper-js')
+var kiki = require('kiki')
+var Wallet = require('simple-wallet')
+var Tim = require('tim')
+
+// Setup components:
+var networkName = 'testnet'
+var blockchain = new Blockchain(networkName)
+//   Create an identity or load an existing one (see midentity readme):
+var jack = Identity.fromJSON(jackJSON)
+//   a dht node is your first point of contact with the outside world
+var dht = new DHT()
+//   a keeper stores/replicates your encrypted files
+var keeper = new Bitkeeper({
+  dht: dht
+})
+
+var wallet = new Wallet({
+  networkName: networkName,
+  blockchain: blockchain,
+  // temporary insecure API
+  priv: jackBTCKey 
+})
+
+var tim = new Tim({
+  pathPrefix: 'tim', // for playing nice with other levelup-based storage
+  networkName: networkName,
+  identity: jack,
+  // temporary insecure API
+  identityKeys: jackPrivKeys, 
+  wallet: wallet,
+  leveldown: leveldown,
+  blockchain: blockchain,
+  port: 12345, // your choice
+  // optional
+  syncInterval: 60000 // how often to bother cb-blockr
+})
+```
+
+### Publishing your identity
+
+```js
+tim.publishMyIdentity()
+```
+
+### Sending messages
+
+```js
+
+var Builder = require('chained-obj').Builder
+
+Builder()
+  .data({
+    hey: 'ho'
+  })
+  .build(function (err, result) {
+    tim.send({
+      msg: result.form,
+      chain: true,
+      to: [{ 
+        fingerprint: 'a fingerprint of a key of an identity known to you' 
+      }]
+    })    
+  })
+```
+
+## Messages
+
+```js
+tim.messages(function (err, msgs) {
+  // msgs contains decrypted message metadata and contents
+})
+```
+
+## Identities (loaded from chain)
+
+```js
+var db = tim.identities() // read-only levelup API
+
+db.createValueStream()
+  .on('data', function (err, identityJSON) {
+    // do something with "identity"
+    // console.log('yo', identityJSON.name.firstName)
+    // 
+  })
+
+db.get(identityRootHash, function (err, identityJSON) {
+  // ...
+})
+
+// additional convenience methods
+db.byRootHash(identityRootHash, callback)
+db.byFingerprint(fingerprint, callback)
+```
+
+## Events
+
+### tim.on('ready', function () {...})
+
+Tim's ready to do stuff
+
+### tim.on('chained', function (info) {...}
+
+An object was successfully put on chain<sup>1</sup>
+
+### tim.on('unchained', function (info) {...}
+
+An object was read off chain<sup>1</sup>
+
+### tim.on('message', function (info) {...}
+
+A message was received peer-to-peer<sup>1</sup>
+
+### tim.on('resolved', function (info) {...}
+
+An object was both received peer-to-peer and read from the chain<sup>1</sup>
+
+<sup>1</sup> Note: does NOT contain chained-object contents. Use tim.lookupChainedObj(info) to obtain.
