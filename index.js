@@ -23,6 +23,7 @@ var ChainLoader = require('chainloader')
 var Permission = require('tradle-permission')
 var Wallet = require('simple-wallet')
 var cbstreams = require('cb-streams')
+var safe = require('safecb')
 var Zlorp = require('zlorp')
 var mi = require('midentity')
 var Identity = mi.Identity
@@ -34,7 +35,6 @@ var lb = require('logbase')
 var rebuf = lb.rebuf
 var Entry = lb.Entry
 var unchainer = require('./unchainer')
-var promiseToCallback = require('./depromisify')
 var filter = require('./filterStream')
 var getDHTKey = require('./getDHTKey')
 var constants = require('tradle-constants')
@@ -248,69 +248,98 @@ Driver.prototype._rethrow = function (err) {
   }
 }
 
-Driver.prototype.publishMyIdentity = function () {
-  var self = this
-
-  if (this._publishingIdentity) {
-    this._publishIdentityQueued = true
-    return
-  }
-
-  delete this._publishIdentityQueued
-
+Driver.prototype.identityPublishStatus = function (cb) {
   // check if we've already chained it
   var rh = this._myRootHash()
   var me = this.identityJSON
-  self._lookupMsgs(toObj(ROOT_HASH, rh), function (err, entries) {
-    if (err) {
-      if (!err.notFound) return self._rethrow(err)
+  var status = {
+    ever: false,
+    current: false
+  }
 
-      // first publish
-      return publish(me)
+  this._lookupMsgs(toObj(ROOT_HASH, rh), function (err, entries) {
+    if (err) {
+      if (!err.notFound) return cb(err)
+
+      return cb(null, status)
     }
+
+    status.ever = true
 
     var entry = entries.pop()
     var buf = toBuffer(me)
     utils.getStorageKeyFor(buf, function (err, key) {
-      if (err) return self._rethrow(err)
+      if (err) return cb(err)
 
       key = key.toString('hex')
       // already queued or already chained
       if (entry.dir === Dir.outbound || entry.tx) {
-        if (key === entry[CUR_HASH]) return finish()
+        if (key === entry[CUR_HASH]) {
+          status.current = true
+        }
       }
 
-      self._debug('identity has changed')
-      // var pub = firstKey(identity.pubkeys, { purpose: 'update' })
-
-      // TODO: use kiki
-      var priv = self.getPrivateKey({ purpose: 'update' })
-      var update = extend(true, {}, self.identityJSON)
-      updateChainedObj(update, entry[CUR_HASH])
-
-      Builder()
-        .data(update)
-        .signWith(toKey(priv))
-        .build(function (err, result) {
-          if (err) return self._rethrow(err)
-
-          publish(result.form)
-
-          // TODO: better have this as a response to an event
-          // so it can be handled the same at startup and here
-          self.identityJSON = update
-          extend(self.identityMeta, pick(update, [CUR_HASH, PREV_HASH, ROOT_HASH]))
-        })
+      cb(null, status)
     })
   })
+}
 
-  function publish (identity) {
-    self.publish({
-        msg: toBuffer(identity),
-        to: [{ fingerprint: constants.IDENTITY_PUBLISH_ADDRESS }]
-      })
-      .done(finish)
+Driver.prototype._publishIdentity = function (identity, cb) {
+  if (typeof identity === 'function') {
+    cb = identity
+    identity = this.identityJSON
   }
+
+  cb = safe(cb)
+  this.publish({
+      msg: toBuffer(identity),
+      to: [{ fingerprint: constants.IDENTITY_PUBLISH_ADDRESS }]
+    })
+    .nodeify(cb)
+}
+
+Driver.prototype.publishMyIdentity = function () {
+  var self = this
+  // var origCB = safe(cb)
+
+  var cb = function (err, result) {
+    // origCB(err, result)
+    if (err) throw err
+
+    finish()
+  }
+
+  if (this._publishingIdentity) {
+    this._publishIdentityQueued = true
+    return cb()
+  }
+
+  delete this._publishIdentityQueued
+
+  this.identityPublishStatus(function (err, status) {
+    if (err) return cb(err)
+    if (!status.ever) return self._publishIdentity(cb)
+    if (status.current) return cb()
+
+    var priv = self.getPrivateKey({ purpose: 'update' })
+    var update = extend(true, {}, self.identityJSON)
+    var prevHash = self._myCurrentHash() || self._myRootHash()
+    updateChainedObj(update, prevHash)
+
+    Builder()
+      .data(update)
+      .signWith(toKey(priv))
+      .build(function (err, result) {
+        if (err) return cb(err)
+
+        self._publishIdentity(result.form, cb)
+
+        // TODO: better have this as a response to an event
+        // so it can be handled the same at startup and here
+        self.identityJSON = update
+        extend(self.identityMeta, pick(update, [CUR_HASH, PREV_HASH, ROOT_HASH]))
+      })
+  })
 
   function finish () {
     delete self._publishingIdentity
@@ -324,17 +353,14 @@ Driver.prototype.messages = function (cb) {
   // get all messages (assemble from msgDB and keeper)
   var self = this
   var stream = pump(
-    this.msgDB.createReadStream(),
+    this.msgDB.createValueStream(),
     filter(function (data) {
       return data[CUR_HASH]
     }),
     map(function (data, cb) {
+      data = rebuf(data)
       self.lookupChainedObj(data)
-        .then(function (chainedObj) {
-          cb(null, chainedObj)
-        })
-        .catch(cb)
-        .done()
+        .nodeify(cb)
     })
   )
 
@@ -519,6 +545,7 @@ Driver.prototype._sendTheUnsent = function () {
           })
         })
         .catch(function (err) {
+          self._debug('error sending message', err)
           var errEntry = new Entry({
             type: EventType.msg.sendError,
             errors: entry.errors || []
@@ -633,6 +660,8 @@ Driver.prototype._setupDBs = function () {
   ;[
     'get',
     'createReadStream',
+    'createKeyStream',
+    'createValueStream',
     'query',
     'liveStream',
     'byFingerprint',
@@ -778,16 +807,9 @@ Driver.prototype.lookupByDHTKey = function (key, cb) {
   this._lookupMsgs(toObj(CUR_HASH, key), function (err, entries) {
     if (err) return cb(err)
 
-    promiseToCallback(self.lookupChainedObj(entries.pop()), cb)
+    self.lookupChainedObj(entries.pop())
+      .nodeify(cb)
   })
-
-  // return defer.promise
-  // return this.keeper.getOne(key)
-  //   .catch(cb)
-  //   .then(function (val) {
-  //     cb(null, val)
-  //   })
-  //   .done()
 }
 
 Driver.prototype.getPublicKey = function (fingerprint, identity) {
@@ -921,9 +943,9 @@ Driver.prototype._myRootHash = function () {
   return this.identityMeta[ROOT_HASH]
 }
 
-// Driver.prototype._myCurrentHash = function () {
-//   return this.identityMeta[CUR_HASH]
-// }
+Driver.prototype._myCurrentHash = function () {
+  return this.identityMeta[CUR_HASH]
+}
 
 // Driver.prototype._myPrevHash = function () {
 //   return this.identityMeta[PREV_HASH]
@@ -969,8 +991,8 @@ Driver.prototype.putOnChain = function (entry) {
     .catch(function (err) {
       self._debug('chaining failed', err)
       var errEntry = new Entry({
-        type: EventType.chain.writeError
-      })
+          type: EventType.chain.writeError
+        })
         .prev(entry)
 
       addError(errEntry, err)
@@ -1267,6 +1289,10 @@ function firstKey (keys, where) {
     return true
   })
 }
+
+// function prettyPrint (json) {
+//   console.log(JSON.stringify(json, null, 2))
+// }
 
 var toObjectStream = map.bind(null, function (data, cb) {
   if (data.type !== 'put' || typeof data.value !== 'object') {

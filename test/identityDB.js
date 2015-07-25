@@ -2,6 +2,7 @@
 var test = require('tape')
 var extend = require('extend')
 var leveldown = require('memdown')
+var collect = require('stream-collector')
 var constants = require('tradle-constants')
 var Log = require('logbase').Log
 var Entry = require('logbase').Entry
@@ -12,10 +13,13 @@ var ROOT_HASH = constants.ROOT_HASH
 var CUR_HASH = constants.CUR_HASH
 
 test('identity store', function (t) {
+  t.plan(7)
+
   var log = new Log('log.db', {
     db: leveldown
   })
 
+  ted = extend(true, {}, ted)
   var keeperMap = {}
   var hash = ted[ROOT_HASH] = ted[CUR_HASH] = 'abc'
   keeperMap[hash] = ted
@@ -37,8 +41,32 @@ test('identity store', function (t) {
         if (err) throw err
 
         t.deepEqual(storedTed, ted)
-        t.end()
       })
+
+      testStreams()
     }
   })
+
+  function testStreams () {
+    collect(identities.createReadStream(), function (err, stored) {
+      if (err) throw err
+
+      t.equal(stored.length, 1)
+      t.deepEqual(stored[0].value, ted)
+    })
+
+    collect(identities.createKeyStream(), function (err, stored) {
+      if (err) throw err
+
+      t.equal(stored.length, 1)
+      t.equal(stored[0], ted[ROOT_HASH])
+    })
+
+    collect(identities.createValueStream(), function (err, stored) {
+      if (err) throw err
+
+      t.equal(stored.length, 1)
+      t.equal(stored[0], ted)
+    })
+  }
 })

@@ -1,5 +1,7 @@
 var debug = require('debug')('identityDB')
 var typeforce = require('typeforce')
+var extend = require('extend')
+var map = require('map-stream')
 var levelup = require('levelup')
 var levelQuery = require('level-queryengine')
 var jsonQueryEngine = require('jsonquery-engine')
@@ -33,6 +35,36 @@ module.exports = function mkIdentityDB (path, options) {
   var hashes = []
   var keeper = options.keeper
 
+  db.createReadStream = function (options) {
+    options = options || {}
+    return main.createReadStream(options)
+      .pipe(map(function (data, cb) {
+        if (options.values === false) return cb(null, data)
+
+        var id = options.keys === false ? data : data.value
+        getContents(id, function (err, contents) {
+          if (err) return cb(err)
+
+          var ret = options.keys === false ?
+            contents :
+            {
+              key: data.key,
+              value: contents
+            }
+
+          cb(null, ret)
+        })
+      }))
+  }
+
+  db.createKeyStream = function (options) {
+    return db.createReadStream(extend({ values: false }, options))
+  }
+
+  db.createValueStream = function (options) {
+    return db.createReadStream(extend({ keys: false }, options))
+  }
+
   db.byFingerprint = liveOnly(db, function (fingerprint, cb) {
     // cb = logify(cb)
     byFingerprint.get(fingerprint, function (err, rootHash) {
@@ -46,21 +78,25 @@ module.exports = function mkIdentityDB (path, options) {
     main.get(rootHash, function (err, id) {
       if (err) return cb(err)
 
-      log.get(id, function (err, entry) {
-        if (err) return cb(err)
-
-        var curHash = entry.get(CUR_HASH)
-        keeper.getOne(curHash)
-          .then(function (buf) {
-            cb(null, toJSON(buf))
-          })
-          .catch(cb)
-          .done()
-      })
+      getContents(id, cb)
     })
   })
 
   return db
+
+  function getContents (id, cb) {
+    log.get(id, function (err, entry) {
+      if (err) return cb(err)
+
+      var curHash = entry.get(CUR_HASH)
+      keeper.getOne(curHash)
+        .then(function (buf) {
+          cb(null, toJSON(buf))
+        })
+        .catch(cb)
+        .done()
+    })
+  }
 
   function processEntry (entry, cb) {
     if (entry.get(TYPE) !== Identity.TYPE) return cb()

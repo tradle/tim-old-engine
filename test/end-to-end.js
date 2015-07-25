@@ -3,6 +3,7 @@ var find = require('array-find')
 var crypto = require('crypto')
 var extend = require('extend')
 var memdown = require('memdown')
+var collect = require('stream-collector')
 var safe = require('safecb')
 var Q = require('q')
 var DHT = require('bittorrent-dht')
@@ -48,9 +49,13 @@ test('setup', function (t) {
 reinitAndTest('self publish, edit, republish', function (t) {
   publish(function () {
     failToRepeatPublish(function () {
-      republish(t.end)
+      republish(function () {
+        readIdentities(t.end)
+      })
     })
   })
+
+  var identitiesChecked = 0
 
   function publish (next) {
     driverBill.publishMyIdentity()
@@ -88,10 +93,32 @@ reinitAndTest('self publish, edit, republish', function (t) {
         })
     })
   }
+
+  function readIdentities (next) {
+    var bStream = driverBill.identities().createValueStream()
+    var tStream = driverTed.identities().createValueStream()
+    collect(bStream, checkIdentities)
+    collect(tStream, checkIdentities)
+  }
+
+  function checkIdentities (err, identities) {
+    if (err) throw err
+
+    t.equal(identities.length, 1)
+    identities.forEach(function (ident) {
+      // if (ident.name.firstName === driverBill.identityJSON.name.firstName) {
+      t.deepEqual(ident, driverBill.identityJSON)
+      // } else {
+      //   t.deepEqual(ident, driverTed.identityJSON)
+      // }
+    })
+
+    if (++identitiesChecked === 2) t.end()
+  }
 })
 
 reinitAndTest('chained message', function (t) {
-  t.plan(4)
+  t.plan(6)
   // t.timeoutAfter(15000)
 
   driverBill.publishMyIdentity()
@@ -124,6 +151,7 @@ reinitAndTest('chained message', function (t) {
   msg[TYPE] = 'blahblah'
 
   var identitiesChained = 0
+  var messagesChained = 0
 
   function onUnchained (info) {
     this.lookupChainedObj(info)
@@ -134,6 +162,9 @@ reinitAndTest('chained message', function (t) {
           onIdentityChained(parsed.data)
         } else {
           checkMessage(parsed.data)
+          if (++messagesChained === 2) {
+            checkMessageDB()
+          }
         }
       })
       .done()
@@ -145,6 +176,17 @@ reinitAndTest('chained message', function (t) {
 
     // delete m[constants.SIG]
     t.deepEqual(m, msg)
+  }
+
+  function checkMessageDB () {
+    driverBill.messages(checkLast)
+    driverTed.messages(checkLast)
+
+    function checkLast (err, messages) {
+      if (err) throw err
+
+      checkMessage(messages.pop().parsed.data)
+    }
   }
 
   function onIdentityChained (i) {
