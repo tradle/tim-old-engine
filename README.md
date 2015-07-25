@@ -198,4 +198,4 @@ A message was received peer-to-peer<sup>1</sup>
 
 An object was both received peer-to-peer and read from the chain<sup>1</sup>
 
-<sup>1</sup> Note: does NOT contain chained-object contents. Use tim.lookupChainedObj(info) to obtain.
+<sup>1</sup> Note: does NOT contain chained-object contents. Use tim.lookupObject(info) to obtain those.
