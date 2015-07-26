@@ -48,7 +48,6 @@ module.exports = function createMsgDB (path, options) {
       case EventType.msg.receivedValid:
       case EventType.msg.receivedInvalid:
         entry.set('dateReceived', now())
-        entry.set('received', true)
         return updateByCurHash({
           entry: entry,
           createIfMissing: true
@@ -62,13 +61,11 @@ module.exports = function createMsgDB (path, options) {
         })
       case EventType.msg.sendSuccess:
         entry.set('dateSent', now())
-        entry.set('sent', true)
         return update(entry, callbackWithEmit(cb, 'sent'))
       case EventType.msg.sendError:
         return update(entry, cb)
       case EventType.chain.writeSuccess:
         entry.set('dateChained', now())
-        entry.set('chained', true)
         return update(entry, callbackWithEmit(cb, 'chained'))
       case EventType.chain.writeError:
         return update(entry, cb)

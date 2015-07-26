@@ -31,11 +31,19 @@ module.exports = function createTxDB (path, options) {
     var eType = entry.get('type')
     entry = entry.clone().unset('type')
 
+    var now = Date.now()
+
     switch (eType) {
       case EventType.tx:
+        entry.set('dateDetected', now)
+        return put(entry, cb)
       case EventType.chain.writeSuccess:
-        return db.put(getKey(entry), entry.toJSON(), cb)
+        entry.set('dateChained', now)
+        return put(entry, cb)
       case EventType.chain.readSuccess:
+        entry.set('dateUnchained', now)
+        return update(entry, cb)
+        /* fall through */
       case EventType.chain.readError:
         return update(entry, cb)
       default:
@@ -44,6 +52,11 @@ module.exports = function createTxDB (path, options) {
   }
 
   return db
+
+  function put (entry, cb) {
+    var key = getKey(entry)
+    db.put(key, entry.toJSON(), cb)
+  }
 
   function update (entry, cb) {
     var key = getKey(entry)
@@ -61,6 +74,7 @@ module.exports = function createTxDB (path, options) {
     })
   }
 }
+
 function getKey (entry) {
   var txId = entry.get('txId')
   if (txId) return txId

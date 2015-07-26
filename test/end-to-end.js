@@ -47,76 +47,76 @@ test('setup', function (t) {
   init(t.pass)
 })
 
-reinitAndTest('self publish, edit, republish', function (t) {
-  publish(function () {
-    failToRepeatPublish(function () {
-      republish(function () {
-        readIdentities(t.end)
-      })
-    })
-  })
+// reinitAndTest('self publish, edit, republish', function (t) {
+//   publish(function () {
+//     failToRepeatPublish(function () {
+//       republish(function () {
+//         readIdentities(t.end)
+//       })
+//     })
+//   })
 
-  var identitiesChecked = 0
+//   var identitiesChecked = 0
 
-  function publish (next) {
-    driverBill.publishMyIdentity()
-    driverTed.once('unchained', function (info) {
-      driverTed.lookupObject(info)
-        .done(function (chainedObj) {
-          t.deepEqual(chainedObj.parsed.data, driverBill.identityJSON)
-          next()
-        })
-    })
-  }
+//   function publish (next) {
+//     driverBill.publishMyIdentity()
+//     driverTed.once('unchained', function (info) {
+//       driverTed.lookupObject(info)
+//         .done(function (chainedObj) {
+//           t.deepEqual(chainedObj.parsed.data, driverBill.identityJSON)
+//           next()
+//         })
+//     })
+//   }
 
-  function failToRepeatPublish (next) {
-    driverTed.on('unchained', t.fail)
-    driverBill.publishMyIdentity()
-    driverBill.publishMyIdentity()
-    driverBill.publishMyIdentity()
-    setTimeout(function () {
-      driverTed.removeListener('unchained', t.fail)
-      next()
-    }, 3000)
-  }
+//   function failToRepeatPublish (next) {
+//     driverTed.on('unchained', t.fail)
+//     driverBill.publishMyIdentity()
+//     driverBill.publishMyIdentity()
+//     driverBill.publishMyIdentity()
+//     setTimeout(function () {
+//       driverTed.removeListener('unchained', t.fail)
+//       next()
+//     }, 3000)
+//   }
 
-  function republish (next) {
-    driverBill.identityJSON.name.firstName = 'blah'
-    driverBill.publishMyIdentity()
-    driverTed.once('unchained', function (info) {
-      driverTed.lookupObject(info)
-        .done(function (chainedObj) {
-          var loaded = chainedObj.parsed.data
-          t.equal(loaded[PREV_HASH], driverBill.identityMeta[PREV_HASH])
-          t.equal(loaded[ROOT_HASH], driverBill.identityMeta[ROOT_HASH])
-          t.deepEqual(loaded, driverBill.identityJSON)
-          next()
-        })
-    })
-  }
+//   function republish (next) {
+//     driverBill.identityJSON.name.firstName = 'blah'
+//     driverBill.publishMyIdentity()
+//     driverTed.once('unchained', function (info) {
+//       driverTed.lookupObject(info)
+//         .done(function (chainedObj) {
+//           var loaded = chainedObj.parsed.data
+//           t.equal(loaded[PREV_HASH], driverBill.identityMeta[PREV_HASH])
+//           t.equal(loaded[ROOT_HASH], driverBill.identityMeta[ROOT_HASH])
+//           t.deepEqual(loaded, driverBill.identityJSON)
+//           next()
+//         })
+//     })
+//   }
 
-  function readIdentities (next) {
-    var bStream = driverBill.identities().createValueStream()
-    var tStream = driverTed.identities().createValueStream()
-    collect(bStream, checkIdentities)
-    collect(tStream, checkIdentities)
-  }
+//   function readIdentities (next) {
+//     var bStream = driverBill.identities().createValueStream()
+//     var tStream = driverTed.identities().createValueStream()
+//     collect(bStream, checkIdentities)
+//     collect(tStream, checkIdentities)
+//   }
 
-  function checkIdentities (err, identities) {
-    if (err) throw err
+//   function checkIdentities (err, identities) {
+//     if (err) throw err
 
-    t.equal(identities.length, 1)
-    identities.forEach(function (ident) {
-      // if (ident.name.firstName === driverBill.identityJSON.name.firstName) {
-      t.deepEqual(ident, driverBill.identityJSON)
-      // } else {
-      //   t.deepEqual(ident, driverTed.identityJSON)
-      // }
-    })
+//     t.equal(identities.length, 1)
+//     identities.forEach(function (ident) {
+//       // if (ident.name.firstName === driverBill.identityJSON.name.firstName) {
+//       t.deepEqual(ident, driverBill.identityJSON)
+//       // } else {
+//       //   t.deepEqual(ident, driverTed.identityJSON)
+//       // }
+//     })
 
-    if (++identitiesChecked === 2) t.end()
-  }
-})
+//     if (++identitiesChecked === 2) t.end()
+//   }
+// })
 
 reinitAndTest('chained message', function (t) {
   t.plan(6)
@@ -155,11 +155,13 @@ reinitAndTest('chained message', function (t) {
   var messagesChained = 0
 
   function onUnchained (info) {
+    // var self = this
     this.lookupObject(info)
       .then(function (chainedObj) {
         var parsed = chainedObj.parsed
         // console.log(self.identityJSON.name.formatted, 'unchained', parsed.data[TYPE])
         if (parsed.data[TYPE] === Identity.TYPE) {
+          // console.log(self.identityJSON.name.formatted, 'unchained', parsed.data.name.formatted)
           onIdentityChained(parsed.data)
         } else {
           checkMessage(parsed.data)

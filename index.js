@@ -390,7 +390,7 @@ Driver.prototype._getToChainStream = function () {
     filter(function (entry) {
       return !entry.tx &&
               entry.chain &&
-             !entry.chained &&
+             !entry.dateChained &&
               entry.dir === Dir.outbound &&
               (!entry.errors || entry.errors.length < MAX_CHAIN_RETRIES)
     }),
@@ -436,7 +436,7 @@ Driver.prototype._getUnsentStream = function () {
     }),
     toObjectStream(),
     filter(function (entry) {
-      if (entry.sent ||
+      if (entry.dateSent ||
           entry.txType === TxData.types.public ||
           !entry.to ||
           entry.dir !== Dir.outbound ||
@@ -453,6 +453,10 @@ Driver.prototype._getUnsentStream = function () {
   )
 }
 
+Driver.prototype.name = function () {
+  return this.identityJSON.name.formatted
+}
+
 Driver.prototype._getFromChainStream = function () {
   return pump(
     this.txDB.liveStream({
@@ -461,10 +465,8 @@ Driver.prototype._getFromChainStream = function () {
     }),
     toObjectStream(),
     filter(function (entry) {
-      if (entry[CUR_HASH]) return
-      if (entry.errors && entry.errors.length) return
-
-      return true
+      // was read from chain and hasn't been processed yet
+      return entry.dateDetected && !entry.dateUnchained
     }),
     this._rethrow
   )
@@ -643,7 +645,7 @@ Driver.prototype._setupDBs = function () {
   ;['received', 'unchained'].forEach(function (event) {
     self.msgDB.on(event, function (entry) {
       self._debug('unchained', entry[CUR_HASH])
-      if (entry.tx && entry.received) {
+      if (entry.tx && entry.dateReceived) {
         self.emit('resolved', entry)
       }
     })
