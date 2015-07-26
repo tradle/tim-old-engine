@@ -107,12 +107,13 @@ var wallet = new Wallet({
 
 var tim = new Tim({
   pathPrefix: 'tim', // for playing nice with other levelup-based storage
+  leveldown: leveldown,
   networkName: networkName,
   identity: jack,
   // temporary insecure API
   identityKeys: jackPrivKeys, 
+  keeper: keeper,
   wallet: wallet,
-  leveldown: leveldown,
   blockchain: blockchain,
   port: 12345, // your choice
   // optional
@@ -150,26 +151,26 @@ Builder()
 ## Messages
 
 ```js
-tim.messages(function (err, msgs) {
-  // msgs contains decrypted message metadata and contents
-})
+var db = tim.messages() // read-only levelup instance
+
+// e.g.
+db.createValueStream()
+  .on('data', function (err, msg) {
+    // issue tim.lookupObject(msg) to get decrypted metadata and contents
+  })
 ```
 
 ## Identities (loaded from chain)
 
 ```js
-var db = tim.identities() // read-only levelup API
+var db = tim.identities() // read-only levelup instance
 
+// e.g.
 db.createValueStream()
   .on('data', function (err, identityJSON) {
     // do something with "identity"
     // console.log('yo', identityJSON.name.firstName)
-    // 
   })
-
-db.get(identityRootHash, function (err, identityJSON) {
-  // ...
-})
 
 // additional convenience methods
 db.byRootHash(identityRootHash, callback)

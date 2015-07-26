@@ -14,6 +14,7 @@ var Entry = lb.Entry
 var LogBase = lb.Simple
 var EventType = require('./eventType')
 var toObj = require('./toObj')
+var rebuf = require('./rebufEncoding')
 
 module.exports = function createMsgDB (path, options) {
   typeforce('String', path)
@@ -24,7 +25,7 @@ module.exports = function createMsgDB (path, options) {
 
   var db = levelup(options.path, {
     db: options.leveldown,
-    valueEncoding: 'json'
+    valueEncoding: rebuf
   })
 
   db = LogBase(db, options.log, processEntry)

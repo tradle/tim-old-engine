@@ -8,6 +8,7 @@ var LiveStream = require('level-live-stream')
 var lb = require('logbase')
 var LogBase = lb.Simple
 var EventType = require('./eventType')
+var rebuf = require('./rebufEncoding')
 
 module.exports = function createTxDB (path, options) {
   typeforce('String', path)
@@ -18,7 +19,7 @@ module.exports = function createTxDB (path, options) {
 
   var db = levelup(options.path, {
     db: options.leveldown,
-    valueEncoding: 'json'
+    valueEncoding: rebuf
   })
 
   db = LogBase(db, options.log, processEntry)

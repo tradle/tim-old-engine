@@ -31,7 +31,6 @@ var toKey = kiki.toKey
 var Builder = ChainedObj.Builder
 var Parser = ChainedObj.Parser
 var lb = require('logbase')
-var rebuf = lb.rebuf
 var Entry = lb.Entry
 var unchainer = require('./unchainer')
 var filter = require('./filterStream')
@@ -348,26 +347,12 @@ Driver.prototype.publishMyIdentity = function () {
   }
 }
 
-Driver.prototype.messages = function (cb) {
-  // get all messages (assemble from msgDB and keeper)
-  var self = this
-  var stream = pump(
-    this.msgDB.createValueStream(),
-    filter(function (data) {
-      return data[CUR_HASH]
-    }),
-    map(function (data, cb) {
-      data = rebuf(data)
-      self.lookupObject(data)
-        .nodeify(cb)
-    })
-  )
-
-  collect(stream, cb)
+Driver.prototype.identities = function () {
+  return this.addressBook
 }
 
-Driver.prototype.identities = function () {
-  return this._readOnlyAddressBook
+Driver.prototype.messages = function () {
+  return this.msgDB
 }
 
 Driver.prototype.chainedObjToEntry = function (chainedObj) {
@@ -765,7 +750,7 @@ Driver.prototype._lookupMsgs = function (query, cb) {
 //         new Error('invalid state: should have single result for query'))
 //     }
 
-    return cb(null, results.map(rebuf))
+    return cb(null, results)
   })
 }
 
@@ -1266,5 +1251,5 @@ var toObjectStream = map.bind(null, function (data, cb) {
     return cb()
   }
 
-  cb(null, rebuf(data.value))
+  cb(null, data.value)
 })

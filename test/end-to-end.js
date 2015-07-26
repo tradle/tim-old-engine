@@ -4,6 +4,7 @@ var crypto = require('crypto')
 var extend = require('extend')
 var memdown = require('memdown')
 var collect = require('stream-collector')
+var map = require('map-stream')
 var safe = require('safecb')
 var Q = require('q')
 var DHT = require('bittorrent-dht')
@@ -179,12 +180,24 @@ reinitAndTest('chained message', function (t) {
   }
 
   function checkMessageDB () {
-    driverBill.messages(checkLast)
-    driverTed.messages(checkLast)
+    collect(driverBill.messages().createValueStream().pipe(
+      map(function (data, cb) {
+        driverBill.lookupObject(data)
+          .nodeify(cb)
+      })
+    ), checkLast)
+
+    collect(driverTed.messages().createValueStream().pipe(
+      map(function (data, cb) {
+        driverTed.lookupObject(data)
+          .nodeify(cb)
+      })
+    ), checkLast)
 
     function checkLast (err, messages) {
       if (err) throw err
 
+      // console.log(JSON.stringify(messages, null, 2))
       checkMessage(messages.pop().parsed.data)
     }
   }

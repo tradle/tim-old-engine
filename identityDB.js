@@ -11,6 +11,7 @@ var TYPE = constants.TYPE
 var ROOT_HASH = constants.ROOT_HASH
 var CUR_HASH = constants.CUR_HASH
 var Simple = require('logbase').Simple
+var rebuf = require('./rebufEncoding')
 
 module.exports = function mkIdentityDB (path, options) {
   typeforce('String', path)
@@ -23,7 +24,7 @@ module.exports = function mkIdentityDB (path, options) {
   var log = options.log
   var db = levelup(options.path, {
     db: options.leveldown,
-    valueEncoding: 'json'
+    valueEncoding: rebuf
   })
 
   db = Simple(db, log, processEntry)
