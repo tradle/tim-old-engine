@@ -17,7 +17,7 @@ module.exports = function createTxDB (path, options) {
     log: 'Log'
   }, options)
 
-  var db = levelup(options.path, {
+  var db = levelup(path, {
     db: options.leveldown,
     valueEncoding: rebuf
   })

@@ -23,7 +23,7 @@ module.exports = function createMsgDB (path, options) {
     log: 'Log'
   }, options)
 
-  var db = levelup(options.path, {
+  var db = levelup(path, {
     db: options.leveldown,
     valueEncoding: rebuf
   })

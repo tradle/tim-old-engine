@@ -22,7 +22,7 @@ module.exports = function mkIdentityDB (path, options) {
   }, options)
 
   var log = options.log
-  var db = levelup(options.path, {
+  var db = levelup(path, {
     db: options.leveldown,
     valueEncoding: rebuf
   })
