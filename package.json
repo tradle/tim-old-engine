@@ -66,7 +66,7 @@
     "tradle-verifier": "git://github.com/tradle/tradle-verifier",
     "typeforce": "^1.1.2",
     "uniq": "^1.0.1",
-    "zlorp": "^1.0.0"
+    "zlorp": "^1.0.1"
   },
   "devDependencies": {
     "bitkeeper-js": "git://github.com/tradle/bitkeeper-js",
