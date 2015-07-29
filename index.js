@@ -973,13 +973,13 @@ Driver.prototype.send = function (options) {
   var self = this
 
   typeforce({
-    msg: 'Buffer',
+    msg: 'Object',
     to: 'Array',
     public: '?Boolean',
     chain: '?Boolean'
   }, options)
 
-  var data = options.msg
+  var data = toBuffer(options.msg)
   // assert(TYPE in data, 'structured messages must specify type property: ' + TYPE)
 
   // either "public" or it has recipients

@@ -17,9 +17,9 @@ var billPriv = require('./fixtures/bill-priv')
 var tedPriv = require('./fixtures/ted-priv')
 var constants = require('tradle-constants')
 var TYPE = constants.TYPE
-var ROOT_HASH = constants.ROOT_HASH
+// var ROOT_HASH = constants.ROOT_HASH
 // var CUR_HASH = constants.CUR_HASH
-var PREV_HASH = constants.PREV_HASH
+// var PREV_HASH = constants.PREV_HASH
 // var tedHash = tedPub[ROOT_HASH] = 'c67905793f6cc0f0ab8d20aecfec441932ffb13d'
 // var billHash = billPub[ROOT_HASH] ='fb07729c0cef307ab7c28cb76088cc60dbc98cdd'
 // var tedHash = 'c67905793f6cc0f0ab8d20aecfec441932ffb13d'

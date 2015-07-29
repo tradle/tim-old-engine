@@ -131,21 +131,29 @@ tim.publishMyIdentity()
 
 ```js
 
-var Builder = require('chained-obj').Builder
+tim.send({
+  msg: Object|String|Buffer,
+  chain: true,
+  to: [{ 
+    fingerprint: 'a fingerprint of a key of an identity known to you' 
+  }]
+})
 
-Builder()
-  .data({
-    hey: 'ho'
-  })
-  .build(function (err, result) {
-    tim.send({
-      msg: result.form,
-      chain: true,
-      to: [{ 
-        fingerprint: 'a fingerprint of a key of an identity known to you' 
-      }]
-    })    
-  })
+```
+
+### Publishing on chain
+
+Same as sending a message, but use tim.publish instead of tim.send
+
+```js
+
+tim.publish({
+  msg: Object|String|Buffer,
+  to: [{
+    fingerprint: 'a [bitcoin] address where to record the link to the object' 
+  }]
+})
+
 ```
 
 ## Messages
