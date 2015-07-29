@@ -13,7 +13,7 @@ fs.exists(nmDir + 'otr', function (exists) {
     raiseOTR(function (err) {
       if (err) throw err
 
-      clean
+      clean()
     })
   }
 })
@@ -28,7 +28,8 @@ function raiseOTR (cb) {
 
 function clean () {
   ;[
-    nmDir + 'kiki/node_modules/otr'
+    nmDir + 'kiki/node_modules/otr',
+    nmDir + 'zlorp/node_modules/otr'
   ].forEach(function (dir) {
     fs.exists(dir, function (exists) {
       if (exists) fs.remove(dir, rethrow)
