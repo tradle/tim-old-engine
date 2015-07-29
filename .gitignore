@@ -25,3 +25,13 @@ build/Release
 # Dependency directory
 # https://www.npmjs.org/doc/misc/npm-faq.html#should-i-check-my-node_modules-folder-into-git
 node_modules
+
+*.js1
+*.sublime-*
+depromisify.js
+eventTypes.md
+eventTypes1.md
+example.js
+publishIdentity.js
+schema.md
+storage/
