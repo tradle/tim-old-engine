@@ -18,9 +18,9 @@ var billPriv = require('./fixtures/bill-priv')
 var tedPriv = require('./fixtures/ted-priv')
 var constants = require('tradle-constants')
 var TYPE = constants.TYPE
-// var ROOT_HASH = constants.ROOT_HASH
+var ROOT_HASH = constants.ROOT_HASH
 // var CUR_HASH = constants.CUR_HASH
-// var PREV_HASH = constants.PREV_HASH
+var PREV_HASH = constants.PREV_HASH
 // var tedHash = tedPub[ROOT_HASH] = 'c67905793f6cc0f0ab8d20aecfec441932ffb13d'
 // var billHash = billPub[ROOT_HASH] ='fb07729c0cef307ab7c28cb76088cc60dbc98cdd'
 // var tedHash = 'c67905793f6cc0f0ab8d20aecfec441932ffb13d'
@@ -46,80 +46,80 @@ test('setup', function (t) {
   init(t.pass)
 })
 
-// reinitAndTest('self publish, edit, republish', function (t) {
-//   publish(function () {
-//     failToRepeatPublish(function () {
-//       republish(function () {
-//         readIdentities(t.end)
-//       })
-//     })
-//   })
+reinitAndTest('self publish, edit, republish', function (t) {
+  publish(function () {
+    failToRepeatPublish(function () {
+      republish(function () {
+        readIdentities(t.end)
+      })
+    })
+  })
 
-//   var identitiesChecked = 0
+  var identitiesChecked = 0
 
-//   function publish (next) {
-//     driverBill.publishMyIdentity()
-//     driverTed.once('unchained', function (info) {
-//       driverTed.lookupObject(info)
-//         .done(function (chainedObj) {
-//           t.deepEqual(chainedObj.parsed.data, driverBill.identityJSON)
-//           next()
-//         })
-//     })
-//   }
+  function publish (next) {
+    driverBill.publishMyIdentity()
+    driverTed.once('unchained', function (info) {
+      driverTed.lookupObject(info)
+        .done(function (chainedObj) {
+          t.deepEqual(chainedObj.parsed.data, driverBill.identityJSON)
+          next()
+        })
+    })
+  }
 
-//   function failToRepeatPublish (next) {
-//     driverTed.on('unchained', t.fail)
-//     driverBill.publishMyIdentity()
-//     driverBill.publishMyIdentity()
-//     driverBill.publishMyIdentity()
-//     setTimeout(function () {
-//       driverTed.removeListener('unchained', t.fail)
-//       next()
-//     }, 3000)
-//   }
+  function failToRepeatPublish (next) {
+    driverTed.on('unchained', t.fail)
+    driverBill.publishMyIdentity()
+    driverBill.publishMyIdentity()
+    driverBill.publishMyIdentity()
+    setTimeout(function () {
+      driverTed.removeListener('unchained', t.fail)
+      next()
+    }, 3000)
+  }
 
-//   function republish (next) {
-//     driverBill.identityJSON.name.firstName = 'blah'
-//     driverBill.publishMyIdentity()
-//     driverTed.once('unchained', function (info) {
-//       driverTed.lookupObject(info)
-//         .done(function (chainedObj) {
-//           var loaded = chainedObj.parsed.data
-//           t.equal(loaded[PREV_HASH], driverBill.identityMeta[PREV_HASH])
-//           t.equal(loaded[ROOT_HASH], driverBill.identityMeta[ROOT_HASH])
-//           t.deepEqual(loaded, driverBill.identityJSON)
-//           next()
-//         })
-//     })
-//   }
+  function republish (next) {
+    driverBill.identityJSON.name.firstName = 'blah'
+    driverBill.publishMyIdentity()
+    driverTed.once('unchained', function (info) {
+      driverTed.lookupObject(info)
+        .done(function (chainedObj) {
+          var loaded = chainedObj.parsed.data
+          t.equal(loaded[PREV_HASH], driverBill.identityMeta[PREV_HASH])
+          t.equal(loaded[ROOT_HASH], driverBill.identityMeta[ROOT_HASH])
+          t.deepEqual(loaded, driverBill.identityJSON)
+          next()
+        })
+    })
+  }
 
-//   function readIdentities (next) {
-//     var bStream = driverBill.identities().createValueStream()
-//     var tStream = driverTed.identities().createValueStream()
-//     collect(bStream, checkIdentities)
-//     collect(tStream, checkIdentities)
-//   }
+  function readIdentities (next) {
+    var bStream = driverBill.identities().createValueStream()
+    var tStream = driverTed.identities().createValueStream()
+    collect(bStream, checkIdentities)
+    collect(tStream, checkIdentities)
+  }
 
-//   function checkIdentities (err, identities) {
-//     if (err) throw err
+  function checkIdentities (err, identities) {
+    if (err) throw err
 
-//     t.equal(identities.length, 1)
-//     identities.forEach(function (ident) {
-//       // if (ident.name.firstName === driverBill.identityJSON.name.firstName) {
-//       t.deepEqual(ident, driverBill.identityJSON)
-//       // } else {
-//       //   t.deepEqual(ident, driverTed.identityJSON)
-//       // }
-//     })
+    t.equal(identities.length, 1)
+    identities.forEach(function (ident) {
+      // if (ident.name.firstName === driverBill.identityJSON.name.firstName) {
+      t.deepEqual(ident, driverBill.identityJSON)
+      // } else {
+      //   t.deepEqual(ident, driverTed.identityJSON)
+      // }
+    })
 
-//     if (++identitiesChecked === 2) t.end()
-//   }
-// })
+    if (++identitiesChecked === 2) t.end()
+  }
+})
 
 reinitAndTest('chained message', function (t) {
   t.plan(6)
-  // t.timeoutAfter(15000)
+  t.timeoutAfter(15000)
 
   driverBill.publishMyIdentity()
   driverTed.publishMyIdentity()
