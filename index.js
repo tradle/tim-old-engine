@@ -50,6 +50,7 @@ var CUR_HASH = constants.CUR_HASH
 var PREFIX = constants.OP_RETURN_PREFIX
 var MAX_CHAIN_RETRIES = 3
 var MAX_RESEND_RETRIES = 10
+var KEY_PURPOSE = 'messaging'
 var MSG_SCHEMA = {
   txData: 'Buffer',
   txType: 'Number',
@@ -671,7 +672,7 @@ Driver.prototype._sendP2P = function (info) {
     ])
     .spread(function (identity, chainedObj) {
       var fingerprint = getFingerprint(identity)
-      self._debug('messaging', fingerprint)
+      self._debug(KEY_PURPOSE, fingerprint)
       var msg = msgToBuffer(getMsgProps(chainedObj))
       self.p2p.send(msg, fingerprint)
     })
@@ -781,7 +782,7 @@ Driver.prototype.getBlockchainKey = function () {
   return this.getPrivateKey({
     networkName: this.networkName,
     type: 'bitcoin',
-    purpose: 'messaging'
+    purpose: KEY_PURPOSE
   })
 }
 
@@ -838,8 +839,10 @@ Driver.prototype._onmessage = function (buf, fingerprint) {
   Q[valid ? 'resolve' : 'reject']()
     .then(this.lookupIdentity.bind(this, { fingerprint: fingerprint }))
     .then(function (identity) {
-      var fromKey = find(identity.pubkeys, function (k) {
-        return k.type === 'bitcoin' && k.purpose === 'messaging'
+      var fromKey = firstKey(identity.pubkeys, {
+        type: 'bitcoin',
+        networkName: self.networkName,
+        purpose: 'messaging'
       })
 
       txInfo = {
@@ -1057,7 +1060,8 @@ Driver.prototype.lookupBTCKey = function (recipient) {
     .then(function (identity) {
       return firstKey(identity.pubkeys, {
         type: 'bitcoin',
-        networkName: self.networkName
+        networkName: self.networkName,
+        purpose: KEY_PURPOSE
       })
     })
 }

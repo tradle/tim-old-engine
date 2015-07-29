@@ -10,7 +10,8 @@ var Q = require('q')
 var DHT = require('bittorrent-dht')
 var ChainedObj = require('chained-obj')
 var Builder = ChainedObj.Builder
-// var kiki = require('kiki')
+var kiki = require('kiki')
+var toKey = kiki.toKey
 var billPub = require('./fixtures/bill-pub.json')
 var tedPub = require('./fixtures/ted-pub.json')
 var billPriv = require('./fixtures/bill-priv')
@@ -24,9 +25,7 @@ var TYPE = constants.TYPE
 // var billHash = billPub[ROOT_HASH] ='fb07729c0cef307ab7c28cb76088cc60dbc98cdd'
 // var tedHash = 'c67905793f6cc0f0ab8d20aecfec441932ffb13d'
 // var billHash = 'fb07729c0cef307ab7c28cb76088cc60dbc98cdd'
-var mi = require('midentity')
-var Identity = mi.Identity
-var toKey = mi.toKey
+var Identity = require('midentity').Identity
 var help = require('tradle-test-helpers')
 var fakeKeeper = help.fakeKeeper
 var fakeWallet = help.fakeWallet
@@ -248,9 +247,9 @@ function init (cb) {
   var keeper = fakeKeeper.empty()
   var billPort = 51086
   var tedPort = 51087
-  var billWallet = walletFor(billPriv)
+  var billWallet = walletFor(billPriv, null, 'messaging')
   var blockchain = billWallet.blockchain
-  var tedWallet = walletFor(tedPriv, blockchain)
+  var tedWallet = walletFor(tedPriv, blockchain, 'messaging')
   var commonOpts = {
     networkName: networkName,
     keeper: keeper,
@@ -336,12 +335,14 @@ function nodeIdFor (identity) {
     .slice(0, 20)
 }
 
-function walletFor (keys, blockchain) {
+function walletFor (keys, blockchain, purpose) {
   return fakeWallet({
     blockchain: blockchain,
     unspents: [100000, 100000, 100000, 100000],
     priv: find(keys, function (k) {
-      return k.type === 'bitcoin' && k.networkName === networkName
+      return k.type === 'bitcoin' &&
+        k.networkName === networkName &&
+        k.purpose === purpose
     }).priv
   })
 }
