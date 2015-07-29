@@ -222,13 +222,7 @@ Driver.prototype._readFromChain = function () {
       // var query = {}
       // query[CUR_HASH] = chainedObj.key
       // self.msgDB.query(query)
-      var type = chainedObj.errors && chainedObj.errors.length ?
-        EventType.chain.readError :
-        EventType.chain.readSuccess
-
-      var entry = self.chainedObjToEntry(chainedObj)
-        .set('type', type)
-
+      var entry = self.unchainResultToEntry(chainedObj)
       cb(null, entry)
     }),
     // filter(function (data) {
@@ -356,19 +350,28 @@ Driver.prototype.messages = function () {
   return this.msgDB
 }
 
-Driver.prototype.chainedObjToEntry = function (chainedObj) {
+Driver.prototype.unchainResultToEntry = function (chainedObj) {
+  var type = chainedObj.errors && chainedObj.errors.length ?
+    EventType.chain.readError :
+    EventType.chain.readSuccess
+
   var from = chainedObj.from.getOriginalJSON()
   var to = chainedObj.to && chainedObj.to.getOriginalJSON()
 
   var entry = new Entry(omit(chainedObj, ['parsed', 'key', 'data', 'type'])) // data is stored in keeper
-    .set(CUR_HASH, chainedObj.key)
-    .set(ROOT_HASH, chainedObj.parsed.data[ROOT_HASH] || chainedObj.key)
-    .set(TYPE, chainedObj.parsed.data[TYPE])
-    .set({
-      public: chainedObj.type === TxData.types.public,
-      from: from[ROOT_HASH],
-      to: to && toObj(ROOT_HASH, to[ROOT_HASH])
-    })
+    .set('type', type)
+
+  if (type === EventType.chain.readSuccess) {
+    entry
+      .set(CUR_HASH, chainedObj.key)
+      .set(ROOT_HASH, chainedObj.parsed.data[ROOT_HASH] || chainedObj.key)
+      .set(TYPE, chainedObj.parsed.data[TYPE])
+      .set({
+        public: chainedObj.type === TxData.types.public,
+        from: from[ROOT_HASH],
+        to: to && toObj(ROOT_HASH, to[ROOT_HASH])
+      })
+  }
 
   if ('tx' in chainedObj) {
     entry.set('tx', chainedObj.tx.toBuffer())
@@ -872,7 +875,7 @@ Driver.prototype._onmessage = function (buf, fingerprint) {
     .then(function (chainedObj) {
       chainedObj.from = chainedObj.from && chainedObj.from.identity
       chainedObj.to = chainedObj.to && chainedObj.to.identity
-      return self.chainedObjToEntry(chainedObj)
+      return self.unchainResultToEntry(chainedObj)
         .set({
           type: EventType.msg.receivedValid,
           dir: Dir.inbound
