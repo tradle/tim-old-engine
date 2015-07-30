@@ -8,6 +8,7 @@ var map = require('map-stream')
 var safe = require('safecb')
 var Q = require('q')
 var DHT = require('bittorrent-dht')
+// var utils = require('tradle-utils')
 var ChainedObj = require('chained-obj')
 var Builder = ChainedObj.Builder
 var kiki = require('kiki')
@@ -117,95 +118,68 @@ reinitAndTest('self publish, edit, republish', function (t) {
   }
 })
 
+reinitAndTest('structured but not chained message', function (t) {
+  t.plan(2)
+  t.timeoutAfter(15000)
+  publishBoth(function () {
+    var billCoords = {
+      fingerprint: billPub.pubkeys[0].fingerprint
+    }
+
+    var msg = { hey: 'blah' }
+
+    driverTed.send({
+      msg: msg,
+      to: [billCoords],
+      chain: false
+    })
+
+    driverBill.on('message', function (info) {
+      driverBill.lookupObject(info)
+        .done(function (chainedObj) {
+          t.deepEqual(chainedObj.parsed.data, msg)
+        })
+    })
+
+    driverTed.on('chained', t.fail)
+    driverTed.on('unchained', t.fail)
+    driverBill.on('unchained', t.fail)
+    setTimeout(t.pass, 3000)
+  })
+})
+
 reinitAndTest('chained message', function (t) {
   t.plan(6)
   t.timeoutAfter(15000)
 
-  driverBill.publishMyIdentity()
-  driverTed.publishMyIdentity()
+  publishBoth(function () {
+    driverTed.on('unchained', onUnchained.bind(driverTed))
+    driverBill.on('unchained', onUnchained.bind(driverBill))
 
-  driverTed.on('unchained', onUnchained.bind(driverTed))
-  driverBill.on('unchained', onUnchained.bind(driverBill))
+    driverBill.on('message', function (obj) {
+      driverBill.lookupObject(obj)
+        .then(function (chainedObj) {
+          checkMessage(chainedObj.data)
+        })
+        .done()
+    })
 
-  driverBill.on('message', function (obj) {
-    driverBill.lookupObject(obj)
-      .then(function (chainedObj) {
-        checkMessage(chainedObj.data)
-      })
-      .done()
-  })
+    driverBill.on('resolved', function (obj) {
+      driverBill.lookupObject(obj)
+        .then(function (chainedObj) {
+          checkMessage(chainedObj.data)
+        })
+        .done()
+    })
 
-  driverBill.on('resolved', function (obj) {
-    driverBill.lookupObject(obj)
-      .then(function (chainedObj) {
-        checkMessage(chainedObj.data)
-      })
-      .done()
-  })
-
-  var billCoords = {
-    fingerprint: billPub.pubkeys[0].fingerprint
-  }
-
-  var msg = { hey: 'ho' }
-  msg[TYPE] = 'blahblah'
-
-  var identitiesChained = 0
-  var messagesChained = 0
-
-  function onUnchained (info) {
-    // var self = this
-    this.lookupObject(info)
-      .then(function (chainedObj) {
-        var parsed = chainedObj.parsed
-        // console.log(self.identityJSON.name.formatted, 'unchained', parsed.data[TYPE])
-        if (parsed.data[TYPE] === Identity.TYPE) {
-          // console.log(self.identityJSON.name.formatted, 'unchained', parsed.data.name.formatted)
-          onIdentityChained(parsed.data)
-        } else {
-          checkMessage(parsed.data)
-          if (++messagesChained === 2) {
-            checkMessageDB()
-          }
-        }
-      })
-      .done()
-  }
-
-  function checkMessage (m) {
-    // console.log('check')
-    if (Buffer.isBuffer(m)) m = JSON.parse(m)
-
-    // delete m[constants.SIG]
-    t.deepEqual(m, msg)
-  }
-
-  function checkMessageDB () {
-    collect(driverBill.messages().createValueStream().pipe(
-      map(function (data, cb) {
-        driverBill.lookupObject(data)
-          .nodeify(cb)
-      })
-    ), checkLast)
-
-    collect(driverTed.messages().createValueStream().pipe(
-      map(function (data, cb) {
-        driverTed.lookupObject(data)
-          .nodeify(cb)
-      })
-    ), checkLast)
-
-    function checkLast (err, messages) {
-      if (err) throw err
-
-      // console.log(JSON.stringify(messages, null, 2))
-      checkMessage(messages.pop().parsed.data)
+    var billCoords = {
+      fingerprint: billPub.pubkeys[0].fingerprint
     }
-  }
 
-  function onIdentityChained (i) {
-    if (++identitiesChained !== 4) return // 2 each, because both also detect themselves
+    var msg = { hey: 'ho' }
+    msg[TYPE] = 'blahblah'
 
+    var messagesChained = 0
     Builder()
       .data(msg)
       .signWith(getSigningKey(tedPriv))
@@ -218,7 +192,50 @@ reinitAndTest('chained message', function (t) {
           chain: true
         }).done()
       })
-  }
+
+    function onUnchained (info) {
+      this.lookupObject(info)
+        .done(function (chainedObj) {
+          var parsed = chainedObj.parsed
+          checkMessage(parsed.data)
+          if (++messagesChained === 2) {
+            checkMessageDB()
+          }
+        })
+    }
+
+    function checkMessage (m) {
+      // console.log('check')
+      if (Buffer.isBuffer(m)) m = JSON.parse(m)
+
+      // delete m[constants.SIG]
+      t.deepEqual(m, msg)
+    }
+
+    function checkMessageDB () {
+      collect(driverBill.messages().createValueStream().pipe(
+        map(function (data, cb) {
+          driverBill.lookupObject(data)
+            .nodeify(cb)
+        })
+      ), checkLast)
+
+      collect(driverTed.messages().createValueStream().pipe(
+        map(function (data, cb) {
+          driverTed.lookupObject(data)
+            .nodeify(cb)
+        })
+      ), checkLast)
+
+      function checkLast (err, messages) {
+        if (err) throw err
+
+        // console.log(JSON.stringify(messages, null, 2))
+        checkMessage(messages.pop().parsed.data)
+      }
+    }
+
+  })
 })
 
 test('teardown', function (t) {
@@ -317,6 +334,37 @@ function reinitAndTest (name, testFn) {
       testFn.apply(ctx, args)
     })
   })
+}
+
+function publishBoth (cb) {
+  driverBill.publishMyIdentity()
+  driverTed.publishMyIdentity()
+
+  var identitiesChained = 0
+  var tedUnchained = onUnchained.bind(driverTed)
+  var billUnchained = onUnchained.bind(driverBill)
+  driverTed.on('unchained', tedUnchained)
+  driverBill.on('unchained', billUnchained)
+
+  function onUnchained (info) {
+    // var self = this
+    this.lookupObject(info)
+      .then(function (chainedObj) {
+        var parsed = chainedObj.parsed
+        // console.log(self.identityJSON.name.formatted, 'unchained', parsed.data[TYPE])
+        if (parsed.data[TYPE] === Identity.TYPE) {
+          // console.log(self.identityJSON.name.formatted, 'unchained', parsed.data.name.formatted)
+          if (++identitiesChained === 4) done() // 2 each, because both also detect themselves
+        }
+      })
+      .done()
+  }
+
+  function done () {
+    driverTed.removeListener('unchained', tedUnchained)
+    driverBill.removeListener('unchained', billUnchained)
+    cb()
+  }
 }
 
 function dhtFor (identity) {
