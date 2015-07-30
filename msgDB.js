@@ -90,8 +90,8 @@ module.exports = function createMsgDB (path, options) {
     var entry = options.entry.clone()
     var curHash = entry.get(CUR_HASH)
     collect(db.query(toObj(CUR_HASH, curHash)), function (err, results) {
-      if (err) return cb(err)
       if (!db.isOpen()) return cb()
+      if (err) return cb(err)
       if (!results.length) {
         if (!options.createIfMissing) return cb(new Error('not found'))
 
@@ -123,8 +123,8 @@ module.exports = function createMsgDB (path, options) {
   function update (entry, cb) {
     var rootId = entry.get('prev')[0]
     return db.get(getKey(rootId), function (err, root) {
-      if (err) return cb(err)
       if (!db.isOpen()) return cb()
+      if (err) return cb(err)
 
       var newEntry = Entry.fromJSON(root)
         .set(entry.toJSON())
