@@ -43,6 +43,7 @@ var createIdentityDB = require('./identityDB')
 var createMsgDB = require('./msgDB')
 var createTxDB = require('./txDB')
 var toObj = require('./toObj')
+var errors = require('./errors')
 var TYPE = constants.TYPE
 var ROOT_HASH = constants.ROOT_HASH
 var PREV_HASH = constants.PREV_HASH
@@ -156,7 +157,10 @@ function Driver (options) {
       self._setupTxStream()
     ])
     .done(function () {
+      if (self._destroyed) return
+
       self._ready = true
+      self._debug('ready')
       self.emit('ready')
       // self.publishMyIdentity()
       self._writeToChain()
@@ -206,6 +210,7 @@ Driver.prototype._setupP2P = function () {
 Driver.prototype._readFromChain = function () {
   var self = this
 
+  if (this._destroyed) return
   if (!this.txDB.isLive()) {
     return this.txDB.once('live', this._readFromChain)
   }
@@ -413,6 +418,8 @@ Driver.prototype._getToChainStream = function () {
  */
 Driver.prototype._writeToChain = function () {
   var self = this
+  if (this._destroyed) return
+
   var db = this.msgDB
 
   if (!db.isLive()) return db.once('live', this._writeToChain)
@@ -484,6 +491,8 @@ Driver.prototype._getFromChainStream = function () {
 
 Driver.prototype._sendTheUnsent = function () {
   var self = this
+  if (this._destroyed) return
+
   var db = this.msgDB
 
   if (!db.isLive()) return db.once('live', this._sendTheUnsent)
@@ -568,6 +577,8 @@ Driver.prototype._setupTxStream = function () {
 
 Driver.prototype._streamTxs = function (fromHeight, skipIds) {
   var self = this
+  if (this._destroyed) return
+
   if (!fromHeight) fromHeight = 0
 
   this._rawTxStream = cbstreams.stream.txs({
@@ -974,6 +985,7 @@ Driver.prototype.putOnChain = function (entry) {
     })
     .catch(function (err) {
       self._debug('chaining failed', err)
+      self.emit('error', errors.NotEnoughFundsError())
       var errEntry = new Entry({
           type: EventType.chain.writeError
         })
@@ -1110,21 +1122,28 @@ Driver.prototype.lookupBTCAddress = function (recipient) {
 }
 
 Driver.prototype.destroy = function () {
+  var self = this
+
+  this._debug('self-destructing')
+  this.emit('destroy')
+
   delete this._fingerprintToIdentity
   this._destroyed = true
 
   // sync
   this.chainwriter.destroy()
-  this._rawTxStream.close() // custom close method
+  if (this._rawTxStream) {
+    this._rawTxStream.close() // custom close method
+  }
 
   // async
   return Q.all([
-      this.keeper.destroy(),
-      Q.ninvoke(this.p2p, 'destroy'),
-      Q.ninvoke(this.addressBook, 'close'),
-      Q.ninvoke(this.msgDB, 'close'),
-      Q.ninvoke(this.txDB, 'close'),
-      Q.ninvoke(this._log, 'close')
+      self.keeper.destroy(),
+      Q.ninvoke(self.p2p, 'destroy'),
+      Q.ninvoke(self.addressBook, 'close'),
+      Q.ninvoke(self.msgDB, 'close'),
+      Q.ninvoke(self.txDB, 'close'),
+      Q.ninvoke(self._log, 'close')
     ])
     .done()
 // .done(console.log.bind(console, this.pathPrefix + ' is dead'))
