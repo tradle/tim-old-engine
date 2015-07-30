@@ -4,6 +4,7 @@ var find = require('array-find')
 var DHT = require('bittorrent-dht')
 var leveldown = require('memdown')
 var Driver = require('../')
+var Identity = require('midentity').Identity
 // var tedPriv = require('chained-chat/test/fixtures/ted-priv')
 // var Fakechain = require('blockloader/fakechain')
 var Blockchain = require('cb-blockr')
@@ -19,7 +20,8 @@ var BILL_PORT = 51086
 // var keeper = fakeKeeper.empty()
 
 function buildDriver (identity, keys, port) {
-  var dht = dhtFor(identity)
+  var iJSON = identity.toJSON()
+  var dht = dhtFor(iJSON)
   dht.listen(port)
 
   var keeper = new Keeper({
@@ -29,7 +31,7 @@ function buildDriver (identity, keys, port) {
   var blockchain = new Blockchain(networkName)
 
   return new Driver({
-    pathPrefix: identity.name.firstName.toLowerCase(),
+    pathPrefix: iJSON.name.firstName.toLowerCase(),
     networkName: networkName,
     keeper: keeper,
     blockchain: blockchain,
