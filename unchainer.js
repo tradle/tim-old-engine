@@ -52,10 +52,14 @@ module.exports = function chainstream (options) {
       chainloader.load(tx)
         .then(function (chainedObjs) {
           var obj = chainedObjs && chainedObjs[0]
-          if (obj) extend(processed, obj)
+          if (obj) {
+            extend(processed, obj)
+          } else {
+            throw new Error('nothing to load in tx?')
+          }
         })
         .catch(function (err) {
-          debug('nothing to load in tx?', err)
+          debug('unchain failed', err.message)
           processed.errors.push(err)
         })
         .done(function () {

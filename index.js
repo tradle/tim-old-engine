@@ -355,26 +355,32 @@ Driver.prototype.unchainResultToEntry = function (chainedObj) {
     EventType.chain.readError :
     EventType.chain.readSuccess
 
-  var from = chainedObj.from.getOriginalJSON()
-  var to = chainedObj.to && chainedObj.to.getOriginalJSON()
-
   var entry = new Entry(omit(chainedObj, ['parsed', 'key', 'data', 'type'])) // data is stored in keeper
     .set('type', type)
 
-  if (type === EventType.chain.readSuccess) {
+  var from = chainedObj.from && chainedObj.from.getOriginalJSON()
+  if (from) {
+    entry.set('from', from[ROOT_HASH])
+  }
+
+  var to = chainedObj.to && chainedObj.to.getOriginalJSON()
+  if (to) {
+    entry.set('to', toObj(ROOT_HASH, to[ROOT_HASH]))
+  }
+
+  if ('key' in chainedObj) {
+    entry.set(CUR_HASH, chainedObj.key)
+  }
+
+  if ('parsed' in chainedObj) {
     entry
-      .set(CUR_HASH, chainedObj.key)
       .set(ROOT_HASH, chainedObj.parsed.data[ROOT_HASH] || chainedObj.key)
       .set(TYPE, chainedObj.parsed.data[TYPE])
-      .set({
-        public: chainedObj.type === TxData.types.public,
-        from: from[ROOT_HASH],
-        to: to && toObj(ROOT_HASH, to[ROOT_HASH])
-      })
+      .set('public', chainedObj.type === TxData.types.public)
   }
 
   if ('tx' in chainedObj) {
-    entry.set('tx', chainedObj.tx.toBuffer())
+    entry.set('tx', toBuffer(chainedObj.tx))
   }
 
   if ('id' in chainedObj) {
@@ -579,19 +585,37 @@ Driver.prototype._streamTxs = function (fromHeight, skipIds) {
     this._rawTxStream,
     map(function (txInfo, cb) {
       var id = txInfo.tx.getId()
-      if (txInfo.height < fromHeight ||
+      if (typeof txInfo.height === 'undefined') {
+        if (skipIds.indexOf(id) !== -1) {
+          return cb()
+        }
+
+        self.txDB.get(id, function (err) {
+          if (err) {
+            if (!err.notFound) return cb(err)
+
+            return save()
+          }
+
+          cb() // already have this one
+        })
+      } else if (txInfo.height < fromHeight ||
         (txInfo.height === fromHeight && skipIds.indexOf(id) !== -1)) {
         return cb()
+      } else {
+        save()
       }
 
-      var props = extend({}, txInfo, {
-        type: EventType.tx,
-        tx: txInfo.tx.toBuffer(),
-        txId: id,
-        dir: self._getTxDir(txInfo.tx)
-      })
+      function save () {
+        var props = extend({}, txInfo, {
+          type: EventType.tx,
+          tx: toBuffer(txInfo.tx),
+          txId: id,
+          dir: self._getTxDir(txInfo.tx)
+        })
 
-      cb(null, new Entry(props))
+        cb(null, new Entry(props))
+      }
     }),
     this._log,
     this._rethrow
@@ -941,7 +965,7 @@ Driver.prototype.putOnChain = function (entry) {
       nextEntry
         .set({
           type: EventType.chain.writeSuccess,
-          tx: tx.toBuffer(),
+          tx: toBuffer(tx),
           txId: tx.getId()
         })
 
@@ -1167,6 +1191,7 @@ function bufferToMsg (buf) {
 }
 
 function toBuffer (data, enc) {
+  if (typeof data.toBuffer === 'function') return data.toBuffer()
   if (Buffer.isBuffer(data)) return data
   if (typeof data === 'object') data = utils.stringify(data)
 
