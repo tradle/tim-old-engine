@@ -35,10 +35,12 @@ var fakeWallet = help.fakeWallet
 var networkName = 'testnet'
 // var blockchain = new Fakechain({ networkName: networkName })
 var Driver = require('../')
+var currentTime = require('../now')
 
 var driverBill
 var driverTed
 var reinitCount = 0
+var chainThrottle = 5000
 
 test('setup', function (t) {
   t.plan(1)
@@ -116,6 +118,35 @@ reinitAndTest('self publish, edit, republish', function (t) {
 
     if (++identitiesChecked === 2) t.end()
   }
+})
+
+reinitAndTest('throttle chaining', function (t) {
+  t.plan(3)
+  t.timeoutAfter(10000)
+
+  var blockchain = driverBill.blockchain
+  var propagate = blockchain.transactions.propagate
+  var firstErrTime
+  blockchain.transactions.propagate = function (txs, cb) {
+    cb(new Error('something went horribly wrong'))
+
+    if (!firstErrTime) {
+      firstErrTime = currentTime()
+    } else {
+      blockchain.transactions.propagate = propagate
+      t.ok(currentTime() - firstErrTime > chainThrottle * 0.9) // fuzzy
+    }
+  }
+
+  driverBill.publish({
+      msg: { blah: 'yo' },
+      to: [{ fingerprint: driverTed.wallet.addressString }]
+    })
+    .done()
+
+  driverBill.on('error', function (err) {
+    t.ok(/horribly/.test(err.message))
+  })
 })
 
 reinitAndTest('structured but not chained message', function (t) {
@@ -272,7 +303,8 @@ function init (cb) {
     keeper: keeper,
     blockchain: blockchain,
     leveldown: memdown,
-    syncInterval: 1000
+    syncInterval: 1000,
+    chainThrottle: chainThrottle
   }
 
   var billDHT = dhtFor(bill)
@@ -303,11 +335,6 @@ function init (cb) {
     dht: tedDHT,
     port: tedPort
   }, commonOpts))
-
-  ;['warn', 'error'].forEach(function (bad) {
-    driverBill.on(bad, rethrow)
-    driverTed.on(bad, rethrow)
-  })
 
   var togo = 2
 

@@ -44,6 +44,7 @@ var createMsgDB = require('./msgDB')
 var createTxDB = require('./txDB')
 var toObj = require('./toObj')
 var errors = require('./errors')
+var currentTime = require('./now')
 var TYPE = constants.TYPE
 var ROOT_HASH = constants.ROOT_HASH
 var PREV_HASH = constants.PREV_HASH
@@ -51,6 +52,7 @@ var CUR_HASH = constants.CUR_HASH
 var PREFIX = constants.OP_RETURN_PREFIX
 var MAX_CHAIN_RETRIES = 3
 var MAX_RESEND_RETRIES = 10
+var CHAIN_WRITE_THROTTLE = 60000
 var KEY_PURPOSE = 'messaging'
 var MSG_SCHEMA = {
   txData: 'Buffer',
@@ -82,7 +84,8 @@ function Driver (options) {
     leveldown: 'Function',
     port: 'Number',
     pathPrefix: 'String',
-    syncInterval: '?Number'
+    syncInterval: '?Number',
+    chainThrottle: '?Number'
   }, options)
 
   EventEmitter.call(this)
@@ -426,14 +429,34 @@ Driver.prototype._writeToChain = function () {
   if (this._chaining) return
 
   this._chaining = true
+  var throttle = this.chainThrottle || CHAIN_WRITE_THROTTLE
 
   pump(
     this._getToChainStream(),
     map(function (entry, cb) {
-      self.putOnChain(new Entry(entry))
-        .done(function (nextEntry) {
-          cb(null, nextEntry)
-        })
+      var errors = entry.errors
+      if (!errors || !errors.length) {
+        return tryAgain()
+      }
+
+      var lastErr = errors[errors.length - 1]
+      var now = currentTime()
+      var wait = lastErr.timestamp + throttle - now
+      if (wait < 0) {
+        return tryAgain()
+      }
+
+      // just in case the device clock time traveled
+      self._debug('throttling chaining', wait)
+      wait = Math.min(wait, throttle)
+      setTimeout(tryAgain, wait)
+
+      function tryAgain () {
+        self.putOnChain(new Entry(entry))
+          .done(function (nextEntry) {
+            cb(null, nextEntry)
+          })
+      }
     }),
     // filter(function (data) {
     //   console.log('after chain write', data.toJSON())
@@ -984,8 +1007,13 @@ Driver.prototype.putOnChain = function (entry) {
       return nextEntry
     })
     .catch(function (err) {
+      err = errors.ChainWriteError(err, {
+        timestamp: currentTime()
+      })
+
       self._debug('chaining failed', err)
-      self.emit('error', errors.NotEnoughFundsError())
+      self.emit('error', err)
+
       var errEntry = new Entry({
           type: EventType.chain.writeError
         })
@@ -1053,6 +1081,16 @@ Driver.prototype.send = function (options) {
     .then(function () {
       return Q.all(to.map(lookup))
     })
+    .catch(function (err) {
+      if (isPublic) {
+        return to.map(function (recipient) {
+          return recipient.fingerprint
+        })
+      } else {
+        debugger
+        throw err
+      }
+    })
     .then(function (_recipients) {
       recipients = _recipients
       return self.chainwriter.create()
@@ -1112,13 +1150,10 @@ Driver.prototype.lookupBTCPubKey = function (recipient) {
 }
 
 Driver.prototype.lookupBTCAddress = function (recipient) {
-  if (recipient.fingerprint === constants.IDENTITY_PUBLISH_ADDRESS) {
-    return Q.resolve(recipient.fingerprint)
-  }
-
-  return this.lookupBTCKey(recipient).then(function (k) {
-    return k.fingerprint
-  })
+  return this.lookupBTCKey(recipient)
+    .then(function (k) {
+      return k.fingerprint
+    })
 }
 
 Driver.prototype.destroy = function () {
