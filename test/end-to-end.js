@@ -8,7 +8,7 @@ var map = require('map-stream')
 var safe = require('safecb')
 var Q = require('q')
 var DHT = require('bittorrent-dht')
-// var utils = require('tradle-utils')
+var utils = require('tradle-utils')
 var ChainedObj = require('chained-obj')
 var Builder = ChainedObj.Builder
 var kiki = require('kiki')
@@ -47,6 +47,24 @@ test('setup', function (t) {
   t.timeoutAfter(2000)
 
   init(t.pass)
+})
+
+reinitAndTest('don\'t choke on non-data tx', function (t) {
+  driverBill.wallet.send()
+    .to(driverTed.wallet.addressString, 10000)
+    .execute()
+
+  driverBill.on('error', rethrow)
+  driverTed.on('error', rethrow)
+  setTimeout(function () {
+    collect(driverBill.transactions().createValueStream(), function (err, txs) {
+      t.equal(txs.length, 1)
+      var tx = txs[0]
+      t.notOk('txData' in tx)
+      t.notOk('txData' in tx)
+      t.end()
+    })
+  }, 1000)
 })
 
 reinitAndTest('self publish, edit, republish', function (t) {
@@ -151,7 +169,7 @@ reinitAndTest('throttle chaining', function (t) {
 
 reinitAndTest('structured but not chained message', function (t) {
   t.plan(2)
-  t.timeoutAfter(15000)
+  t.timeoutAfter(20000)
   publishBoth(function () {
     var billCoords = {
       fingerprint: billPub.pubkeys[0].fingerprint

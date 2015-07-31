@@ -54,8 +54,6 @@ module.exports = function chainstream (options) {
           var obj = chainedObjs && chainedObjs[0]
           if (obj) {
             extend(processed, obj)
-          } else {
-            throw new Error('nothing to load in tx?')
           }
         })
         .catch(function (err) {
