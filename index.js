@@ -358,6 +358,10 @@ Driver.prototype.messages = function () {
   return this.msgDB
 }
 
+Driver.prototype.transactions = function () {
+  return this.txDB
+}
+
 Driver.prototype.unchainResultToEntry = function (chainedObj) {
   var type = chainedObj.errors && chainedObj.errors.length ?
     EventType.chain.readError :
