@@ -5,7 +5,6 @@
   "main": "index.js",
   "scripts": {
     "test": "node test",
-    "postinstall": "./postInstall.js",
     "style": "standard $(git ls-files '**.js')"
   },
   "pre-commit": [
@@ -32,11 +31,11 @@
   "dependencies": {
     "array-find": "^1.0.0",
     "bitcoinjs-lib": "^1.4.1",
-    "bitjoe-js": "git://github.com/tradle/bitjoe-js",
-    "bittorrent-dht": "git://github.com/tradle/bittorrent-dht",
+    "bitjoe-js": "tradle/bitjoe-js",
+    "bittorrent-dht": "tradle/bittorrent-dht",
     "cb-streams": "^1.0.2",
     "chained-obj": "^1.0.2",
-    "chainloader": "git://github.com/tradle/chainloader",
+    "chainloader": "tradle/chainloader",
     "debug": "^2.2.0",
     "elliptic": "^3.1.0",
     "error": "^7.0.2",
@@ -49,7 +48,7 @@
     "level-queryengine": "^3.0.1",
     "levelup": "^0.18.0",
     "lexicographic-integer": "^1.1.0",
-    "logbase": "^1.0.0",
+    "logbase": "^1.1.0",
     "map-stream": "0.0.6",
     "midentity": "^1.0.2",
     "object.omit": "^1.1.0",
@@ -58,26 +57,26 @@
     "q": "^1.4.1",
     "re-emitter": "^1.1.1",
     "safecb": "0.0.1",
-    "simple-wallet": "git://github.com/tradle/simple-wallet",
+    "simple-wallet": "tradle/simple-wallet",
     "stream-collector": "^1.0.1",
     "stream-combiner2": "^1.0.2",
     "tradle-constants": "^1.0.0",
-    "tradle-permission": "git://github.com/tradle/permission",
-    "tradle-tx-data": "git://github.com/tradle/tx-data",
+    "tradle-permission": "tradle/permission",
+    "tradle-tx-data": "tradle/tx-data",
     "tradle-utils": "^0.1.3",
-    "tradle-verifier": "git://github.com/tradle/tradle-verifier",
+    "tradle-verifier": "tradle/tradle-verifier",
     "typeforce": "^1.1.2",
     "uniq": "^1.0.1",
-    "zlorp": "^1.0.1"
+    "zlorp": "^1.0.4"
   },
   "devDependencies": {
-    "bitkeeper-js": "git://github.com/tradle/bitkeeper-js",
-    "cb-blockr": "git://github.com/tradle/cb-blockr",
+    "bitkeeper-js": "tradle/bitkeeper-js",
+    "cb-blockr": "tradle/cb-blockr",
     "memdown": "^1.0.0",
     "pre-commit": "^1.0.10",
     "rimraf": "^2.4.1",
     "standard": "^4.5.2",
     "tape": "^4.0.0",
-    "tradle-test-helpers": "git://github.com/tradle/test-helpers"
+    "tradle-test-helpers": "tradle/test-helpers"
   }
 }
