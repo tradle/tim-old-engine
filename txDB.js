@@ -70,7 +70,7 @@ module.exports = function createTxDB (path, options) {
         .set(root)
         .set(entryJSON)
 
-      db.put(key, entry.toJSON(), cb)
+      put(entry, cb)
     })
   }
 }
