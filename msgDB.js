@@ -56,7 +56,7 @@ module.exports = function createMsgDB (path, options) {
 
           cb()
           if (eType === EventType.msg.receivedValid) {
-            db.emit('received', result)
+            db.emit('message', result)
           }
         })
       case EventType.msg.sendSuccess:
@@ -82,7 +82,9 @@ module.exports = function createMsgDB (path, options) {
       if (err) return cb(err)
 
       cb()
-      db.emit(event, result)
+      if (typeof result !== 'undefined') {
+        db.emit(event, result)
+      }
     }
   }
 

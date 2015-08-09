@@ -1,3 +1,5 @@
+
+var Q = require('q')
 var debug = require('debug')('identityDB')
 var typeforce = require('typeforce')
 var extend = require('extend')
@@ -129,7 +131,7 @@ module.exports = function mkIdentityDB (path, options) {
           prefix: main
         })
 
-        db.batch(batch, cb)
+        return Q.ninvoke(db, 'batch', batch)
       })
       .catch(function (err) {
         if (err instanceof TypeError ||
@@ -138,9 +140,10 @@ module.exports = function mkIdentityDB (path, options) {
         }
 
         debug('unable to get identity from keeper', err)
+      })
+      .done(function () {
         cb()
       })
-      .done()
   }
 }
 

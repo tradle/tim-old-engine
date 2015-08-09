@@ -8,16 +8,25 @@ var map = require('map-stream')
 var safe = require('safecb')
 var Q = require('q')
 var DHT = require('bittorrent-dht')
-var utils = require('tradle-utils')
+var Keeper = require('bitkeeper-js')
+var Zlorp = require('zlorp')
+Zlorp.ANNOUNCE_INTERVAL = 1000
+Zlorp.LOOKUP_INTERVAL = 1000
 var ChainedObj = require('chained-obj')
 var Builder = ChainedObj.Builder
 var kiki = require('kiki')
 var toKey = kiki.toKey
-var billPub = require('./fixtures/bill-pub.json')
-var tedPub = require('./fixtures/ted-pub.json')
+var Identity = require('midentity').Identity
+var billPub = require('./fixtures/bill-pub')
+var tedPub = require('./fixtures/ted-pub')
 var billPriv = require('./fixtures/bill-priv')
 var tedPriv = require('./fixtures/ted-priv')
+var bill = Identity.fromJSON(billPub)
+var ted = Identity.fromJSON(tedPub)
 var constants = require('tradle-constants')
+// var testDrivers = require('./helpers/testDriver')
+var billPort = 51086
+var tedPort = 51087
 var TYPE = constants.TYPE
 var ROOT_HASH = constants.ROOT_HASH
 // var CUR_HASH = constants.CUR_HASH
@@ -26,9 +35,8 @@ var PREV_HASH = constants.PREV_HASH
 // var billHash = billPub[ROOT_HASH] ='fb07729c0cef307ab7c28cb76088cc60dbc98cdd'
 // var tedHash = 'c67905793f6cc0f0ab8d20aecfec441932ffb13d'
 // var billHash = 'fb07729c0cef307ab7c28cb76088cc60dbc98cdd'
-var Identity = require('midentity').Identity
 var help = require('tradle-test-helpers')
-var fakeKeeper = help.fakeKeeper
+// var fakeKeeper = help.fakeKeeper
 var fakeWallet = help.fakeWallet
 // var bill = Identity.fromJSON(billPriv)
 // var ted = Identity.fromJSON(tedPriv)
@@ -42,12 +50,54 @@ var driverTed
 var reinitCount = 0
 var chainThrottle = 5000
 
-test('setup', function (t) {
-  t.plan(1)
-  t.timeoutAfter(2000)
+// test('zlorp', function (t) {
+//   var billDHT = dhtFor(bill)
+//   billDHT.listen(billPort)
+//   var a = new Zlorp({
+//     name: 'bill',
+//     available: true,
+//     leveldown: memdown,
+//     port: billPort,
+//     dht: billDHT,
+//     key: toKey(find(billPriv, function (k) {
+//       return k.type === 'dsa' && k.purpose === 'sign'
+//     })).priv()
+//   })
 
-  init(t.pass)
-})
+//   var tedDHT = dhtFor(ted)
+//   tedDHT.listen(tedPort)
+//   var b = new Zlorp({
+//     name: 'ted',
+//     available: true,
+//     leveldown: memdown,
+//     port: tedPort,
+//     dht: tedDHT,
+//     key: toKey(find(tedPriv, function (k) {
+//       return k.type === 'dsa' && k.purpose === 'sign'
+//     })).priv()
+//   })
+
+//   billDHT.addNode('127.0.0.1:' + tedPort, tedDHT.nodeId)
+//   tedDHT.addNode('127.0.0.1:' + billPort, billDHT.nodeId)
+
+//   a.send(new Buffer('yo'), b.fingerprint)
+//   b.on('data', function () {
+//     a.destroy()
+//     b.destroy()
+//     t.end()
+//   })
+
+//   b.on('connect', function () {
+//     console.log('connect')
+//   })
+
+//   b.on('knock', function () {
+//     console.log('knock')
+//   })
+
+//   console.log('BILL', a.key.fingerprint())
+//   console.log('TED', b.key.fingerprint())
+// })
 
 reinitAndTest('don\'t choke on non-data tx', function (t) {
   driverBill.wallet.send()
@@ -56,15 +106,18 @@ reinitAndTest('don\'t choke on non-data tx', function (t) {
 
   driverBill.on('error', rethrow)
   driverTed.on('error', rethrow)
-  setTimeout(function () {
-    collect(driverBill.transactions().createValueStream(), function (err, txs) {
-      t.equal(txs.length, 1)
-      var tx = txs[0]
-      t.notOk('txData' in tx)
-      t.notOk('txData' in tx)
-      t.end()
+  var stream = driverBill.transactions()
+    .liveStream({
+      old: true,
+      tail: true
     })
-  }, 1000)
+    .on('data', function (data) {
+      stream.destroy()
+      var tx = data.value
+      t.notOk('txType' in tx)
+      t.notOk('txData' in tx)
+      setTimeout(t.end, 1000)
+    })
 })
 
 reinitAndTest('self publish, edit, republish', function (t) {
@@ -79,13 +132,16 @@ reinitAndTest('self publish, edit, republish', function (t) {
   var identitiesChecked = 0
 
   function publish (next) {
+    var togo = 2
     driverBill.publishMyIdentity()
-    driverTed.once('unchained', function (info) {
-      driverTed.lookupObject(info)
-        .done(function (chainedObj) {
-          t.deepEqual(chainedObj.parsed.data, driverBill.identityJSON)
-          next()
-        })
+    ;[driverBill, driverTed].forEach(function (driver) {
+      driver.once('unchained', function (info) {
+        driver.lookupObject(info)
+          .done(function (chainedObj) {
+            t.deepEqual(chainedObj.parsed.data, driverBill.identityJSON)
+            if (--togo === 0) next()
+          })
+      })
     })
   }
 
@@ -118,13 +174,14 @@ reinitAndTest('self publish, edit, republish', function (t) {
   function readIdentities (next) {
     var bStream = driverBill.identities().createValueStream()
     var tStream = driverTed.identities().createValueStream()
-    collect(bStream, checkIdentities)
-    collect(tStream, checkIdentities)
+    collect(bStream, checkIdentities.bind(driverBill))
+    collect(tStream, checkIdentities.bind(driverTed))
   }
 
   function checkIdentities (err, identities) {
     if (err) throw err
 
+    console.log(this.identityJSON.name.firstName)
     t.equal(identities.length, 1)
     identities.forEach(function (ident) {
       // if (ident.name.firstName === driverBill.identityJSON.name.firstName) {
@@ -289,6 +346,22 @@ reinitAndTest('chained message', function (t) {
 
 test('teardown', function (t) {
   t.timeoutAfter(10000)
+  // setInterval(function () {
+  //   var handles = process._getActiveHandles()
+  //   console.log(handles.length, 'handles open')
+  //   var types = handles.map(function (h) {
+  //     var type = h.constructor.toString().match(/function (.*?)\s*\(/)[1]
+  //     if (type === 'Socket') {
+  //       if (h instanceof dgram.Socket) type += ' (raw)'
+  //       if (h._tag) type += ' ' + h._tag
+  //     }
+
+  //     return type
+  //   })
+
+  //   console.log(types)
+  // }, 2000).unref()
+
   teardown(function () {
     t.end()
   })
@@ -308,17 +381,29 @@ function reinit (cb) {
 function init (cb) {
   reinitCount++
 
-  var bill = Identity.fromJSON(billPub)
-  var ted = Identity.fromJSON(tedPub)
-  var keeper = fakeKeeper.empty()
-  var billPort = 51086
-  var tedPort = 51087
+  // var bill = Identity.fromJSON(billPub)
+  // driverBill = testDrivers.fake({
+  //   identity: bill,
+  //   port: billPort,
+  //   identityKeys: billPriv
+  // })
+
+  // var ted = Identity.fromJSON(tedPub)
+  // driverTed = testDrivers.fake({
+  //   identity: ted,
+  //   port: tedPort,
+  //   identityKeys: tedPriv,
+  //   blockchain: bill.blockchain, // share a fake blockchain
+  //   keeper: bill.keeper
+  // })
+
+  // var keeper = fakeKeeper.empty()
   var billWallet = walletFor(billPriv, null, 'messaging')
   var blockchain = billWallet.blockchain
   var tedWallet = walletFor(tedPriv, blockchain, 'messaging')
   var commonOpts = {
     networkName: networkName,
-    keeper: keeper,
+    // keeper: keeper,
     blockchain: blockchain,
     leveldown: memdown,
     syncInterval: 1000,
@@ -338,6 +423,7 @@ function init (cb) {
     pathPrefix: 'bill' + reinitCount,
     identity: bill,
     identityKeys: billPriv,
+    keeper: new Keeper({ dht: billDHT }),
     // kiki: kiki.kiki(billPriv),
     wallet: billWallet,
     dht: billDHT,
@@ -348,6 +434,7 @@ function init (cb) {
     pathPrefix: 'ted' + reinitCount,
     identity: ted,
     identityKeys: tedPriv,
+    keeper: new Keeper({ dht: tedDHT }),
     // kiki: kiki.kiki(tedPriv),
     wallet: tedWallet,
     dht: tedDHT,
@@ -366,9 +453,16 @@ function init (cb) {
 
 function teardown (cb) {
   Q.all([
-    driverBill.destroy(),
-    driverTed.destroy()
-  ]).done(safe(cb))
+      driverBill.destroy(),
+      driverTed.destroy()
+    ])
+    .then(function () {
+      return Q.all([
+        Q.ninvoke(driverBill.dht, 'destroy'),
+        Q.ninvoke(driverTed.dht, 'destroy')
+      ])
+    })
+    .done(safe(cb))
 }
 
 function reinitAndTest (name, testFn) {

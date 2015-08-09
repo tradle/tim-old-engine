@@ -3,6 +3,7 @@ var crypto = require('crypto')
 var find = require('array-find')
 var DHT = require('bittorrent-dht')
 var leveldown = require('memdown')
+var utils = require('tradle-utils')
 var Driver = require('../')
 var Identity = require('midentity').Identity
 // var tedPriv = require('chained-chat/test/fixtures/ted-priv')
@@ -40,7 +41,7 @@ function buildDriver (identity, keys, port) {
     identityKeys: keys,
     dht: dht,
     port: port,
-    syncInterval: 5000
+    syncInterval: 60000
   })
 
 }
@@ -57,6 +58,14 @@ var driverBill = buildDriver(Identity.fromJSON(billPub), billPriv, BILL_PORT)
 driverBill.once('ready', function () {
   driverBill.on('chained', function (obj) {
     console.log('chained', obj)
+    debugger
+  })
+
+  debugger
+  driverBill.publishMyIdentity()
+  driverBill.on('error', function (err) {
+    console.error(err)
+    debugger
   })
 })
 

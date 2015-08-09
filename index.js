@@ -152,6 +152,7 @@ function Driver (options) {
 
   // in-memory cache of recent conversants
   this._fingerprintToIdentity = {}
+  this._pendingTxs = []
   this._setupP2P()
 
   this._setupDBs()
@@ -224,6 +225,14 @@ Driver.prototype._readFromChain = function () {
 
   pump(
     this._getFromChainStream(),
+    map(function (txInfo, cb) {
+      var idx = self._pendingTxs.indexOf(txInfo.txId)
+      if (idx !== -1) {
+        self._pendingTxs.splice(idx, 1)
+      }
+
+      cb(null, txInfo)
+    }),
     this.unchainer,
     map(function (chainedObj, cb) {
       self._debug('unchained (read)', chainedObj.key, chainedObj.errors)
@@ -622,29 +631,27 @@ Driver.prototype._streamTxs = function (fromHeight, skipIds) {
   pump(
     this._rawTxStream,
     map(function (txInfo, cb) {
+      // TODO: make more efficient
+      // when we have a source of txs that
+      // consistently provides block height
       var id = txInfo.tx.getId()
-      if (typeof txInfo.height === 'undefined') {
-        if (skipIds.indexOf(id) !== -1) {
-          return cb()
-        }
-
-        self.txDB.get(id, function (err) {
-          if (err) {
-            if (!err.notFound) return cb(err)
-
-            return save()
-          }
-
-          cb() // already have this one
-        })
-      } else if (txInfo.height < fromHeight ||
-        (txInfo.height === fromHeight && skipIds.indexOf(id) !== -1)) {
-        return cb()
-      } else {
-        save()
+      if (self._pendingTxs.indexOf(id) !== -1) {
+        return cb() // already handled this one
       }
 
+      self.txDB.get(id, function (err, entry) {
+        if (err) {
+          if (!err.notFound) return cb(err)
+
+          return save()
+        }
+
+        if ('dateUnchained' in entry) cb() // already have this one
+        else save()
+      })
+
       function save () {
+        self._pendingTxs.push(id)
         var props = extend({}, txInfo, {
           type: EventType.tx,
           tx: toBuffer(txInfo.tx),
@@ -701,14 +708,11 @@ Driver.prototype._setupDBs = function () {
 
   reemit(this.msgDB, this, [
     'chained',
-    'unchained'
+    'unchained',
+    'message'
   ])
 
-  this.msgDB.on('received', function (msg) {
-    self.emit('message', msg)
-  })
-
-  ;['received', 'unchained'].forEach(function (event) {
+  ;['message', 'unchained'].forEach(function (event) {
     self.msgDB.on(event, function (entry) {
       self._debug('unchained', entry[CUR_HASH])
       if (entry.tx && entry.dateReceived) {
@@ -723,6 +727,13 @@ Driver.prototype._setupDBs = function () {
   })
 
   this.txDB.name = this.identityJSON.name.formatted + ' txDB'
+  // this.msgDB.once('live', function () {
+  //   console.log('msgDB is live')
+  // })
+
+  // this.txDB.once('live', function () {
+  //   console.log('txDB is live')
+  // })
 }
 
 Driver.prototype._sendP2P = function (info) {
@@ -744,7 +755,7 @@ Driver.prototype._sendP2P = function (info) {
 }
 
 Driver.prototype.lookupObject = function (info) {
-  // this duplicates part of unchainer.js
+  // TODO: this unfortunately duplicates part of unchainer.js
   if (!info.txData) {
     if (info.tx) {
       info = bitcoin.Transaction.fromBuffer(info.tx)
@@ -756,7 +767,7 @@ Driver.prototype.lookupObject = function (info) {
   var chainedObj
   return this.chainloader.load(info)
     .then(function (objs) {
-      if (!objs.length) throw new Error('not found')
+      if (!objs.length) throw new Error('object not found')
 
       chainedObj = objs[0]
       return Q.ninvoke(Parser, 'parse', chainedObj.data)
@@ -768,21 +779,19 @@ Driver.prototype.lookupObject = function (info) {
 }
 
 Driver.prototype.lookupByFingerprint = function (fingerprint) {
-  var self = this
-
-  var cached = this._fingerprintToIdentity[fingerprint]
-  if (cached) return Q.resolve(cached)
+//   var cached = this._fingerprintToIdentity[fingerprint]
+//   if (cached) return Q.resolve(cached)
 
   return this.lookupIdentity({
-      fingerprint: fingerprint
-    })
-    .then(function (identity) {
-      identity.pubkeys.forEach(function (p) {
-        self._fingerprintToIdentity[p.fingerprint] = identity
-      })
+    fingerprint: fingerprint
+  })
+//     .then(function (identity) {
+//       identity.pubkeys.forEach(function (p) {
+//         self._fingerprintToIdentity[p.fingerprint] = identity
+//       })
 
-      return identity
-    })
+//       return identity
+    // })
 }
 
 Driver.prototype.getKeyAndIdentity = function (fingerprint, returnPrivate) {
@@ -1091,7 +1100,6 @@ Driver.prototype.send = function (options) {
           return recipient.fingerprint
         })
       } else {
-        debugger
         throw err
       }
     })
