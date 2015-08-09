@@ -1,7 +1,7 @@
 
 var bitcoin = require('bitcoinjs-lib')
 var map = require('map-stream')
-var debug = require('debug')('chainstream')
+var debug = require('debug')('unchainer')
 var extend = require('extend')
 var combine = require('stream-combiner2')
 var typeforce = require('typeforce')
