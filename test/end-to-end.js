@@ -1,3 +1,5 @@
+
+require('multiplex-utp')
 var test = require('tape')
 var find = require('array-find')
 var crypto = require('crypto')
@@ -10,8 +12,7 @@ var Q = require('q')
 var DHT = require('bittorrent-dht')
 var Keeper = require('bitkeeper-js')
 var Zlorp = require('zlorp')
-Zlorp.ANNOUNCE_INTERVAL = 1000
-Zlorp.LOOKUP_INTERVAL = 1000
+Zlorp.ANNOUNCE_INTERVAL = Zlorp.LOOKUP_INTERVAL = 100
 var ChainedObj = require('chained-obj')
 var Builder = ChainedObj.Builder
 var kiki = require('kiki')
@@ -181,7 +182,7 @@ reinitAndTest('self publish, edit, republish', function (t) {
   function checkIdentities (err, identities) {
     if (err) throw err
 
-    console.log(this.identityJSON.name.firstName)
+    // console.log(this.identityJSON.name.firstName)
     t.equal(identities.length, 1)
     identities.forEach(function (ident) {
       // if (ident.name.firstName === driverBill.identityJSON.name.firstName) {
@@ -259,23 +260,18 @@ reinitAndTest('chained message', function (t) {
   t.timeoutAfter(15000)
 
   publishBoth(function () {
-    driverTed.on('unchained', onUnchained.bind(driverTed))
-    driverBill.on('unchained', onUnchained.bind(driverBill))
-
-    driverBill.on('message', function (obj) {
-      driverBill.lookupObject(obj)
-        .then(function (chainedObj) {
-          checkMessage(chainedObj.data)
-        })
-        .done()
+    ;[driverBill, driverTed].forEach(function (driver) {
+      driver.on('unchained', onUnchained.bind(driver))
     })
 
-    driverBill.on('resolved', function (obj) {
-      driverBill.lookupObject(obj)
-        .then(function (chainedObj) {
-          checkMessage(chainedObj.data)
-        })
-        .done()
+    ;['message', 'resolved'].forEach(function (event) {
+      driverBill.on(event, function (obj) {
+        driverBill.lookupObject(obj)
+          .then(function (chainedObj) {
+            checkMessage(chainedObj.data)
+          })
+          .done()
+      })
     })
 
     var billCoords = {
@@ -319,24 +315,18 @@ reinitAndTest('chained message', function (t) {
     }
 
     function checkMessageDB () {
-      collect(driverBill.messages().createValueStream().pipe(
-        map(function (data, cb) {
-          driverBill.lookupObject(data)
-            .nodeify(cb)
-        })
-      ), checkLast)
-
-      collect(driverTed.messages().createValueStream().pipe(
-        map(function (data, cb) {
-          driverTed.lookupObject(data)
-            .nodeify(cb)
-        })
-      ), checkLast)
+      ;[driverBill, driverTed].forEach(function (driver) {
+        collect(driver.messages().createValueStream().pipe(
+          map(function (data, cb) {
+            driver.lookupObject(data)
+              .nodeify(cb)
+          })
+        ), checkLast)
+      })
 
       function checkLast (err, messages) {
         if (err) throw err
 
-        // console.log(JSON.stringify(messages, null, 2))
         checkMessage(messages.pop().parsed.data)
       }
     }
@@ -346,22 +336,6 @@ reinitAndTest('chained message', function (t) {
 
 test('teardown', function (t) {
   t.timeoutAfter(10000)
-  // setInterval(function () {
-  //   var handles = process._getActiveHandles()
-  //   console.log(handles.length, 'handles open')
-  //   var types = handles.map(function (h) {
-  //     var type = h.constructor.toString().match(/function (.*?)\s*\(/)[1]
-  //     if (type === 'Socket') {
-  //       if (h instanceof dgram.Socket) type += ' (raw)'
-  //       if (h._tag) type += ' ' + h._tag
-  //     }
-
-  //     return type
-  //   })
-
-  //   console.log(types)
-  // }, 2000).unref()
-
   teardown(function () {
     t.end()
   })
@@ -545,3 +519,50 @@ function getSigningKey (keys) {
 
   return key && toKey(key)
 }
+
+// function overrideDgram () {
+//   var createSocket = dgram.createSocket
+//   var id = 0
+//   dgram.createSocket = function () {
+//     var s = createSocket.apply(dgram, arguments)
+//     s.once('listening', function () {
+//       s.socket._id = s._id
+//     })
+
+//     s._id = id++
+//     if ([51, 55, 75, 79].indexOf(s._id) !== -1) {
+//       console.log('socket', s._id)
+//       printStack()
+//     }
+
+//     return s
+//   }
+// }
+
+// function printStack (from, to) {
+//   var trace = stackTrace.get()
+//   if (!from) from = 0
+//   if (!to) to = trace.length - 1
+//   trace = trace.slice(from + 1, to + 1)
+//   if (trace.length) {
+//     trace.forEach(function (t) {
+//       console.log(t.toString())
+//     })
+//   }
+// }
+
+// setInterval(function () {
+//   var handles = process._getActiveHandles()
+//   console.log(handles.length, 'handles open')
+//   var types = handles.map(function (h) {
+//     var type = h.constructor.toString().match(/function (.*?)\s*\(/)[1]
+//     if (type === 'Socket') {
+//       if (h instanceof dgram.Socket) type += ' (raw)'
+//       if (h._tag) type += ' ' + h._tag
+//     }
+
+//     return type + h._id
+//   })
+
+//   console.log(types)
+// }, 2000).unref()
