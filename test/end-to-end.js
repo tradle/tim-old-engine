@@ -44,7 +44,7 @@ var fakeWallet = help.fakeWallet
 var networkName = 'testnet'
 // var blockchain = new Fakechain({ networkName: networkName })
 var Driver = require('../')
-var currentTime = require('../now')
+var currentTime = require('../lib/now')
 
 var driverBill
 var driverTed
