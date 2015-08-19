@@ -1192,7 +1192,6 @@ Driver.prototype.destroy = function () {
       Q.ninvoke(self.txDB, 'close'),
       Q.ninvoke(self._log, 'close')
     ])
-    .done()
 // .done(console.log.bind(console, this.pathPrefix + ' is dead'))
 }
 
