@@ -714,7 +714,7 @@ Driver.prototype._setupDBs = function () {
 
   ;['message', 'unchained'].forEach(function (event) {
     self.msgDB.on(event, function (entry) {
-      self._debug('unchained', entry[CUR_HASH])
+      self._debug(event, entry[CUR_HASH])
       if (entry.tx && entry.dateReceived) {
         self.emit('resolved', entry)
       }
@@ -1116,11 +1116,9 @@ Driver.prototype.send = function (options) {
       self._debug('stored (write)', entry.get(ROOT_HASH))
       var entries
       if (isPublic) {
-        entries = to.map(function (addr, i) {
+        entries = to.map(function (contact, i) {
           return entry.clone().set({
-            to: {
-              fingerprint: addr
-            },
+            to: contact,
             addressesFrom: [self.wallet.addressString],
             addressesTo: [recipients[i]],
             txType: TxData.types.public,
