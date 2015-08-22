@@ -28,6 +28,8 @@ var constants = require('tradle-constants')
 // var testDrivers = require('./helpers/testDriver')
 var billPort = 51086
 var tedPort = 51087
+var bootstrapDHT
+var BOOTSTRAP_DHT_PORT = 12345
 var TYPE = constants.TYPE
 var ROOT_HASH = constants.ROOT_HASH
 // var CUR_HASH = constants.CUR_HASH
@@ -100,7 +102,7 @@ var chainThrottle = 5000
 //   console.log('TED', b.key.fingerprint())
 // })
 
-reinitAndTest('don\'t choke on non-data tx', function (t) {
+reinitAndTest('handle non-data tx', function (t) {
   driverBill.wallet.send()
     .to(driverTed.wallet.addressString, 10000)
     .execute()
@@ -185,14 +187,12 @@ reinitAndTest('self publish, edit, republish', function (t) {
     // console.log(this.identityJSON.name.firstName)
     t.equal(identities.length, 1)
     identities.forEach(function (ident) {
-      // if (ident.name.firstName === driverBill.identityJSON.name.firstName) {
       t.deepEqual(ident, driverBill.identityJSON)
-      // } else {
-      //   t.deepEqual(ident, driverTed.identityJSON)
-      // }
     })
 
-    if (++identitiesChecked === 2) t.end()
+    if (++identitiesChecked === 2) {
+      t.end()
+    }
   }
 })
 
@@ -384,14 +384,14 @@ function init (cb) {
     chainThrottle: chainThrottle
   }
 
+  bootstrapDHT = new DHT({ bootstrap: false })
+  bootstrapDHT.listen(BOOTSTRAP_DHT_PORT)
+
   var billDHT = dhtFor(bill)
   billDHT.listen(billPort)
 
   var tedDHT = dhtFor(ted)
   tedDHT.listen(tedPort)
-
-  billDHT.addNode('127.0.0.1:' + tedPort, tedDHT.nodeId)
-  tedDHT.addNode('127.0.0.1:' + billPort, billDHT.nodeId)
 
   driverBill = new Driver(extend({
     pathPrefix: 'bill' + reinitCount,
@@ -433,7 +433,8 @@ function teardown (cb) {
     .then(function () {
       return Q.all([
         Q.ninvoke(driverBill.dht, 'destroy'),
-        Q.ninvoke(driverTed.dht, 'destroy')
+        Q.ninvoke(driverTed.dht, 'destroy'),
+        Q.ninvoke(bootstrapDHT, 'destroy')
       ])
     })
     .done(safe(cb))
@@ -483,7 +484,7 @@ function publishBoth (cb) {
 function dhtFor (identity) {
   return new DHT({
     nodeId: nodeIdFor(identity),
-    bootstrap: false
+    bootstrap: ['127.0.0.1:' + BOOTSTRAP_DHT_PORT]
     // ,
     // bootstrap: ['tradle.io:25778']
   })
