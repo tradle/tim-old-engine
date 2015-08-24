@@ -706,15 +706,22 @@ Driver.prototype._setupDBs = function () {
 
   this.msgDB.name = this.identityJSON.name.formatted + ' msgDB'
 
-  reemit(this.msgDB, this, [
+  var msgDBEvents = [
     'chained',
     'unchained',
-    'message'
-  ])
+    'message',
+    'sent'
+  ]
+
+  reemit(this.msgDB, this, msgDBEvents)
+  msgDBEvents.forEach(function (e) {
+    self.msgDB.on(e, function (entry) {
+      self._debug(e)
+    })
+  })
 
   ;['message', 'unchained'].forEach(function (event) {
     self.msgDB.on(event, function (entry) {
-      self._debug(event, entry[CUR_HASH])
       if (entry.tx && entry.dateReceived) {
         self.emit('resolved', entry)
       }
@@ -736,21 +743,21 @@ Driver.prototype._setupDBs = function () {
   // })
 }
 
-Driver.prototype._sendP2P = function (info) {
+Driver.prototype._sendP2P = function (entry) {
   // TODO:
   //   do we log that we sent it?
   //   do we log when we delivered it? How do we know it was delivered?
   var self = this
 
   return Q.all([
-      this.lookupIdentity(info.to),
-      this.lookupObject(info)
+      this.lookupIdentity(entry.to),
+      this.lookupObject(entry)
     ])
     .spread(function (identity, chainedObj) {
       var fingerprint = getFingerprint(identity)
       self._debug(KEY_PURPOSE, fingerprint)
       var msg = msgToBuffer(getMsgProps(chainedObj))
-      self.p2p.send(msg, fingerprint)
+      return Q.ninvoke(self.p2p, 'send', msg, fingerprint)
     })
 }
 

@@ -204,7 +204,7 @@ reinitAndTest('throttle chaining', function (t) {
   var propagate = blockchain.transactions.propagate
   var firstErrTime
   blockchain.transactions.propagate = function (txs, cb) {
-    cb(new Error('something went horribly wrong'))
+    cb(new Error('this is a test error'))
 
     if (!firstErrTime) {
       firstErrTime = currentTime()
@@ -226,7 +226,7 @@ reinitAndTest('throttle chaining', function (t) {
 })
 
 reinitAndTest('structured but not chained message', function (t) {
-  t.plan(2)
+  t.plan(3)
   t.timeoutAfter(20000)
   publishBoth(function () {
     var billCoords = {
@@ -241,17 +241,19 @@ reinitAndTest('structured but not chained message', function (t) {
       chain: false
     })
 
-    driverBill.on('message', function (info) {
-      driverBill.lookupObject(info)
-        .done(function (chainedObj) {
-          t.deepEqual(chainedObj.parsed.data, msg)
-        })
-    })
-
+    driverTed.on('sent', checkReceived)
+    driverBill.on('message', checkReceived)
     driverTed.on('chained', t.fail)
     driverTed.on('unchained', t.fail)
     driverBill.on('unchained', t.fail)
     setTimeout(t.pass, 3000)
+
+    function checkReceived (info) {
+      driverBill.lookupObject(info)
+        .done(function (chainedObj) {
+          t.deepEqual(chainedObj.parsed.data, msg)
+        })
+    }
   })
 })
 
