@@ -4,7 +4,7 @@
   "description": "Tradle's P2P OTR-based chat with plaintext and structured messages, and the ability to externalize messages onto a blockchain (currently bitcoin's)",
   "main": "index.js",
   "scripts": {
-    "test": "node test",
+    "test": "node test && MULTIPLEX=1 node test",
     "style": "standard $(git ls-files '**.js')"
   },
   "pre-commit": [
@@ -37,10 +37,8 @@
     "chained-obj": "^1.0.2",
     "chainloader": "tradle/chainloader",
     "debug": "^2.2.0",
-    "elliptic": "^3.1.0",
     "error": "^7.0.2",
     "extend": "^2.0.1",
-    "fs-extra": "^0.20.1",
     "jsonquery-engine": "^1.0.2",
     "kiki": "^1.1.3",
     "level-errors": "^1.0.3",

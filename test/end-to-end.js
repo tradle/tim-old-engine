@@ -1,7 +1,14 @@
 
-require('multiplex-utp')
+if (process.env.MULTIPLEX) {
+  console.log('multiplex over UTP')
+  require('multiplex-utp')
+}
+
+var path = require('path')
 var test = require('tape')
+var rimraf = require('rimraf')
 var find = require('array-find')
+var pick = require('object.pick')
 var crypto = require('crypto')
 var extend = require('extend')
 var memdown = require('memdown')
@@ -34,6 +41,7 @@ var TYPE = constants.TYPE
 var ROOT_HASH = constants.ROOT_HASH
 // var CUR_HASH = constants.CUR_HASH
 var PREV_HASH = constants.PREV_HASH
+var STORAGE_DIR = path.resolve('./storage')
 // var tedHash = tedPub[ROOT_HASH] = 'c67905793f6cc0f0ab8d20aecfec441932ffb13d'
 // var billHash = billPub[ROOT_HASH] ='fb07729c0cef307ab7c28cb76088cc60dbc98cdd'
 // var tedHash = 'c67905793f6cc0f0ab8d20aecfec441932ffb13d'
@@ -221,12 +229,12 @@ reinitAndTest('throttle chaining', function (t) {
     .done()
 
   driverBill.on('error', function (err) {
-    t.ok(/horribly/.test(err.message))
+    t.ok(/test error/.test(err.message))
   })
 })
 
 reinitAndTest('structured but not chained message', function (t) {
-  t.plan(3)
+  t.plan(2)
   t.timeoutAfter(20000)
   publishBoth(function () {
     var billCoords = {
@@ -241,14 +249,68 @@ reinitAndTest('structured but not chained message', function (t) {
       chain: false
     })
 
-    driverTed.on('sent', checkReceived)
-    driverBill.on('message', checkReceived)
+    driverBill.on('message', function (info) {
+      driverBill.lookupObject(info)
+        .done(function (chainedObj) {
+          t.deepEqual(chainedObj.parsed.data, msg)
+        })
+    })
+
     driverTed.on('chained', t.fail)
     driverTed.on('unchained', t.fail)
     driverBill.on('unchained', t.fail)
-    setTimeout(t.pass, 3000)
+    setTimeout(t.pass, 2000)
+  })
+})
 
+reinitAndTest('delivery check', function (t) {
+  t.plan(3)
+  t.timeoutAfter(30000)
+  publishBoth(function () {
+    var billCoords = {
+      fingerprint: billPub.pubkeys[0].fingerprint
+    }
+
+    var msg = { hey: 'blah' }
+
+    driverTed.send({
+      msg: msg,
+      to: [billCoords],
+      chain: false
+    })
+
+    driverTed.on('sent', checkReceived)
+    driverTed.on('chained', t.fail)
+    driverTed.on('unchained', t.fail)
+    driverBill.on('unchained', t.fail)
+    driverBill.destroy()
+      .done(function () {
+        driverBill = new Driver(extend(pick(driverBill, [
+          'pathPrefix',
+          'identity',
+          'identityKeys',
+          'wallet',
+          'dht',
+          'port',
+          'networkName',
+          'blockchain',
+          'leveldown',
+          'syncInterval',
+          'chainThrottle'
+        ]), {
+          keeper: new Keeper({ dht: driverBill.dht, storage: STORAGE_DIR })
+        }))
+
+        driverBill.on('message', checkReceived)
+        driverBill.on('unchained', t.fail)
+      })
+
+    var togo = 2
     function checkReceived (info) {
+      if (--togo === 0) {
+        setTimeout(t.pass, 2000)
+      }
+
       driverBill.lookupObject(info)
         .done(function (chainedObj) {
           t.deepEqual(chainedObj.parsed.data, msg)
@@ -259,7 +321,7 @@ reinitAndTest('structured but not chained message', function (t) {
 
 reinitAndTest('chained message', function (t) {
   t.plan(6)
-  t.timeoutAfter(15000)
+  t.timeoutAfter(20000)
 
   publishBoth(function () {
     ;[driverBill, driverTed].forEach(function (driver) {
@@ -399,7 +461,7 @@ function init (cb) {
     pathPrefix: 'bill' + reinitCount,
     identity: bill,
     identityKeys: billPriv,
-    keeper: new Keeper({ dht: billDHT }),
+    keeper: new Keeper({ dht: billDHT, storage: STORAGE_DIR }),
     // kiki: kiki.kiki(billPriv),
     wallet: billWallet,
     dht: billDHT,
@@ -410,7 +472,7 @@ function init (cb) {
     pathPrefix: 'ted' + reinitCount,
     identity: ted,
     identityKeys: tedPriv,
-    keeper: new Keeper({ dht: tedDHT }),
+    keeper: new Keeper({ dht: tedDHT, storage: STORAGE_DIR }),
     // kiki: kiki.kiki(tedPriv),
     wallet: tedWallet,
     dht: tedDHT,
@@ -436,7 +498,8 @@ function teardown (cb) {
       return Q.all([
         Q.ninvoke(driverBill.dht, 'destroy'),
         Q.ninvoke(driverTed.dht, 'destroy'),
-        Q.ninvoke(bootstrapDHT, 'destroy')
+        Q.ninvoke(bootstrapDHT, 'destroy'),
+        Q.nfcall(rimraf, STORAGE_DIR)
       ])
     })
     .done(safe(cb))
