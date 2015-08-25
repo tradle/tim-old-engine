@@ -734,13 +734,6 @@ Driver.prototype._setupDBs = function () {
   })
 
   this.txDB.name = this.identityJSON.name.formatted + ' txDB'
-  // this.msgDB.once('live', function () {
-  //   console.log('msgDB is live')
-  // })
-
-  // this.txDB.once('live', function () {
-  //   console.log('txDB is live')
-  // })
 }
 
 Driver.prototype._sendP2P = function (entry) {
