@@ -235,7 +235,7 @@ reinitAndTest('throttle chaining', function (t) {
 
 reinitAndTest('structured but not chained message', function (t) {
   t.plan(2)
-  t.timeoutAfter(20000)
+  t.timeoutAfter(25000)
   publishBoth(function () {
     var billCoords = {
       fingerprint: billPub.pubkeys[0].fingerprint
@@ -321,7 +321,7 @@ reinitAndTest('delivery check', function (t) {
 
 reinitAndTest('chained message', function (t) {
   t.plan(6)
-  t.timeoutAfter(20000)
+  t.timeoutAfter(25000)
 
   publishBoth(function () {
     ;[driverBill, driverTed].forEach(function (driver) {
