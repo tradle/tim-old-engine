@@ -492,6 +492,7 @@ Driver.prototype._getUnsentStream = function () {
       if (entry.dateSent ||
           entry.txType === TxData.types.public ||
           !entry.to ||
+          !entry.deliver ||
           entry.dir !== Dir.outbound ||
           self._currentlySending.indexOf(entry.id) !== -1) return
 
@@ -1051,6 +1052,7 @@ Driver.prototype.publish = function (options) {
  * @param {Array} options.to (optional) - recipients
  * @param {Boolean} options.public (optional) - whether this message should be publicly visible
  * @param {Boolean} options.chain (optional) - whether to put this message on chain
+ * @param {Boolean} options.deliver (optional) - whether to deliver this message p2p
  */
 Driver.prototype.send = function (options) {
   var self = this
@@ -1059,8 +1061,13 @@ Driver.prototype.send = function (options) {
     msg: 'Object',
     to: 'Array',
     public: '?Boolean',
-    chain: '?Boolean'
+    chain: '?Boolean',
+    deliver: '?Boolean'
   }, options)
+
+  if (!options.deliver && !options.chain) {
+    throw new Error('expected "deliver" and/or "chain"')
+  }
 
   var data = toBuffer(options.msg)
   // assert(TYPE in data, 'structured messages must specify type property: ' + TYPE)
@@ -1082,6 +1089,7 @@ Driver.prototype.send = function (options) {
     dir: Dir.outbound,
     public: isPublic,
     chain: !!options.chain,
+    deliver: !!options.deliver,
     from: toObj(ROOT_HASH, this._myRootHash()),
     to: to
   })
@@ -1344,7 +1352,7 @@ function firstKey (keys, where) {
 // }
 
 var toObjectStream = map.bind(null, function (data, cb) {
-  if (data.type !== 'put' || typeof data.value !== 'object') {
+  if (typeof data.value !== 'object') {
     return cb()
   }
 

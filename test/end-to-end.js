@@ -55,6 +55,7 @@ var networkName = 'testnet'
 // var blockchain = new Fakechain({ networkName: networkName })
 var Driver = require('../')
 var currentTime = require('../lib/now')
+// var TestDriver = require('./helpers/testDriver')
 
 var driverBill
 var driverTed
@@ -233,7 +234,7 @@ reinitAndTest('throttle chaining', function (t) {
   })
 })
 
-reinitAndTest('structured but not chained message', function (t) {
+reinitAndTest('delivered but not chained', function (t) {
   t.plan(2)
   t.timeoutAfter(25000)
   publishBoth(function () {
@@ -246,7 +247,8 @@ reinitAndTest('structured but not chained message', function (t) {
     driverTed.send({
       msg: msg,
       to: [billCoords],
-      chain: false
+      chain: false,
+      deliver: true
     })
 
     driverBill.on('message', function (info) {
@@ -259,6 +261,36 @@ reinitAndTest('structured but not chained message', function (t) {
     driverTed.on('chained', t.fail)
     driverTed.on('unchained', t.fail)
     driverBill.on('unchained', t.fail)
+    setTimeout(t.pass, 2000)
+  })
+})
+
+reinitAndTest('chained but not delivered', function (t) {
+  t.plan(2)
+  t.timeoutAfter(25000)
+  publishBoth(function () {
+    var billCoords = {
+      fingerprint: billPub.pubkeys[0].fingerprint
+    }
+
+    var msg = { hey: 'blah' }
+
+    driverTed.send({
+      msg: msg,
+      to: [billCoords],
+      chain: true,
+      deliver: false
+    })
+
+    driverBill.on('unchained', function (info) {
+      driverBill.lookupObject(info)
+        .done(function (chainedObj) {
+          t.deepEqual(chainedObj.parsed.data, msg)
+        })
+    })
+
+    driverTed.on('sent', t.fail)
+    driverBill.on('message', t.fail)
     setTimeout(t.pass, 2000)
   })
 })
@@ -276,6 +308,7 @@ reinitAndTest('delivery check', function (t) {
     driverTed.send({
       msg: msg,
       to: [billCoords],
+      deliver: true,
       chain: false
     })
 
@@ -355,7 +388,8 @@ reinitAndTest('chained message', function (t) {
         driverTed.send({
           msg: result.form,
           to: [billCoords],
-          chain: true
+          chain: true,
+          deliver: true
         }).done()
       })
 
@@ -419,23 +453,31 @@ function reinit (cb) {
 function init (cb) {
   reinitCount++
 
-  // var bill = Identity.fromJSON(billPub)
-  // driverBill = testDrivers.fake({
+  // commonOpts = {
+  //   networkName: networkName,
+  //   leveldown: memdown,
+  //   syncInterval: 100,
+  //   chainThrottle: chainThrottle
+  // }
+
+  // driverBill = TestDriver.fake(extend({
   //   identity: bill,
+  //   identityKeys: billPriv,
   //   port: billPort,
-  //   identityKeys: billPriv
-  // })
+  //   syncInterval: 100
+  // }, commonOpts))
 
-  // var ted = Identity.fromJSON(tedPub)
-  // driverTed = testDrivers.fake({
+  // driverTed = TestDriver.fake(extend({
   //   identity: ted,
-  //   port: tedPort,
   //   identityKeys: tedPriv,
-  //   blockchain: bill.blockchain, // share a fake blockchain
-  //   keeper: bill.keeper
+  //   port: tedPort,
+  //   blockchain: driverBill.blockchain
+  // }, commonOpts))
+
+  // ;[driverBill, driverTed].forEach(function (d) {
+  //   d.dht.addNode('127.0.0.1:' + BOOTSTRAP_DHT_PORT, bootstrapDHT.nodeId)
   // })
 
-  // var keeper = fakeKeeper.empty()
   var billWallet = walletFor(billPriv, null, 'messaging')
   var blockchain = billWallet.blockchain
   var tedWallet = walletFor(tedPriv, blockchain, 'messaging')
