@@ -19,7 +19,7 @@ var Q = require('q')
 var DHT = require('bittorrent-dht')
 var Keeper = require('bitkeeper-js')
 var Zlorp = require('zlorp')
-Zlorp.ANNOUNCE_INTERVAL = Zlorp.LOOKUP_INTERVAL = 100
+Zlorp.ANNOUNCE_INTERVAL = Zlorp.LOOKUP_INTERVAL = 2000
 var ChainedObj = require('chained-obj')
 var Builder = ChainedObj.Builder
 var kiki = require('kiki')
@@ -40,7 +40,7 @@ var billPort = 51086
 var tedPort = 51087
 var rufusPort = 51088
 var bootstrapDHT
-var BOOTSTRAP_DHT_PORT = 12345
+var BOOTSTRAP_DHT_PORT = 54321
 var TYPE = constants.TYPE
 var ROOT_HASH = constants.ROOT_HASH
 var CUR_HASH = constants.CUR_HASH
