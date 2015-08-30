@@ -896,6 +896,10 @@ Driver.prototype.lookupIdentity = function (query) {
 
 Driver.prototype.log = function (entry) {
   return Q.ninvoke(this._log, 'append', entry)
+    .then(function () {
+      // pass through for convenience
+      return entry
+    })
 }
 
 Driver.prototype.createReadStream = function (options) {
