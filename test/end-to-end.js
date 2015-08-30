@@ -368,12 +368,13 @@ reinitAndTest('delivery check', function (t) {
 })
 
 reinitAndTest('share chained content with 3rd party', function (t) {
-  t.plan(3)
-  // t.timeoutAfter(25000)
+  t.plan(4)
+  t.timeoutAfter(25000)
   publishAll([driverBill, driverTed, driverRufus], function () {
     var msg = { hey: 'blah' }
     msg[TYPE] = 'msg'
 
+    driverBill.on('message', t.fail) // only chain
     driverTed.send({
       msg: msg,
       to: [{
@@ -389,7 +390,7 @@ reinitAndTest('share chained content with 3rd party', function (t) {
           fingerprint: rufusPub.pubkeys[0].fingerprint
         }],
         chain: true,
-        deliver: false
+        deliver: true
       }
 
       shareOpts[CUR_HASH] = info[CUR_HASH]
@@ -404,15 +405,15 @@ reinitAndTest('share chained content with 3rd party', function (t) {
         })
     })
 
-    driverRufus.on('unchained', function (info) {
-      driverRufus.lookupObject(info)
-        .done(function (chainedObj) {
-          t.deepEqual(chainedObj.parsed.data, msg)
-        })
+    ;['message', 'unchained'].forEach(function (event) {
+      driverRufus.on(event, function (info) {
+        driverRufus.lookupObject(info)
+          .done(function (chainedObj) {
+            t.deepEqual(chainedObj.parsed.data, msg)
+          })
+      })
     })
 
-    driverTed.on('sent', t.fail)
-    driverBill.on('message', t.fail)
     setTimeout(t.pass, 2000)
   })
 })
