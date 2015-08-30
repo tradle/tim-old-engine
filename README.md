@@ -133,11 +133,35 @@ tim.publishMyIdentity()
 
 tim.send({
   msg: Object|String|Buffer,
+  // record message on chain
   chain: true,
+  // send message p2p
+  deliver: true,
   to: [{ 
     fingerprint: 'a fingerprint of a key of an identity known to you' 
   }]
 })
+
+```
+
+### Sharing existing messages (via the blockchain)
+
+```js
+
+var constants = require('tradle-constants')
+var curHash = '...' // the "hash" of the existing message
+var shareOpts = {
+  // record message on chain
+  chain: true,
+  // send message p2p
+  deliver: true,
+  to: [{
+    fingerprint: 'a fingerprint of a key of an identity known to you'
+  }]
+}
+
+shareOpts[constants.CUR_HASH] = curHash
+tim.share(shareOpts)
 
 ```
 
