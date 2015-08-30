@@ -119,6 +119,42 @@ var chainThrottle = 5000
 //   console.log('TED', b.key.fingerprint())
 // })
 
+reinitAndTest('delivered/chained/both', function (t) {
+  t.plan(4)
+  t.timeoutAfter(25000)
+  publishAll([driverBill, driverTed], function () {
+    var msgs = [
+      { chain: true, deliver: false },
+      { chain: false, deliver: true },
+      { chain: true, deliver: true }
+    ]
+
+    msgs.forEach(function (msg) {
+      driverTed.send(extend({
+        msg: msg,
+        to: [{
+          fingerprint: billPub.pubkeys[0].fingerprint
+        }],
+        chain: true,
+        deliver: false
+      }, msg))
+    })
+
+    ;['message', 'unchained'].forEach(function (event) {
+      driverBill.on(event, function (info) {
+        driverBill.lookupObject(info)
+          .done(function (chainedObj) {
+            if (event === 'message') {
+              t.deepEqual(chainedObj.parsed.data.deliver, true)
+            } else {
+              t.deepEqual(chainedObj.parsed.data.chain, true)
+            }
+          })
+      })
+    })
+  })
+})
+
 reinitAndTest('handle non-data tx', function (t) {
   driverBill.wallet.send()
     .to(driverTed.wallet.addressString, 10000)
@@ -242,74 +278,6 @@ reinitAndTest('throttle chaining', function (t) {
   })
 })
 
-reinitAndTest('delivered but not chained', function (t) {
-  t.plan(2)
-  t.timeoutAfter(25000)
-  publishAll([driverBill, driverTed], function () {
-    var billCoords = {
-      fingerprint: billPub.pubkeys[0].fingerprint
-    }
-
-    var msg = { hey: 'blah' }
-
-    driverTed.send({
-      msg: msg,
-      to: [billCoords],
-      chain: false,
-      deliver: true
-    })
-
-    driverBill.on('message', function (info) {
-      driverBill.lookupObject(info)
-        .done(function (chainedObj) {
-          t.deepEqual(chainedObj.parsed.data, msg)
-        })
-    })
-
-    driverTed.on('chained', t.fail)
-    driverTed.on('unchained', t.fail)
-    driverBill.on('unchained', t.fail)
-    setTimeout(t.pass, 2000)
-  })
-})
-
-reinitAndTest('chained but not delivered', function (t) {
-  t.plan(3)
-  t.timeoutAfter(25000)
-  publishAll([driverBill, driverTed, driverRufus], function () {
-    var msg = { hey: 'blah' }
-
-    driverTed.send({
-      msg: msg,
-      to: [
-        {fingerprint: billPub.pubkeys[0].fingerprint},
-        {fingerprint: rufusPub.pubkeys[0].fingerprint}
-      ],
-      chain: true,
-      deliver: false
-    })
-
-    driverBill.on('unchained', function (info) {
-      driverBill.lookupObject(info)
-        .done(function (chainedObj) {
-          t.deepEqual(chainedObj.parsed.data, msg)
-        })
-    })
-
-    driverRufus.on('unchained', function (info) {
-      driverRufus.lookupObject(info)
-        .done(function (chainedObj) {
-          t.deepEqual(chainedObj.parsed.data, msg)
-        })
-    })
-
-    driverTed.on('sent', t.fail)
-    driverBill.on('message', t.fail)
-    driverRufus.on('message', t.fail)
-    setTimeout(t.pass, 2000)
-  })
-})
-
 reinitAndTest('delivery check', function (t) {
   t.plan(3)
   t.timeoutAfter(30000)
@@ -368,53 +336,85 @@ reinitAndTest('delivery check', function (t) {
 })
 
 reinitAndTest('share chained content with 3rd party', function (t) {
-  t.plan(4)
+  t.plan(5)
   t.timeoutAfter(25000)
   publishAll([driverBill, driverTed, driverRufus], function () {
-    var msg = { hey: 'blah' }
-    msg[TYPE] = 'msg'
-
-    driverBill.on('message', t.fail) // only chain
-    driverTed.send({
-      msg: msg,
-      to: [{
-        fingerprint: billPub.pubkeys[0].fingerprint
-      }],
-      chain: true,
-      deliver: false
+    // make sure all the combinations work
+    // make it easier to check by sending settings as messages
+    var msgs = [
+      { chain: true, deliver: false },
+      { chain: false, deliver: true },
+      { chain: true, deliver: true }
+    ].map(function (m) {
+      m[TYPE] = 'message'
+      return m
     })
 
-    driverTed.once('chained', function (info) {
-      var shareOpts = {
+    // send all msgs to ted
+    msgs.forEach(function (msg) {
+      driverTed.send(extend({
+        msg: msg,
         to: [{
-          fingerprint: rufusPub.pubkeys[0].fingerprint
+          fingerprint: billPub.pubkeys[0].fingerprint
         }],
         chain: true,
-        deliver: true
-      }
-
-      shareOpts[CUR_HASH] = info[CUR_HASH]
-      driverTed.share(shareOpts)
-        .done()
+        deliver: false
+      }, msg))
     })
 
-    driverBill.on('unchained', function (info) {
-      driverBill.lookupObject(info)
-        .done(function (chainedObj) {
-          t.deepEqual(chainedObj.parsed.data, msg)
-        })
-    })
-
+    var togo = 4
     ;['message', 'unchained'].forEach(function (event) {
+      driverBill.on(event, function () {
+        if (--togo === 0) {
+          // share all msgs with rufus
+          togo = 4
+          share()
+        }
+      })
+
       driverRufus.on(event, function (info) {
         driverRufus.lookupObject(info)
           .done(function (chainedObj) {
-            t.deepEqual(chainedObj.parsed.data, msg)
+            if (event === 'message') {
+              t.deepEqual(chainedObj.parsed.data.deliver, true)
+            } else {
+              t.deepEqual(chainedObj.parsed.data.chain, true)
+            }
+
+            if (--togo === 0) {
+              // check for other events coming in
+              setTimeout(t.pass, 2000)
+            }
           })
       })
     })
 
-    setTimeout(t.pass, 2000)
+    function share () {
+      var stream = driverBill.decryptedMessagesStream()
+        .pipe(map(function (obj, cb) {
+          if (obj[TYPE] !== 'message') {
+            cb()
+          } else {
+            cb(null, obj)
+          }
+        }))
+
+      collect(stream, function (err, results) {
+        if (err) throw err
+
+        results.forEach(function (obj) {
+          var shareOpts = extend({
+            to: [{
+              fingerprint: rufusPub.pubkeys[0].fingerprint
+            }]
+          }, obj.parsed.data) // msg body
+
+          shareOpts[CUR_HASH] = obj[CUR_HASH]
+          driverTed.share(shareOpts)
+            .done()
+        })
+      })
+    }
   })
 })
 
@@ -480,12 +480,7 @@ reinitAndTest('message resolution - contents match on p2p and chain channels', f
 
     function checkMessageDB () {
       ;[driverBill, driverTed].forEach(function (driver) {
-        collect(driver.messages().createValueStream().pipe(
-          map(function (data, cb) {
-            driver.lookupObject(data)
-              .nodeify(cb)
-          })
-        ), checkLast)
+        collect(driver.decryptedMessagesStream(), checkLast)
       })
 
       function checkLast (err, messages) {

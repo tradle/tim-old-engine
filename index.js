@@ -367,6 +367,16 @@ Driver.prototype.messages = function () {
   return this.msgDB
 }
 
+Driver.prototype.decryptedMessagesStream = function (opts) {
+  var self = this
+  opts = opts || {}
+  return this.msgDB.createValueStream()
+    .pipe(map(function (info, cb) {
+      self.lookupObject(info)
+        .nodeify(cb)
+    }))
+}
+
 Driver.prototype.transactions = function () {
   return this.txDB
 }
