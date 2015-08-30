@@ -26,20 +26,24 @@ var kiki = require('kiki')
 var toKey = kiki.toKey
 var Identity = require('midentity').Identity
 var billPub = require('./fixtures/bill-pub')
-var tedPub = require('./fixtures/ted-pub')
 var billPriv = require('./fixtures/bill-priv')
-var tedPriv = require('./fixtures/ted-priv')
 var bill = Identity.fromJSON(billPub)
+var tedPub = require('./fixtures/ted-pub')
+var tedPriv = require('./fixtures/ted-priv')
 var ted = Identity.fromJSON(tedPub)
+var rufusPub = require('./fixtures/rufus-pub')
+var rufusPriv = require('./fixtures/rufus-priv')
+var rufus = Identity.fromJSON(rufusPub)
 var constants = require('tradle-constants')
 // var testDrivers = require('./helpers/testDriver')
 var billPort = 51086
 var tedPort = 51087
+var rufusPort = 51088
 var bootstrapDHT
 var BOOTSTRAP_DHT_PORT = 12345
 var TYPE = constants.TYPE
 var ROOT_HASH = constants.ROOT_HASH
-// var CUR_HASH = constants.CUR_HASH
+var CUR_HASH = constants.CUR_HASH
 var PREV_HASH = constants.PREV_HASH
 var STORAGE_DIR = path.resolve('./storage')
 // var tedHash = tedPub[ROOT_HASH] = 'c67905793f6cc0f0ab8d20aecfec441932ffb13d'
@@ -59,8 +63,12 @@ var currentTime = require('../lib/now')
 
 var driverBill
 var driverTed
+var driverRufus
 var reinitCount = 0
 var chainThrottle = 5000
+
+// var NAMES = ['bill', 'ted', 'rufus']
+// var basePort = 51086
 
 // test('zlorp', function (t) {
 //   var billDHT = dhtFor(bill)
@@ -237,7 +245,7 @@ reinitAndTest('throttle chaining', function (t) {
 reinitAndTest('delivered but not chained', function (t) {
   t.plan(2)
   t.timeoutAfter(25000)
-  publishBoth(function () {
+  publishAll([driverBill, driverTed], function () {
     var billCoords = {
       fingerprint: billPub.pubkeys[0].fingerprint
     }
@@ -266,18 +274,17 @@ reinitAndTest('delivered but not chained', function (t) {
 })
 
 reinitAndTest('chained but not delivered', function (t) {
-  t.plan(2)
+  t.plan(3)
   t.timeoutAfter(25000)
-  publishBoth(function () {
-    var billCoords = {
-      fingerprint: billPub.pubkeys[0].fingerprint
-    }
-
+  publishAll([driverBill, driverTed, driverRufus], function () {
     var msg = { hey: 'blah' }
 
     driverTed.send({
       msg: msg,
-      to: [billCoords],
+      to: [
+        {fingerprint: billPub.pubkeys[0].fingerprint},
+        {fingerprint: rufusPub.pubkeys[0].fingerprint}
+      ],
       chain: true,
       deliver: false
     })
@@ -289,8 +296,16 @@ reinitAndTest('chained but not delivered', function (t) {
         })
     })
 
+    driverRufus.on('unchained', function (info) {
+      driverRufus.lookupObject(info)
+        .done(function (chainedObj) {
+          t.deepEqual(chainedObj.parsed.data, msg)
+        })
+    })
+
     driverTed.on('sent', t.fail)
     driverBill.on('message', t.fail)
+    driverRufus.on('message', t.fail)
     setTimeout(t.pass, 2000)
   })
 })
@@ -298,7 +313,7 @@ reinitAndTest('chained but not delivered', function (t) {
 reinitAndTest('delivery check', function (t) {
   t.plan(3)
   t.timeoutAfter(30000)
-  publishBoth(function () {
+  publishAll([driverBill, driverTed], function () {
     var billCoords = {
       fingerprint: billPub.pubkeys[0].fingerprint
     }
@@ -352,11 +367,61 @@ reinitAndTest('delivery check', function (t) {
   })
 })
 
-reinitAndTest('chained message', function (t) {
+reinitAndTest('share chained content with 3rd party', function (t) {
+  t.plan(3)
+  // t.timeoutAfter(25000)
+  publishAll([driverBill, driverTed, driverRufus], function () {
+    var msg = { hey: 'blah' }
+    msg[TYPE] = 'msg'
+
+    driverTed.send({
+      msg: msg,
+      to: [{
+        fingerprint: billPub.pubkeys[0].fingerprint
+      }],
+      chain: true,
+      deliver: false
+    })
+
+    driverTed.once('chained', function (info) {
+      var shareOpts = {
+        to: [{
+          fingerprint: rufusPub.pubkeys[0].fingerprint
+        }],
+        chain: true,
+        deliver: false
+      }
+
+      shareOpts[CUR_HASH] = info[CUR_HASH]
+      driverTed.share(shareOpts)
+        .done()
+    })
+
+    driverBill.on('unchained', function (info) {
+      driverBill.lookupObject(info)
+        .done(function (chainedObj) {
+          t.deepEqual(chainedObj.parsed.data, msg)
+        })
+    })
+
+    driverRufus.on('unchained', function (info) {
+      driverRufus.lookupObject(info)
+        .done(function (chainedObj) {
+          t.deepEqual(chainedObj.parsed.data, msg)
+        })
+    })
+
+    driverTed.on('sent', t.fail)
+    driverBill.on('message', t.fail)
+    setTimeout(t.pass, 2000)
+  })
+})
+
+reinitAndTest('message resolution - contents match on p2p and chain channels', function (t) {
   t.plan(6)
   t.timeoutAfter(25000)
 
-  publishBoth(function () {
+  publishAll([driverBill, driverTed], function () {
     ;[driverBill, driverTed].forEach(function (driver) {
       driver.on('unchained', onUnchained.bind(driver))
     })
@@ -442,7 +507,7 @@ test('teardown', function (t) {
 function reinit (cb) {
   if (driverBill) {
     return teardown(function () {
-      driverBill = driverTed = null
+      driverBill = driverTed = driverRufus = null
       reinit(cb)
     })
   } else {
@@ -480,7 +545,6 @@ function init (cb) {
 
   var billWallet = walletFor(billPriv, null, 'messaging')
   var blockchain = billWallet.blockchain
-  var tedWallet = walletFor(tedPriv, blockchain, 'messaging')
   var commonOpts = {
     networkName: networkName,
     // keeper: keeper,
@@ -499,11 +563,14 @@ function init (cb) {
   var tedDHT = dhtFor(ted)
   tedDHT.listen(tedPort)
 
+  var rufusDHT = dhtFor(rufus)
+  rufusDHT.listen(rufusPort)
+
   driverBill = new Driver(extend({
     pathPrefix: 'bill' + reinitCount,
     identity: bill,
     identityKeys: billPriv,
-    keeper: new Keeper({ dht: billDHT, storage: STORAGE_DIR }),
+    keeper: new Keeper({ dht: billDHT, storage: STORAGE_DIR + '/bill' }),
     // kiki: kiki.kiki(billPriv),
     wallet: billWallet,
     dht: billDHT,
@@ -514,17 +581,29 @@ function init (cb) {
     pathPrefix: 'ted' + reinitCount,
     identity: ted,
     identityKeys: tedPriv,
-    keeper: new Keeper({ dht: tedDHT, storage: STORAGE_DIR }),
+    keeper: new Keeper({ dht: tedDHT, storage: STORAGE_DIR + '/ted' }),
     // kiki: kiki.kiki(tedPriv),
-    wallet: tedWallet,
+    wallet: walletFor(tedPriv, blockchain, 'messaging'),
     dht: tedDHT,
     port: tedPort
   }, commonOpts))
 
-  var togo = 2
+  driverRufus = new Driver(extend({
+    pathPrefix: 'rufus' + reinitCount,
+    identity: rufus,
+    identityKeys: rufusPriv,
+    keeper: new Keeper({ dht: rufusDHT, storage: STORAGE_DIR + '/rufus' }),
+    // kiki: kiki.kiki(rufusPriv),
+    wallet: walletFor(rufusPriv, blockchain, 'messaging'),
+    dht: rufusDHT,
+    port: rufusPort
+  }, commonOpts))
+
+  var togo = 3
 
   driverBill.once('ready', finish)
   driverTed.once('ready', finish)
+  driverRufus.once('ready', finish)
 
   function finish () {
     if (--togo === 0) cb()
@@ -534,12 +613,14 @@ function init (cb) {
 function teardown (cb) {
   Q.all([
       driverBill.destroy(),
-      driverTed.destroy()
+      driverTed.destroy(),
+      driverRufus.destroy()
     ])
     .then(function () {
       return Q.all([
         Q.ninvoke(driverBill.dht, 'destroy'),
         Q.ninvoke(driverTed.dht, 'destroy'),
+        Q.ninvoke(driverRufus.dht, 'destroy'),
         Q.ninvoke(bootstrapDHT, 'destroy'),
         Q.nfcall(rimraf, STORAGE_DIR)
       ])
@@ -557,33 +638,20 @@ function reinitAndTest (name, testFn) {
   })
 }
 
-function publishBoth (cb) {
-  driverBill.publishMyIdentity()
-  driverTed.publishMyIdentity()
-
-  var identitiesChained = 0
-  var tedUnchained = onUnchained.bind(driverTed)
-  var billUnchained = onUnchained.bind(driverBill)
-  driverTed.on('unchained', tedUnchained)
-  driverBill.on('unchained', billUnchained)
+function publishAll (drivers, cb) {
+  var togo = drivers.length * drivers.length
+  drivers.forEach(function (d) {
+    d.on('unchained', onUnchained)
+    d.publishMyIdentity()
+  })
 
   function onUnchained (info) {
-    // var self = this
-    this.lookupObject(info)
-      .then(function (chainedObj) {
-        var parsed = chainedObj.parsed
-        // console.log(self.identityJSON.name.formatted, 'unchained', parsed.data[TYPE])
-        if (parsed.data[TYPE] === Identity.TYPE) {
-          // console.log(self.identityJSON.name.formatted, 'unchained', parsed.data.name.formatted)
-          if (++identitiesChained === 4) done() // 2 each, because both also detect themselves
-        }
-      })
-      .done()
-  }
+    if (--togo) return
 
-  function done () {
-    driverTed.removeListener('unchained', tedUnchained)
-    driverBill.removeListener('unchained', billUnchained)
+    drivers.forEach(function (d) {
+      d.removeListener('unchained', onUnchained)
+    })
+
     cb()
   }
 }

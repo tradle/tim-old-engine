@@ -459,8 +459,8 @@ Driver.prototype._writeToChain = function () {
         return tryAgain()
       }
 
-      // just in case the device clock time traveled
       self._debug('throttling chaining', wait)
+      // just in case the device clock time-traveled
       wait = Math.min(wait, throttle)
       setTimeout(tryAgain, wait)
 
@@ -1021,6 +1021,7 @@ Driver.prototype.putOnChain = function (entry) {
       return nextEntry
     })
     .catch(function (err) {
+      err = toErrInstance(err)
       err = errors.ChainWriteError(err, {
         timestamp: currentTime()
       })
@@ -1043,6 +1044,68 @@ Driver.prototype.publish = function (options) {
     public: true,
     chain: true
   }, options))
+}
+
+Driver.prototype.share = function (options) {
+  var self = this
+
+  typeforce({
+    to: 'Array',
+    chain: '?Boolean',
+    deliver: '?Boolean'
+  }, options)
+
+  assert(CUR_HASH in options, 'expected current hash of object being shared')
+
+  var to = options.to
+  validateRecipients(to)
+
+  var curHash = options[CUR_HASH]
+  var entry = new Entry({
+    type: EventType.msg.new, // msg.shared maybe?
+    dir: Dir.outbound,
+    public: false,
+    chain: !!options.chain,
+    deliver: !!options.deliver,
+    from: toObj(ROOT_HASH, this._myRootHash()),
+    to: to
+  })
+
+  var recipients
+  return Q.all(to.map(this.lookupBTCPubKey))
+    .then(function (_recipients) {
+      recipients = _recipients
+      return Q.ninvoke(self, '_lookupMsgs', toObj(CUR_HASH, curHash))
+    })
+    .then(function (results) {
+      return self.lookupObject(results[0])
+    })
+    .then(function (obj) {
+      entry.set(CUR_HASH, curHash)
+        .set(ROOT_HASH, obj[ROOT_HASH])
+
+      var symmetricKey = obj.permission.body().decryptionKey
+      return Q.all(recipients.map(function (r) {
+        return self.chainwriter.share()
+          .shareAccessTo(curHash, symmetricKey)
+          .shareAccessWith(r)
+          .execute()
+      }))
+    })
+    .then(function (shares) {
+      // TODO: rethink this repeated code from send()
+      var entries = shares.map(function (share, i) {
+        return entry.clone().set({
+          to: to[i],
+          addressesTo: [share.address],
+          addressesFrom: [self.wallet.addressString],
+          txType: TxData.types.permission,
+          txData: toBuffer(share.encryptedKey, 'hex')
+        })
+      })
+
+      return Q.all(entries.map(self.log, self))
+    })
 }
 
 /**
@@ -1358,3 +1421,12 @@ var toObjectStream = map.bind(null, function (data, cb) {
 
   cb(null, data.value)
 })
+
+function toErrInstance (err) {
+  var n = new Error(err.message)
+  for (var p in err) {
+    n[p] = err[p]
+  }
+
+  return n
+}

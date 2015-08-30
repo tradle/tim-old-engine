@@ -46,7 +46,7 @@
     "level-queryengine": "^3.0.1",
     "levelup": "^0.18.0",
     "lexicographic-integer": "^1.1.0",
-    "logbase": "^1.1.0",
+    "logbase": "^1.2.0",
     "map-stream": "0.0.6",
     "midentity": "^1.0.2",
     "multiplex-utp": "^1.0.0",
