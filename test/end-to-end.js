@@ -5,7 +5,7 @@ if (process.env.MULTIPLEX) {
 }
 
 var path = require('path')
-var test = require('tape')
+var test = require('tape-extra')
 var rimraf = require('rimraf')
 var find = require('array-find')
 var pick = require('object.pick')
@@ -66,6 +66,8 @@ var driverTed
 var driverRufus
 var reinitCount = 0
 var chainThrottle = 5000
+test.beforeEach = init
+test.afterEach = teardown
 
 // var NAMES = ['bill', 'ted', 'rufus']
 // var basePort = 51086
@@ -121,10 +123,10 @@ var chainThrottle = 5000
 
 rimraf.sync(STORAGE_DIR)
 
-reinitAndTest('delivered/chained/both', function (t) {
+test('delivered/chained/both', function (t) {
   t.plan(4)
   t.timeoutAfter(25000)
-  publishAll([driverBill, driverTed], function () {
+  publishIdentities([driverBill, driverTed], function () {
     var msgs = [
       { chain: true, deliver: false },
       { chain: false, deliver: true },
@@ -155,7 +157,8 @@ reinitAndTest('delivered/chained/both', function (t) {
   })
 })
 
-reinitAndTest('handle non-data tx', function (t) {
+test('handle non-data tx', function (t) {
+  t.plan(3)
   driverBill.wallet.send()
     .to(driverTed.wallet.addressString, 10000)
     .execute()
@@ -172,15 +175,15 @@ reinitAndTest('handle non-data tx', function (t) {
       var tx = data.value
       t.notOk('txType' in tx)
       t.notOk('txData' in tx)
-      setTimeout(t.end, 1000)
+      setTimeout(t.pass, 1000)
     })
 })
 
-reinitAndTest('self publish, edit, republish', function (t) {
+test('self publish, edit, republish', function (t) {
   publish(function () {
     failToRepeatPublish(function () {
       republish(function () {
-        readIdentities(t.end)
+        readIdentities()
       })
     })
   })
@@ -209,7 +212,7 @@ reinitAndTest('self publish, edit, republish', function (t) {
     setTimeout(function () {
       driverTed.removeListener('unchained', t.fail)
       next()
-    }, 3000)
+    }, 1500)
   }
 
   function republish (next) {
@@ -227,7 +230,7 @@ reinitAndTest('self publish, edit, republish', function (t) {
     })
   }
 
-  function readIdentities (next) {
+  function readIdentities () {
     var bStream = driverBill.identities().createValueStream()
     var tStream = driverTed.identities().createValueStream()
     collect(bStream, checkIdentities.bind(driverBill))
@@ -249,9 +252,9 @@ reinitAndTest('self publish, edit, republish', function (t) {
   }
 })
 
-reinitAndTest('throttle chaining', function (t) {
+test('throttle chaining', function (t) {
   t.plan(3)
-  t.timeoutAfter(10000)
+  // t.timeoutAfter(10000)
 
   var blockchain = driverBill.blockchain
   var propagate = blockchain.transactions.propagate
@@ -263,7 +266,7 @@ reinitAndTest('throttle chaining', function (t) {
       firstErrTime = currentTime()
     } else {
       blockchain.transactions.propagate = propagate
-      t.ok(currentTime() - firstErrTime > chainThrottle * 0.9) // fuzzy
+      t.ok(currentTime() - firstErrTime > chainThrottle * 0.8) // fuzzy
     }
   }
 
@@ -278,10 +281,10 @@ reinitAndTest('throttle chaining', function (t) {
   })
 })
 
-reinitAndTest('delivery check', function (t) {
-  t.plan(3)
+test('delivery check', function (t) {
+  t.plan(2)
   t.timeoutAfter(30000)
-  publishAll([driverBill, driverTed], function () {
+  publishIdentities([driverBill, driverTed], function () {
     var billCoords = {
       fingerprint: billPub.pubkeys[0].fingerprint
     }
@@ -321,12 +324,7 @@ reinitAndTest('delivery check', function (t) {
         driverBill.on('unchained', t.fail)
       })
 
-    var togo = 2
     function checkReceived (info) {
-      if (--togo === 0) {
-        setTimeout(t.pass, 2000)
-      }
-
       driverBill.lookupObject(info)
         .done(function (chainedObj) {
           t.deepEqual(chainedObj.parsed.data, msg)
@@ -335,10 +333,10 @@ reinitAndTest('delivery check', function (t) {
   })
 })
 
-reinitAndTest('share chained content with 3rd party', function (t) {
+test('share chained content with 3rd party', function (t) {
   t.plan(5)
   t.timeoutAfter(25000)
-  publishAll([driverBill, driverTed, driverRufus], function () {
+  publishIdentities([driverBill, driverTed, driverRufus], function () {
     // make sure all the combinations work
     // make it easier to check by sending settings as messages
     var msgs = [
@@ -416,11 +414,11 @@ reinitAndTest('share chained content with 3rd party', function (t) {
   })
 })
 
-reinitAndTest('message resolution - contents match on p2p and chain channels', function (t) {
+test('message resolution - contents match on p2p and chain channels', function (t) {
   t.plan(6)
   t.timeoutAfter(25000)
 
-  publishAll([driverBill, driverTed], function () {
+  publishIdentities([driverBill, driverTed], function () {
     ;[driverBill, driverTed].forEach(function (driver) {
       driver.on('unchained', onUnchained.bind(driver))
     })
@@ -490,24 +488,6 @@ reinitAndTest('message resolution - contents match on p2p and chain channels', f
 
   })
 })
-
-test('teardown', function (t) {
-  t.timeoutAfter(10000)
-  teardown(function () {
-    t.end()
-  })
-})
-
-function reinit (cb) {
-  if (driverBill) {
-    return teardown(function () {
-      driverBill = driverTed = driverRufus = null
-      reinit(cb)
-    })
-  } else {
-    return init(cb)
-  }
-}
 
 function init (cb) {
   reinitCount++
@@ -619,20 +599,13 @@ function teardown (cb) {
         Q.nfcall(rimraf, STORAGE_DIR)
       ])
     })
-    .done(safe(cb))
-}
-
-function reinitAndTest (name, testFn) {
-  test(name, function (t) {
-    var ctx = this
-    var args = arguments
-    reinit(function () {
-      testFn.apply(ctx, args)
+    .done(function () {
+      driverBill = driverTed = driverRufus = null
+      safe(cb)()
     })
-  })
 }
 
-function publishAll (drivers, cb) {
+function publishIdentities (drivers, cb) {
   var togo = drivers.length * drivers.length
   drivers.forEach(function (d) {
     d.on('unchained', onUnchained)
