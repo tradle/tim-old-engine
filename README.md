@@ -1,5 +1,7 @@
 # Trust in Motion (TiM)
 
+[![Build status](https://travis-ci.org/tradle/tim.png)](https://travis-ci.org/tradle/tim)
+
 Tradle's P2P chat with plaintext and structured messages, and the ability to externalize messages onto a blockchain (currently bitcoin's).
 
 _this module is used by [Tradle](https://github.com/tradle/about/wiki)_  
