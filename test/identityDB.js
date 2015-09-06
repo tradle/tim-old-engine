@@ -1,6 +1,6 @@
 
 var test = require('tape')
-var extend = require('extend')
+var extend = require('xtend/mutable')
 var leveldown = require('memdown')
 var collect = require('stream-collector')
 var constants = require('tradle-constants')
@@ -19,7 +19,7 @@ test('identity store', function (t) {
     db: leveldown
   })
 
-  ted = extend(true, {}, ted)
+  ted = extend({}, ted)
   var keeperMap = {}
   var hash = ted[ROOT_HASH] = ted[CUR_HASH] = 'abc'
   keeperMap[hash] = ted

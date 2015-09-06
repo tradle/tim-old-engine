@@ -8,7 +8,7 @@ var pick = require('object.pick')
 var debug = require('debug')('tim')
 var reemit = require('re-emitter')
 var bitcoin = require('bitcoinjs-lib')
-var extend = require('extend')
+var extend = require('xtend/mutable')
 var utils = require('tradle-utils')
 var map = require('map-stream')
 var collect = require('stream-collector')
@@ -50,6 +50,7 @@ var ROOT_HASH = constants.ROOT_HASH
 var PREV_HASH = constants.PREV_HASH
 var CUR_HASH = constants.CUR_HASH
 var PREFIX = constants.OP_RETURN_PREFIX
+var CONFIRMATIONS_BEFORE_CONFIRMED = 10
 var MAX_CHAIN_RETRIES = 3
 var MAX_RESEND_RETRIES = 10
 var CHAIN_WRITE_THROTTLE = 60000
@@ -224,28 +225,27 @@ Driver.prototype._readFromChain = function () {
   this._unchaining = true
 
   pump(
-    this._getFromChainStream(),
-    map(function (txInfo, cb) {
-      var idx = self._pendingTxs.indexOf(txInfo.txId)
+    this.txDB.liveStream({
+      old: true,
+      tail: true
+    }),
+    toObjectStream(),
+    filter(function (entry) {
+      var idx = self._pendingTxs.indexOf(entry.txId)
       if (idx !== -1) {
         self._pendingTxs.splice(idx, 1)
       }
 
-      cb(null, txInfo)
+      // was read from chain and hasn't been processed yet
+      // self._debug('unchaining tx', entry.txId)
+      return entry.dateDetected && !entry.dateUnchained
     }),
     this.unchainer,
     map(function (chainedObj, cb) {
       self._debug('unchained (read)', chainedObj.key, chainedObj.errors)
-      // var query = {}
-      // query[CUR_HASH] = chainedObj.key
-      // self.msgDB.query(query)
       var entry = self.unchainResultToEntry(chainedObj)
       cb(null, entry)
     }),
-    // filter(function (data) {
-    //   console.log('after chain read')
-    //   return true
-    // }),
     this._log,
     this._rethrow
   )
@@ -332,7 +332,7 @@ Driver.prototype.publishMyIdentity = function () {
     if (status.current) return cb()
 
     var priv = self.getPrivateKey({ purpose: 'update' })
-    var update = extend(true, {}, self.identityJSON)
+    var update = extend({}, self.identityJSON)
     var prevHash = self._myCurrentHash() || self._myRootHash()
     updateChainedObj(update, prevHash)
 
@@ -386,7 +386,16 @@ Driver.prototype.unchainResultToEntry = function (chainedObj) {
     EventType.chain.readError :
     EventType.chain.readSuccess
 
-  var entry = new Entry(omit(chainedObj, ['parsed', 'key', 'data', 'type'])) // data is stored in keeper
+  // no decrypted data should be stored in the log
+  var entry = new Entry(omit(chainedObj, [
+    'type',
+    'parsed',
+    'key',
+    'data',
+    'encryptedData', // stored in keeper
+    'permission',
+    'encryptedPermission' // stored in keeper
+    ]))
     .set('type', type)
 
   var from = chainedObj.from && chainedObj.from.getOriginalJSON()
@@ -504,10 +513,15 @@ Driver.prototype._getUnsentStream = function () {
           !entry.to ||
           !entry.deliver ||
           entry.dir !== Dir.outbound ||
-          self._currentlySending.indexOf(entry.id) !== -1) return
+          self._currentlySending.indexOf(entry.id) !== -1) {
+        return
+      }
 
       if (entry.errors && entry.errors.length > MAX_RESEND_RETRIES) {
-        self._debug('giving up on sending message', entry)
+        if (entry.errors.length === MAX_RESEND_RETRIES) {
+          self._debug('giving up on sending message', entry)
+        }
+
         return
       }
 
@@ -519,21 +533,6 @@ Driver.prototype._getUnsentStream = function () {
 
 Driver.prototype.name = function () {
   return this.identityJSON.name.formatted
-}
-
-Driver.prototype._getFromChainStream = function () {
-  return pump(
-    this.txDB.liveStream({
-      old: true,
-      tail: true
-    }),
-    toObjectStream(),
-    filter(function (entry) {
-      // was read from chain and hasn't been processed yet
-      return entry.dateDetected && !entry.dateUnchained
-    }),
-    this._rethrow
-  )
 }
 
 Driver.prototype._sendTheUnsent = function () {
@@ -565,7 +564,7 @@ Driver.prototype._sendTheUnsent = function () {
           })
         })
         .catch(function (err) {
-          self._debug('error sending message', err)
+          console.log('errors', entry.errors.length)
           var errEntry = new Entry({
             type: EventType.msg.sendError,
             errors: entry.errors || []
@@ -615,6 +614,8 @@ Driver.prototype._setupTxStream = function () {
     })
     .on('error', this._rethrow)
     .once('close', function () {
+      // start CONFIRMATIONS_BEFORE_CONFIRMED blocks back
+      lastBlock = Math.max(0, lastBlock - CONFIRMATIONS_BEFORE_CONFIRMED)
       self._streamTxs(lastBlock, lastBlockTxIds)
       defer.resolve()
     })
@@ -633,6 +634,7 @@ Driver.prototype._streamTxs = function (fromHeight, skipIds) {
     interval: this.syncInterval || 60000,
     api: this.blockchain,
     height: fromHeight,
+    confirmations: CONFIRMATIONS_BEFORE_CONFIRMED,
     addresses: [
       this.wallet.addressString,
       constants.IDENTITY_PUBLISH_ADDRESS
@@ -651,26 +653,29 @@ Driver.prototype._streamTxs = function (fromHeight, skipIds) {
       }
 
       self.txDB.get(id, function (err, entry) {
-        if (err) {
-          if (!err.notFound) return cb(err)
+        if (err && !err.notFound) return cb(err)
 
-          return save()
-        }
-
-        if ('dateUnchained' in entry) cb() // already have this one
-        else save()
+        save(entry)
       })
 
-      function save () {
+      function save (entry) {
         self._pendingTxs.push(id)
-        var props = extend({}, txInfo, {
-          type: EventType.tx,
-          tx: toBuffer(txInfo.tx),
-          txId: id,
-          dir: self._getTxDir(txInfo.tx)
-        })
+        var type = entry ?
+          EventType.tx.confirmation :
+          EventType.tx.new
+          // we may have chained this tx
+          // but this is the first time we're
+          // getting it FROM the chain
 
-        cb(null, new Entry(props))
+        var nextEntry = new Entry(extend(entry || {}, txInfo, {
+          type: type,
+          txId: id,
+          tx: toBuffer(txInfo.tx),
+          dir: self._getTxDir(txInfo.tx)
+        }))
+
+        if (entry) nextEntry.prev(new Entry(entry))
+        cb(null, nextEntry)
       }
     }),
     this._log,
@@ -725,11 +730,11 @@ Driver.prototype._setupDBs = function () {
   ]
 
   reemit(this.msgDB, this, msgDBEvents)
-  msgDBEvents.forEach(function (e) {
-    self.msgDB.on(e, function (entry) {
-      self._debug(e)
-    })
-  })
+  // msgDBEvents.forEach(function (e) {
+  //   self.msgDB.on(e, function (entry) {
+  //     self._debug(e, entry)
+  //   })
+  // })
 
   ;['message', 'unchained'].forEach(function (event) {
     self.msgDB.on(event, function (entry) {
@@ -752,7 +757,6 @@ Driver.prototype._sendP2P = function (entry) {
   //   do we log that we sent it?
   //   do we log when we delivered it? How do we know it was delivered?
   var self = this
-
   return Q.all([
       this.lookupIdentity(entry.to),
       this.lookupObject(entry)

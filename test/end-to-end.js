@@ -119,6 +119,8 @@ var chainThrottle = 5000
 //   console.log('TED', b.key.fingerprint())
 // })
 
+rimraf.sync(STORAGE_DIR)
+
 reinitAndTest('delivered/chained/both', function (t) {
   t.plan(4)
   t.timeoutAfter(25000)
@@ -134,9 +136,7 @@ reinitAndTest('delivered/chained/both', function (t) {
         msg: msg,
         to: [{
           fingerprint: billPub.pubkeys[0].fingerprint
-        }],
-        chain: true,
-        deliver: false
+        }]
       }, msg))
     })
 
@@ -356,9 +356,7 @@ reinitAndTest('share chained content with 3rd party', function (t) {
         msg: msg,
         to: [{
           fingerprint: billPub.pubkeys[0].fingerprint
-        }],
-        chain: true,
-        deliver: false
+        }]
       }, msg))
     })
 
