@@ -125,7 +125,7 @@ rimraf.sync(STORAGE_DIR)
 
 test('delivered/chained/both', function (t) {
   t.plan(4)
-  t.timeoutAfter(25000)
+  t.timeoutAfter(60000)
   publishIdentities([driverBill, driverTed], function () {
     var msgs = [
       { chain: true, deliver: false },
@@ -254,7 +254,7 @@ test('self publish, edit, republish', function (t) {
 
 test('throttle chaining', function (t) {
   t.plan(3)
-  // t.timeoutAfter(10000)
+  t.timeoutAfter(10000)
 
   var blockchain = driverBill.blockchain
   var propagate = blockchain.transactions.propagate
@@ -283,7 +283,7 @@ test('throttle chaining', function (t) {
 
 test('delivery check', function (t) {
   t.plan(2)
-  t.timeoutAfter(30000)
+  t.timeoutAfter(60000)
   publishIdentities([driverBill, driverTed], function () {
     var billCoords = {
       fingerprint: billPub.pubkeys[0].fingerprint
@@ -335,7 +335,7 @@ test('delivery check', function (t) {
 
 test('share chained content with 3rd party', function (t) {
   t.plan(5)
-  t.timeoutAfter(25000)
+  t.timeoutAfter(60000)
   publishIdentities([driverBill, driverTed, driverRufus], function () {
     // make sure all the combinations work
     // make it easier to check by sending settings as messages
@@ -416,7 +416,7 @@ test('share chained content with 3rd party', function (t) {
 
 test('message resolution - contents match on p2p and chain channels', function (t) {
   t.plan(6)
-  t.timeoutAfter(25000)
+  t.timeoutAfter(60000)
 
   publishIdentities([driverBill, driverTed], function () {
     ;[driverBill, driverTed].forEach(function (driver) {
