@@ -50,7 +50,7 @@ var ROOT_HASH = constants.ROOT_HASH
 var PREV_HASH = constants.PREV_HASH
 var CUR_HASH = constants.CUR_HASH
 var PREFIX = constants.OP_RETURN_PREFIX
-var CONFIRMATIONS_BEFORE_CONFIRMED = 10
+var CONFIRMATIONS_BEFORE_CONFIRMED = 1000000 // for now
 var MAX_CHAIN_RETRIES = 3
 var MAX_RESEND_RETRIES = 10
 var CHAIN_WRITE_THROTTLE = 60000
@@ -157,14 +157,24 @@ function Driver (options) {
   this._setupP2P()
 
   this._setupDBs()
+  var keeperReadyDfd = Q.defer()
+  var keeperReady = keeperReadyDfd.promise
+  if (keeper.isReady()) keeperReadyDfd.resolve()
+  else keeper.once('ready', keeperReadyDfd.resolve)
+
   Q.all([
       self._prepIdentity(),
-      self._setupTxStream()
+      self._setupTxStream(),
+      keeperReady
     ])
     .done(function () {
       if (self._destroyed) return
 
       self._ready = true
+      self.msgDB.start()
+      self.txDB.start()
+      self.addressBook.start()
+
       self._debug('ready')
       self.emit('ready')
       // self.publishMyIdentity()
@@ -387,7 +397,7 @@ Driver.prototype.unchainResultToEntry = function (chainedObj) {
     EventType.chain.readSuccess
 
   // no decrypted data should be stored in the log
-  var entry = new Entry(omit(chainedObj, [
+  var safeProps = omit(chainedObj, [
     'type',
     'parsed',
     'key',
@@ -395,7 +405,9 @@ Driver.prototype.unchainResultToEntry = function (chainedObj) {
     'encryptedData', // stored in keeper
     'permission',
     'encryptedPermission' // stored in keeper
-    ]))
+  ])
+
+  var entry = new Entry(safeProps)
     .set('type', type)
 
   var from = chainedObj.from && chainedObj.from.getOriginalJSON()
@@ -590,7 +602,6 @@ Driver.prototype._sendTheUnsent = function () {
 
 Driver.prototype._setupTxStream = function () {
   // TODO: use txDB for this instead
-
   var self = this
   var defer = Q.defer()
   var lastBlock
@@ -615,6 +626,7 @@ Driver.prototype._setupTxStream = function () {
     .on('error', this._rethrow)
     .once('close', function () {
       // start CONFIRMATIONS_BEFORE_CONFIRMED blocks back
+      lastBlock = lastBlock || 0
       lastBlock = Math.max(0, lastBlock - CONFIRMATIONS_BEFORE_CONFIRMED)
       self._streamTxs(lastBlock, lastBlockTxIds)
       defer.resolve()
@@ -695,7 +707,8 @@ Driver.prototype._setupDBs = function () {
   this.addressBook = createIdentityDB(this._prefix('addressBook.db'), {
     leveldown: this.leveldown,
     log: this._log,
-    keeper: this.keeper
+    keeper: this.keeper,
+    autostart: false
   })
 
   var readWrite = this.addressBook
@@ -717,7 +730,8 @@ Driver.prototype._setupDBs = function () {
 
   this.msgDB = createMsgDB(this._prefix('messages.db'), {
     leveldown: this.leveldown,
-    log: this._log
+    log: this._log,
+    autostart: false
   })
 
   this.msgDB.name = this.identityJSON.name.formatted + ' msgDB'
@@ -744,9 +758,22 @@ Driver.prototype._setupDBs = function () {
     })
   })
 
+  // announce that own identity got published
+  // this.msgDB.on('unchained', function (entry) {
+  //   if (entry.txType === TxData.types.public) {
+  //     if ()
+  //     self.identityKeys.map(function (k) {
+  //       return k.fingerprint
+  //     }).some(function )
+  //     if (entry.from && entry.from[ROOT_HASH] === self._myRootHash()) {
+  //     }
+  //   }
+  // })
+
   this.txDB = createTxDB(this._prefix('txs.db'), {
     leveldown: this.leveldown,
-    log: this._log
+    log: this._log,
+    autostart: false
   })
 
   this.txDB.name = this.identityJSON.name.formatted + ' txDB'
