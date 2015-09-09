@@ -252,7 +252,10 @@ Driver.prototype._readFromChain = function () {
     }),
     this.unchainer,
     map(function (chainedObj, cb) {
-      self._debug('unchained (read)', chainedObj.key, chainedObj.errors)
+      if (chainedObj.parsed) {
+        self._debug('unchained (read)', chainedObj.key, chainedObj.errors)
+      }
+
       var entry = self.unchainResultToEntry(chainedObj)
       cb(null, entry)
     }),
@@ -576,7 +579,6 @@ Driver.prototype._sendTheUnsent = function () {
           })
         })
         .catch(function (err) {
-          console.log('errors', entry.errors.length)
           var errEntry = new Entry({
             type: EventType.msg.sendError,
             errors: entry.errors || []
@@ -808,11 +810,9 @@ Driver.prototype.lookupObject = function (info) {
 
   var chainedObj
   return this.chainloader.load(info)
-    .then(function (objs) {
-      if (!objs.length) throw new Error('object not found')
-
-      chainedObj = objs[0]
-      return Q.ninvoke(Parser, 'parse', chainedObj.data)
+    .then(function (obj) {
+      chainedObj = obj
+      return Q.ninvoke(Parser, 'parse', obj.data)
     })
     .then(function (parsed) {
       chainedObj.parsed = parsed
