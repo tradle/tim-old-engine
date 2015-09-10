@@ -35,7 +35,7 @@
     "bittorrent-dht": "tradle/bittorrent-dht",
     "cb-streams": "^1.0.2",
     "chained-obj": "^1.0.2",
-    "chainloader": "tradle/chainloader",
+    "chainloader": "^1.0.0",
     "debug": "^2.2.0",
     "error": "^7.0.2",
     "jsonquery-engine": "^1.0.2",
