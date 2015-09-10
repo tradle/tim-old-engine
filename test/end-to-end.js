@@ -66,8 +66,20 @@ var driverTed
 var driverRufus
 var reinitCount = 0
 var chainThrottle = 5000
-test.beforeEach = init
-test.afterEach = teardown
+var testTimerName = 'test took'
+test.beforeEach = function (cb) {
+  init(function () {
+    console.time(testTimerName)
+    cb()
+  })
+}
+
+test.afterEach = function (cb) {
+  teardown(function () {
+    console.timeEnd(testTimerName)
+    cb()
+  })
+}
 
 // var NAMES = ['bill', 'ted', 'rufus']
 // var basePort = 51086
