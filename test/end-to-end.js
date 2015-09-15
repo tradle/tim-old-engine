@@ -346,7 +346,7 @@ test('delivery check', function (t) {
 })
 
 test('share chained content with 3rd party', function (t) {
-  t.plan(5)
+  t.plan(6)
   t.timeoutAfter(60000)
   publishIdentities([driverBill, driverTed, driverRufus], function () {
     // make sure all the combinations work
@@ -373,20 +373,24 @@ test('share chained content with 3rd party', function (t) {
     var togo = 4
     ;['message', 'unchained'].forEach(function (event) {
       driverBill.on(event, function () {
-        if (--togo === 0) {
-          // share all msgs with rufus
-          togo = 4
-          share()
-        }
+        if (--togo) return
+
+        t.pass('2nd party is up to date')
+
+        // share all msgs with rufus
+        togo = 4
+        share()
       })
 
       driverRufus.on(event, function (info) {
         driverRufus.lookupObject(info)
           .done(function (chainedObj) {
+            var msg = chainedObj.parsed.data
+            console.log(event, msg)
             if (event === 'message') {
-              t.deepEqual(chainedObj.parsed.data.deliver, true)
+              t.deepEqual(msg.deliver, true)
             } else {
-              t.deepEqual(chainedObj.parsed.data.chain, true)
+              t.deepEqual(msg.chain, true)
             }
 
             if (--togo === 0) {
