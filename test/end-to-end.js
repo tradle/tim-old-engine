@@ -386,7 +386,6 @@ test('share chained content with 3rd party', function (t) {
         driverRufus.lookupObject(info)
           .done(function (chainedObj) {
             var msg = chainedObj.parsed.data
-            console.log(event, msg)
             if (event === 'message') {
               t.deepEqual(msg.deliver, true)
             } else {
@@ -483,7 +482,6 @@ test('message resolution - contents match on p2p and chain channels', function (
     }
 
     function checkMessage (m) {
-      // console.log('check')
       if (Buffer.isBuffer(m)) m = JSON.parse(m)
 
       // delete m[constants.SIG]
