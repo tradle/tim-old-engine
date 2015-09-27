@@ -76,6 +76,41 @@ Details to follow
 
 ## Usage
 
+### Identity Identifiers
+
+When you want to communicate with someone else on the network, you need to identify them uniquely. You can identify them by a fingerprint of one of their public keys, a public key string, or by their identity's root hash:
+
+```js
+// if this is the identity of your friend Bill:
+{
+  "_t": "tradle.Identity",
+  "name": {
+    "firstName": "Bill",
+    "formatted": "Bill S. Preston",
+    "lastName": "Preston",
+    "middleName": "S"
+  },
+  "pubkeys": [
+    {
+      "fingerprint": "mvDNdZFbCCmnAPCBmLY91LnfKWoMH39Q2c",
+      "networkName": "testnet",
+      "purpose": "payment",
+      "type": "bitcoin",
+      "value": "03a45ede4be12a812e6e2ef1650ecbd8900152b1c6e3fe47f427ee5d9323759fe3"
+    }
+  ]
+}
+
+// the following are equivalent identifiers for Bill:
+{
+  fingerprint: 'mvDNdZFbCCmnAPCBmLY91LnfKWoMH39Q2c' 
+}
+
+{
+  _r: 'whatever the infoHash of the above JSON object is'
+}
+```
+
 ### Initialization
 
 ```js
@@ -84,7 +119,6 @@ var DHT = require('bittorrent-dht') // use tradle/bittorrent-dht fork
 var Blockchain = require('cb-blockr') // use tradle/cb-blockr fork
 var Identity = require('midentity').Identity
 var Bitkeeper = require('bitkeeper-js')
-var kiki = require('kiki')
 var Wallet = require('simple-wallet')
 var Tim = require('tim')
 
@@ -134,14 +168,14 @@ tim.publishMyIdentity()
 ```js
 
 tim.send({
-  msg: Object|String|Buffer,
+  msg: Object|Buffer,
   // record message on chain
   chain: true,
   // send message p2p
   deliver: true,
-  to: [{ 
-    fingerprint: 'a fingerprint of a key of an identity known to you' 
-  }]
+  to: [
+    identityIdentitifier // see Identity Identifiers
+  ]
 })
 
 ```
@@ -157,9 +191,9 @@ var shareOpts = {
   chain: true,
   // send message p2p
   deliver: true,
-  to: [{
-    fingerprint: 'a fingerprint of a key of an identity known to you'
-  }]
+  to: [
+    identityIdentitifier // see Identity Identifiers  
+  ]
 }
 
 shareOpts[constants.CUR_HASH] = curHash
@@ -174,10 +208,10 @@ Same as sending a message, but use tim.publish instead of tim.send
 ```js
 
 tim.publish({
-  msg: Object|String|Buffer,
-  to: [{
-    fingerprint: 'a [bitcoin] address where to record the link to the object' 
-  }]
+  msg: Object|Buffer,
+  to: [
+    identityIdentitifier // see Identity Identifiers
+  ]
 })
 
 ```

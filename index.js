@@ -1156,7 +1156,7 @@ Driver.prototype.share = function (options) {
 /**
  * send an object (and optionally chain it)
  * @param {Object} options
- * @param {Buffer} options.msg - message to send (to be chainable, it should pass Parser.parse())
+ * @param {Object|Buffer} options.msg - message to send (to be chainable, it should pass Parser.parse())
  * @param {Array} options.to (optional) - recipients
  * @param {Boolean} options.public (optional) - whether this message should be publicly visible
  * @param {Boolean} options.chain (optional) - whether to put this message on chain
