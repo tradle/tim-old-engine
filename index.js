@@ -159,7 +159,7 @@ function Driver (options) {
   this._setupDBs()
   var keeperReadyDfd = Q.defer()
   var keeperReady = keeperReadyDfd.promise
-  if (keeper.isReady()) keeperReadyDfd.resolve()
+  if (!keeper.isReady || keeper.isReady()) keeperReadyDfd.resolve()
   else keeper.once('ready', keeperReadyDfd.resolve)
 
   Q.all([
@@ -1230,6 +1230,10 @@ Driver.prototype.send = function (options) {
     .then(function (resp) {
       copyDHTKeys(entry, resp.key)
       self._debug('stored (write)', entry.get(ROOT_HASH))
+      if (isPublic && self.keeper.push) {
+        self.keeper.push(resp)
+      }
+
       var entries
       if (isPublic) {
         entries = to.map(function (contact, i) {
