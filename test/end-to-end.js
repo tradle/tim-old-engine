@@ -608,7 +608,7 @@ function teardown (cb) {
         Q.ninvoke(driverBill.dht, 'destroy'),
         Q.ninvoke(driverTed.dht, 'destroy'),
         Q.ninvoke(driverRufus.dht, 'destroy'),
-        Q.ninvoke(bootstrapDHT, 'destroy'),
+        Q.ninvoke(bootstrapDHT, 'destroy')
         // Q.nfcall(rimraf, STORAGE_DIR)
       ])
     })
