@@ -19,7 +19,7 @@ var Q = require('q')
 var DHT = require('bittorrent-dht')
 var Keeper = require('bitkeeper-js')
 var Zlorp = require('zlorp')
-Zlorp.ANNOUNCE_INTERVAL = Zlorp.LOOKUP_INTERVAL = 2000
+Zlorp.ANNOUNCE_INTERVAL = Zlorp.LOOKUP_INTERVAL = 5000
 var ChainedObj = require('chained-obj')
 var Builder = ChainedObj.Builder
 var kiki = require('kiki')
@@ -441,10 +441,9 @@ test('message resolution - contents match on p2p and chain channels', function (
     ;['message', 'resolved'].forEach(function (event) {
       driverBill.on(event, function (obj) {
         driverBill.lookupObject(obj)
-          .then(function (chainedObj) {
+          .done(function (chainedObj) {
             checkMessage(chainedObj.data)
           })
-          .done()
       })
     })
 
@@ -538,7 +537,7 @@ function init (cb) {
     // keeper: keeper,
     blockchain: blockchain,
     leveldown: memdown,
-    syncInterval: 1000,
+    syncInterval: 3000,
     chainThrottle: chainThrottle
   }
 
@@ -610,10 +609,11 @@ function teardown (cb) {
         Q.ninvoke(driverTed.dht, 'destroy'),
         Q.ninvoke(driverRufus.dht, 'destroy'),
         Q.ninvoke(bootstrapDHT, 'destroy'),
-        Q.nfcall(rimraf, STORAGE_DIR)
+        // Q.nfcall(rimraf, STORAGE_DIR)
       ])
     })
     .done(function () {
+      rimraf.sync(STORAGE_DIR)
       driverBill = driverTed = driverRufus = null
       safe(cb)()
     })
