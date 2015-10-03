@@ -273,12 +273,22 @@ Driver.prototype._rethrow = function (err) {
 
 Driver.prototype.identityPublishStatus = function (cb) {
   // check if we've already chained it
+  // var self = this
   var rh = this._myRootHash()
   var me = this.identityJSON
   var status = {
     ever: false,
     current: false
   }
+
+  // Q.ninvoke(this.msgDB, 'onLive')
+  //   .then(function () {
+  //     return Q.ninvoke(self, '_lookupMsgs', toObj(ROOT_HASH, rh))
+  //   })
+  //   .catch(function (err) {
+  //     if (!err.notFound) throw err
+  //   })
+  //   .then(function (entries) {
 
   this._lookupMsgs(toObj(ROOT_HASH, rh), function (err, entries) {
     if (err) {
@@ -746,6 +756,9 @@ Driver.prototype._setupDBs = function () {
   ]
 
   reemit(this.msgDB, this, msgDBEvents)
+  this.msgDB.on('live', function () {
+    self._debug('msgDB is live')
+  })
   // msgDBEvents.forEach(function (e) {
   //   self.msgDB.on(e, function (entry) {
   //     self._debug(e, entry)
@@ -858,18 +871,21 @@ Driver.prototype.getKeyAndIdentity2 = function (fingerprint, returnPrivate) {
 }
 
 Driver.prototype._lookupMsgs = function (query, cb) {
-  collect(this.msgDB.query(query), function (err, results) {
-    if (err) return cb(err)
-    if (!results.length) {
-      return cb(new levelErrs.NotFoundError())
-    }
+  var self = this
+  this.msgDB.onLive(function () {
+    collect(self.msgDB.query(query), function (err, results) {
+      if (err) return cb(err)
+      if (!results.length) {
+        return cb(new levelErrs.NotFoundError())
+      }
 
-//     if (results.length !== 1) {
-//       return self.emit('error',
-//         new Error('invalid state: should have single result for query'))
-//     }
+  //     if (results.length !== 1) {
+  //       return self.emit('error',
+  //         new Error('invalid state: should have single result for query'))
+  //     }
 
-    return cb(null, results)
+      return cb(null, results)
+    })
   })
 }
 
