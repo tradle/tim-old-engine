@@ -723,22 +723,22 @@ Driver.prototype._setupDBs = function () {
     autostart: false
   })
 
-  var readWrite = this.addressBook
-  var readOnly = this._readOnlyAddressBook = {}
-  ;[
-    'get',
-    'createReadStream',
-    'createKeyStream',
-    'createValueStream',
-    'query',
-    'liveStream',
-    'byFingerprint',
-    'byRootHash'
-  ].forEach(function (method) {
-    if (readWrite[method]) {
-      readOnly[method] = readWrite[method].bind(readWrite)
-    }
-  })
+  // var readWrite = this.addressBook
+  // var readOnly = this._readOnlyAddressBook = {}
+  // ;[
+  //   'get',
+  //   'createReadStream',
+  //   'createKeyStream',
+  //   'createValueStream',
+  //   'query',
+  //   'liveStream',
+  //   'byFingerprint',
+  //   'byRootHash'
+  // ].forEach(function (method) {
+  //   if (readWrite[method]) {
+  //     readOnly[method] = readWrite[method].bind(readWrite)
+  //   }
+  // })
 
   this.msgDB = createMsgDB(this._prefix('messages.db'), {
     leveldown: this.leveldown,
