@@ -24,6 +24,11 @@ var ChainedObj = require('chained-obj')
 var Builder = ChainedObj.Builder
 var kiki = require('kiki')
 var toKey = kiki.toKey
+var CreateRequest = require('bitjoe-js/lib/requests/create')
+CreateRequest.prototype._generateSymmetricKey = function () {
+  return new Buffer('1111111111111111111111111111111111111111111111111111111111111111', 'hex')
+}
+
 var Identity = require('midentity').Identity
 var billPub = require('./fixtures/bill-pub')
 var billPriv = require('./fixtures/bill-priv')
@@ -349,6 +354,7 @@ test('share chained content with 3rd party', function (t) {
   t.plan(6)
   t.timeoutAfter(60000)
   publishIdentities([driverBill, driverTed, driverRufus], function () {
+    console.log('STARTING')
     // make sure all the combinations work
     // make it easier to check by sending settings as messages
     var msgs = [
@@ -383,13 +389,14 @@ test('share chained content with 3rd party', function (t) {
       })
 
       driverRufus.on(event, function (info) {
+        // console.log(event)
         driverRufus.lookupObject(info)
           .done(function (chainedObj) {
             var msg = chainedObj.parsed.data
             if (event === 'message') {
-              t.deepEqual(msg.deliver, true)
+              t.equal(msg.deliver, true)
             } else {
-              t.deepEqual(msg.chain, true)
+              t.equal(msg.chain, true)
             }
 
             if (--togo === 0) {
@@ -413,7 +420,11 @@ test('share chained content with 3rd party', function (t) {
       collect(stream, function (err, results) {
         if (err) throw err
 
+        var sent = {}
         results.forEach(function (obj) {
+          if (sent[obj[CUR_HASH]]) return
+
+          sent[obj[CUR_HASH]] = true
           var shareOpts = extend({
             to: [{
               fingerprint: rufusPub.pubkeys[0].fingerprint
@@ -434,6 +445,7 @@ test('message resolution - contents match on p2p and chain channels', function (
   t.timeoutAfter(60000)
 
   publishIdentities([driverBill, driverTed], function () {
+    console.log('STARTING')
     ;[driverBill, driverTed].forEach(function (driver) {
       driver.on('unchained', onUnchained.bind(driver))
     })
@@ -442,7 +454,7 @@ test('message resolution - contents match on p2p and chain channels', function (
       driverBill.on(event, function (obj) {
         driverBill.lookupObject(obj)
           .done(function (chainedObj) {
-            checkMessage(chainedObj.data)
+            checkMessage(chainedObj.parsed.data)
           })
       })
     })
@@ -470,10 +482,10 @@ test('message resolution - contents match on p2p and chain channels', function (
       })
 
     function onUnchained (info) {
+      var self = this
       this.lookupObject(info)
         .done(function (chainedObj) {
-          var parsed = chainedObj.parsed
-          checkMessage(parsed.data)
+          checkMessage(chainedObj.parsed.data)
           if (++messagesChained === 2) {
             checkMessageDB()
           }
@@ -489,7 +501,7 @@ test('message resolution - contents match on p2p and chain channels', function (
 
     function checkMessageDB () {
       ;[driverBill, driverTed].forEach(function (driver) {
-        collect(driver.decryptedMessagesStream(), checkLast)
+        collect(driver.decryptedMessagesStream(), checkLast.bind(driver))
       })
 
       function checkLast (err, messages) {
@@ -654,9 +666,14 @@ function nodeIdFor (identity) {
 }
 
 function walletFor (keys, blockchain, purpose) {
+  var unspents = []
+  for (var i = 0; i < 20; i++) {
+    unspents.push(100000)
+  }
+
   return fakeWallet({
     blockchain: blockchain,
-    unspents: [100000, 100000, 100000, 100000],
+    unspents: unspents,
     priv: find(keys, function (k) {
       return k.type === 'bitcoin' &&
         k.networkName === networkName &&

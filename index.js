@@ -44,6 +44,7 @@ var createMsgDB = require('./lib/msgDB')
 var createTxDB = require('./lib/txDB')
 var toObj = require('./lib/toObj')
 var errors = require('./lib/errors')
+var errToJSON = require('./lib/errToJSON')
 var currentTime = require('./lib/now')
 var TYPE = constants.TYPE
 var ROOT_HASH = constants.ROOT_HASH
@@ -52,8 +53,10 @@ var CUR_HASH = constants.CUR_HASH
 var PREFIX = constants.OP_RETURN_PREFIX
 var CONFIRMATIONS_BEFORE_CONFIRMED = 1000000 // for now
 var MAX_CHAIN_RETRIES = 3
+var MAX_UNCHAIN_RETRIES = 10
 var MAX_RESEND_RETRIES = 10
 var CHAIN_WRITE_THROTTLE = 60000
+var CHAIN_READ_THROTTLE = 60000
 var KEY_PURPOSE = 'messaging'
 var MSG_SCHEMA = {
   txData: 'Buffer',
@@ -122,6 +125,7 @@ function Driver (options) {
     priv: this.getBlockchainKey().priv
   })
 
+  // this._monkeypatchWallet()
   this.p2p = new Zlorp({
     name: identity.name(),
     available: true,
@@ -185,6 +189,35 @@ function Driver (options) {
     })
 }
 
+// Driver.prototype._monkeypatchWallet = function () {
+//   var self = this
+//   var getUnspents = this.wallet.unspents.bind(this.wallet)
+//   this.wallet.unspents = function (cb) {
+//     Q.nfcall(getUnspents)
+//       .then(function (utxos) {
+//         return Q.allSettled(utxos.map(this._findSpentTXO))
+//       })
+//       .then(function (results) {
+//         utxos = utxos.filter(function (u, i) {
+//           return !!results[i].value
+//         })
+//       })
+//       .nodeify(cb)
+//   }
+// }
+
+// Driver.prototype._findSpentTXO = function (utxo) {
+//   // {
+//   //   address: unspent.address,
+//   //   confirmations: unspent.confirmations,
+//   //   vout: unspent.n,
+//   //   txId: unspent.tx,
+//   //   value: utils.btcToSatoshi(unspent.amount)
+//   // }
+
+//   // return Q.ninvoke(this.spentDB)
+// }
+
 Driver.prototype.isReady = function () {
   return this._ready
 }
@@ -240,7 +273,7 @@ Driver.prototype._readFromChain = function () {
       tail: true
     }),
     toObjectStream(),
-    filter(function (entry) {
+    map(function (entry, cb) {
       var idx = self._pendingTxs.indexOf(entry.txId)
       if (idx !== -1) {
         self._pendingTxs.splice(idx, 1)
@@ -248,13 +281,30 @@ Driver.prototype._readFromChain = function () {
 
       // was read from chain and hasn't been processed yet
       // self._debug('unchaining tx', entry.txId)
-      return entry.dateDetected && !entry.dateUnchained
+      if (!entry.dateDetected || entry.dateUnchained) {
+        return cb()
+      }
+
+      if (entry.errors) {
+        if (entry.errors.length > MAX_UNCHAIN_RETRIES) {
+          // console.log(entry.errors, entry.id)
+          self._debug('giving up on unchaining tx')
+          return cb()
+        } else {
+          self._debug('throttling unchain retry of tx')
+          return throttleIfRetrying(entry, CHAIN_READ_THROTTLE, function () {
+            cb(null, entry)
+          })
+        }
+      }
+
+      cb(null, entry)
     }),
     this.unchainer,
     map(function (chainedObj, cb) {
-      if (chainedObj.parsed) {
-        self._debug('unchained (read)', chainedObj.key, chainedObj.errors)
-      }
+      // if (chainedObj.parsed) {
+      //   self._debug('unchained (read)', chainedObj.key, chainedObj.errors)
+      // }
 
       var entry = self.unchainResultToEntry(chainedObj)
       cb(null, entry)
@@ -395,6 +445,7 @@ Driver.prototype.decryptedMessagesStream = function (opts) {
   opts = opts || {}
   return this.msgDB.createValueStream()
     .pipe(map(function (info, cb) {
+      // console.log(info)
       self.lookupObject(info)
         .nodeify(cb)
     }))
@@ -491,22 +542,11 @@ Driver.prototype._writeToChain = function () {
   pump(
     this._getToChainStream(),
     map(function (entry, cb) {
-      var errors = entry.errors
-      if (!errors || !errors.length) {
-        return tryAgain()
+      if (entry.errors && entry.errors.length) {
+        self._debug('throttling chaining')
       }
 
-      var lastErr = errors[errors.length - 1]
-      var now = currentTime()
-      var wait = lastErr.timestamp + throttle - now
-      if (wait < 0) {
-        return tryAgain()
-      }
-
-      self._debug('throttling chaining', wait)
-      // just in case the device clock time-traveled
-      wait = Math.min(wait, throttle)
-      setTimeout(tryAgain, wait)
+      throttleIfRetrying(entry, throttle, tryAgain)
 
       function tryAgain () {
         self.putOnChain(new Entry(entry))
@@ -557,7 +597,11 @@ Driver.prototype._getUnsentStream = function () {
 }
 
 Driver.prototype.name = function () {
-  return this.identityJSON.name.formatted
+  if (this.identityJSON.name) {
+    return this.identityJSON.name.firstName
+  } else {
+    return this.identityJSON.pubkeys[0].fingerprint
+  }
 }
 
 Driver.prototype._sendTheUnsent = function () {
@@ -676,14 +720,17 @@ Driver.prototype._streamTxs = function (fromHeight, skipIds) {
         return cb() // already handled this one
       }
 
+      self._pendingTxs.push(id)
       self.txDB.get(id, function (err, entry) {
-        if (err && !err.notFound) return cb(err)
+        if (err && !err.notFound) {
+          self._pendingTxs.splice(self._pendingTxs.indexOf(id), 1)
+          return cb(err)
+        }
 
         save(entry)
       })
 
       function save (entry) {
-        self._pendingTxs.push(id)
         var type = entry ?
           EventType.tx.confirmation :
           EventType.tx.new
@@ -746,7 +793,7 @@ Driver.prototype._setupDBs = function () {
     autostart: false
   })
 
-  this.msgDB.name = this.identityJSON.name.formatted + ' msgDB'
+  this.msgDB.name = this.name() + ' msgDB'
 
   var msgDBEvents = [
     'chained',
@@ -759,11 +806,6 @@ Driver.prototype._setupDBs = function () {
   this.msgDB.on('live', function () {
     self._debug('msgDB is live')
   })
-  // msgDBEvents.forEach(function (e) {
-  //   self.msgDB.on(e, function (entry) {
-  //     self._debug(e, entry)
-  //   })
-  // })
 
   ;['message', 'unchained'].forEach(function (event) {
     self.msgDB.on(event, function (entry) {
@@ -773,25 +815,13 @@ Driver.prototype._setupDBs = function () {
     })
   })
 
-  // announce that own identity got published
-  // this.msgDB.on('unchained', function (entry) {
-  //   if (entry.txType === TxData.types.public) {
-  //     if ()
-  //     self.identityKeys.map(function (k) {
-  //       return k.fingerprint
-  //     }).some(function )
-  //     if (entry.from && entry.from[ROOT_HASH] === self._myRootHash()) {
-  //     }
-  //   }
-  // })
-
   this.txDB = createTxDB(this._prefix('txs.db'), {
     leveldown: this.leveldown,
     log: this._log,
     autostart: false
   })
 
-  this.txDB.name = this.identityJSON.name.formatted + ' txDB'
+  this.txDB.name = this.name() + ' txDB'
 }
 
 Driver.prototype._sendP2P = function (entry) {
@@ -806,6 +836,7 @@ Driver.prototype._sendP2P = function (entry) {
     .spread(function (identity, chainedObj) {
       var fingerprint = getFingerprint(identity)
       self._debug(KEY_PURPOSE, fingerprint)
+      self._debug('sending msg p2p', chainedObj.parsed.data)
       var msg = msgToBuffer(getMsgProps(chainedObj))
       return Q.ninvoke(self.p2p, 'send', msg, fingerprint)
     })
@@ -1078,7 +1109,7 @@ Driver.prototype.putOnChain = function (entry) {
           txId: tx.getId()
         })
 
-      self._debug('chained (write)', nextEntry.get(CUR_HASH), 'tx: ' + nextEntry.get('txId'))
+      // self._debug('chained (write)', nextEntry.get(CUR_HASH), 'tx: ' + nextEntry.get('txId'))
       return nextEntry
     })
     .catch(function (err) {
@@ -1165,6 +1196,7 @@ Driver.prototype.share = function (options) {
         })
       })
 
+      // entries.forEach(function (e) {console.log(e.toJSON())})
       return Q.all(entries.map(self.log, self))
     })
 }
@@ -1220,7 +1252,8 @@ Driver.prototype.send = function (options) {
 
   var recipients
   var lookup = isPublic ? this.lookupBTCAddress : this.lookupBTCPubKey
-  var validate = options.chain ? Q.ninvoke(Parser, 'parse', data) : Q.resolve()
+  // var validate = options.chain ? Q.ninvoke(Parser, 'parse', data) : Q.resolve()
+  var validate = Q.ninvoke(Parser, 'parse', data)
 
   return validate
     .then(function () {
@@ -1446,21 +1479,28 @@ function validateRecipients (recipients) {
   })
 }
 
-function toErrJSON (err) {
-  var json = {}
-
-  Object.getOwnPropertyNames(err).forEach(function (key) {
-    json[key] = err[key]
-  })
-
-  delete json.stack
-  return json
-}
-
 function addError (entry, err) {
   var errs = entry.get('errors') || []
-  errs.push(toErrJSON(err))
+  errs.push(errToJSON(err))
   entry.set('errors', errs)
+}
+
+function throttleIfRetrying (entry, throttle, cb) {
+  var errors = entry.errors
+  if (!errors || !errors.length) {
+    return cb()
+  }
+
+  var lastErr = errors[errors.length - 1]
+  var now = currentTime()
+  var wait = lastErr.timestamp + throttle - now
+  if (wait < 0) {
+    return cb()
+  }
+
+  // just in case the device clock time-traveled
+  wait = Math.min(wait, throttle)
+  setTimeout(cb, wait)
 }
 
 function firstKey (keys, where) {
