@@ -465,8 +465,6 @@ Driver.prototype.unchainResultToEntry = function (chainedObj) {
     EventType.chain.readSuccess :
     EventType.chain.readError
 
-  if (!success) debugger
-
   // no decrypted data should be stored in the log
   var safeProps = omit(chainedObj, [
     'type',
