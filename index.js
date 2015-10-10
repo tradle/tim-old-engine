@@ -4,7 +4,6 @@ var EventEmitter = require('events').EventEmitter
 var omit = require('object.omit')
 var Q = require('q')
 var typeforce = require('typeforce')
-var pick = require('object.pick')
 var debug = require('debug')('tim')
 var reemit = require('re-emitter')
 var bitcoin = require('bitcoinjs-lib')
@@ -46,11 +45,13 @@ var toObj = require('./lib/toObj')
 var errors = require('./lib/errors')
 var errToJSON = require('./lib/errToJSON')
 var currentTime = require('./lib/now')
+var getUID = require('./lib/getUID')
 var TYPE = constants.TYPE
 var ROOT_HASH = constants.ROOT_HASH
 var PREV_HASH = constants.PREV_HASH
 var CUR_HASH = constants.CUR_HASH
 var PREFIX = constants.OP_RETURN_PREFIX
+var NONCE = constants.NONCE
 var CONFIRMATIONS_BEFORE_CONFIRMED = 1000000 // for now
 var MAX_CHAIN_RETRIES = 3
 var MAX_UNCHAIN_RETRIES = 10
@@ -222,17 +223,8 @@ Driver.prototype.isReady = function () {
   return this._ready
 }
 
-Driver.prototype._onLogReadError = function (err) {
-  throw err
-}
-
-Driver.prototype._onLogWriteError = function (err) {
-  throw err
-}
-
 Driver.prototype._prepIdentity = function () {
   var self = this
-
   return Q.nfcall(getDHTKey, this.identityJSON)
     .then(function (key) {
       copyDHTKeys(self.identityMeta, key)
@@ -245,7 +237,8 @@ Driver.prototype._setupP2P = function () {
   this.p2p.on('data', this._onmessage)
   this.p2p.on('connect', function (fingerprint, addr) {
     self.lookupByFingerprint(fingerprint)
-      .then(function (identity) {
+      .then(function (result) {
+        var identity = result.identity
         self._debug('connecting to', identity.name.formatted)
         self.emit('connect', identity, addr)
       })
@@ -274,31 +267,32 @@ Driver.prototype._readFromChain = function () {
     }),
     toObjectStream(),
     map(function (entry, cb) {
-      var idx = self._pendingTxs.indexOf(entry.txId)
-      if (idx !== -1) {
-        self._pendingTxs.splice(idx, 1)
-      }
-
       // was read from chain and hasn't been processed yet
       // self._debug('unchaining tx', entry.txId)
       if (!entry.dateDetected || entry.dateUnchained) {
-        return cb()
+        return finish()
       }
 
       if (entry.errors) {
         if (entry.errors.length > MAX_UNCHAIN_RETRIES) {
           // console.log(entry.errors, entry.id)
           self._debug('giving up on unchaining tx')
-          return cb()
+          return finish()
         } else {
-          self._debug('throttling unchain retry of tx')
+          self._debug('throttling unchain retry of tx', entry.txId)
           return throttleIfRetrying(entry, CHAIN_READ_THROTTLE, function () {
-            cb(null, entry)
+            finish(null, entry)
           })
         }
       }
 
-      cb(null, entry)
+      finish(null, entry)
+
+      function finish (err, ret) {
+        if (err || !ret) rmPending(entry.txId)
+
+        cb.apply(null, arguments)
+      }
     }),
     this.unchainer,
     map(function (chainedObj, cb) {
@@ -306,12 +300,22 @@ Driver.prototype._readFromChain = function () {
       //   self._debug('unchained (read)', chainedObj.key, chainedObj.errors)
       // }
 
-      var entry = self.unchainResultToEntry(chainedObj)
-      cb(null, entry)
+      self.unchainResultToEntry(chainedObj)
+        .done(function (entry) {
+          rmPending(entry.txId)
+          cb(null, entry)
+        })
     }),
     this._log,
     this._rethrow
   )
+
+  function rmPending (txId) {
+    var idx = self._pendingTxs.indexOf(txId)
+    if (idx !== -1) {
+      self._pendingTxs.splice(idx, 1)
+    }
+  }
 }
 
 Driver.prototype._rethrow = function (err) {
@@ -374,8 +378,8 @@ Driver.prototype._publishIdentity = function (identity, cb) {
   }
 
   cb = safe(cb)
-  this.publish({
-      msg: toBuffer(identity),
+  return this.publish({
+      msg: identity,
       to: [{ fingerprint: constants.IDENTITY_PUBLISH_ADDRESS }]
     })
     .nodeify(cb)
@@ -420,7 +424,7 @@ Driver.prototype.publishMyIdentity = function () {
         // TODO: better have this as a response to an event
         // so it can be handled the same at startup and here
         self.identityJSON = update
-        extend(self.identityMeta, pick(update, [CUR_HASH, PREV_HASH, ROOT_HASH]))
+        extend(self.identityMeta, pick(update, CUR_HASH, PREV_HASH, ROOT_HASH))
       })
   })
 
@@ -456,9 +460,12 @@ Driver.prototype.transactions = function () {
 }
 
 Driver.prototype.unchainResultToEntry = function (chainedObj) {
-  var type = chainedObj.errors && chainedObj.errors.length ?
-    EventType.chain.readError :
-    EventType.chain.readSuccess
+  var success = !(chainedObj.errors && chainedObj.errors.length)
+  var type = success ?
+    EventType.chain.readSuccess :
+    EventType.chain.readError
+
+  if (!success) debugger
 
   // no decrypted data should be stored in the log
   var safeProps = omit(chainedObj, [
@@ -473,16 +480,6 @@ Driver.prototype.unchainResultToEntry = function (chainedObj) {
 
   var entry = new Entry(safeProps)
     .set('type', type)
-
-  var from = chainedObj.from && chainedObj.from.getOriginalJSON()
-  if (from) {
-    entry.set('from', from[ROOT_HASH])
-  }
-
-  var to = chainedObj.to && chainedObj.to.getOriginalJSON()
-  if (to) {
-    entry.set('to', toObj(ROOT_HASH, to[ROOT_HASH]))
-  }
 
   if ('key' in chainedObj) {
     entry.set(CUR_HASH, chainedObj.key)
@@ -503,7 +500,32 @@ Driver.prototype.unchainResultToEntry = function (chainedObj) {
     entry.prev(chainedObj.id)
   }
 
-  return entry
+  var tasks = ['from', 'to'].map(function (party) {
+    return chainedObj[party]
+  })
+  .map(function (party) {
+    if (!party) return
+
+    if (party[ROOT_HASH]) return party[ROOT_HASH]
+
+    if (typeof party.keys !== 'function') debugger
+    var fingerprint = party.keys()[0].toJSON().fingerprint
+    return self.rootHashByFingerprint(fingerprint)
+  })
+
+  return Q.allSettled(tasks)
+    .spread(function (from, to) {
+      if (from.value) {
+        entry.set('from', toObj(ROOT_HASH, from.value))
+      }
+
+      if (to.value) {
+        entry.set('to', toObj(ROOT_HASH, to.value))
+      }
+
+      if (success) setUID(entry)
+      return entry
+    })
 }
 
 Driver.prototype._getToChainStream = function () {
@@ -578,7 +600,7 @@ Driver.prototype._getUnsentStream = function () {
           !entry.to ||
           !entry.deliver ||
           entry.dir !== Dir.outbound ||
-          self._currentlySending.indexOf(entry.id) !== -1) {
+          self._currentlySending.indexOf(entry.uid) !== -1) {
         return
       }
 
@@ -604,6 +626,15 @@ Driver.prototype.name = function () {
   }
 }
 
+Driver.prototype._markSending = function (entry) {
+  this._currentlySending.push(entry.uid)
+}
+
+Driver.prototype._markSent = function (entry) {
+  var idx = this._currentlySending.indexOf(entry.uid)
+  this._currentlySending.splice(idx, 1)
+}
+
 Driver.prototype._sendTheUnsent = function () {
   var self = this
   if (this._destroyed) return
@@ -616,36 +647,29 @@ Driver.prototype._sendTheUnsent = function () {
 
   this._sending = true
   this._currentlySending = []
-  this.msgDB.on('sent', function (entry) {
-    var id = entry.prev[0]
-    var idx = self._currentlySending.indexOf(id)
-    self._currentlySending.splice(idx, 1)
-  })
+  this.msgDB.on('sent', this._markSent)
 
   pump(
     this._getUnsentStream(),
     map(function (entry, cb) {
-      self._currentlySending.push(entry.id)
+      var nextEntry = new Entry()
+      nextEntry.set(ROOT_HASH, entry[ROOT_HASH])
+      nextEntry.set('uid', entry.uid)
+      self._markSending(entry)
       self._sendP2P(entry)
         .then(function () {
-          return new Entry({
-            type: EventType.msg.sendSuccess
-          })
+          return nextEntry.set('type', EventType.msg.sendSuccess)
         })
         .catch(function (err) {
-          var errEntry = new Entry({
+          nextEntry.set({
             type: EventType.msg.sendError,
             errors: entry.errors || []
           })
 
-          addError(errEntry, err)
-          return errEntry
+          addError(nextEntry, err)
+          return nextEntry
         })
-        .done(function (nextEntry) {
-          var prev = entry.prev.concat(entry.id)
-          nextEntry.prev(prev)
-          cb(null, nextEntry)
-        })
+        .nodeify(cb)
     }),
     // filter(function (data) {
     //   console.log('after sendTheUnsent', data.toJSON())
@@ -770,6 +794,8 @@ Driver.prototype._setupDBs = function () {
     autostart: false
   })
 
+  this.addressBook.name = this.name()
+
   // var readWrite = this.addressBook
   // var readOnly = this._readOnlyAddressBook = {}
   // ;[
@@ -793,7 +819,7 @@ Driver.prototype._setupDBs = function () {
     autostart: false
   })
 
-  this.msgDB.name = this.name() + ' msgDB'
+  this.msgDB.name = this.name()
 
   var msgDBEvents = [
     'chained',
@@ -821,7 +847,7 @@ Driver.prototype._setupDBs = function () {
     autostart: false
   })
 
-  this.txDB.name = this.name() + ' txDB'
+  this.txDB.name = this.name()
 }
 
 Driver.prototype._sendP2P = function (entry) {
@@ -833,8 +859,8 @@ Driver.prototype._sendP2P = function (entry) {
       this.lookupIdentity(entry.to),
       this.lookupObject(entry)
     ])
-    .spread(function (identity, chainedObj) {
-      var fingerprint = getFingerprint(identity)
+    .spread(function (result, chainedObj) {
+      var fingerprint = getFingerprint(result.identity)
       self._debug(KEY_PURPOSE, fingerprint)
       self._debug('sending msg p2p', chainedObj.parsed.data)
       var msg = msgToBuffer(getMsgProps(chainedObj))
@@ -864,6 +890,13 @@ Driver.prototype.lookupObject = function (info) {
     })
 }
 
+Driver.prototype.lookupRootHash = function (fingerprint) {
+  var pub = this.getPublicKey(fingerprint)
+  if (pub) return Q.resolve(this._myRootHash())
+
+  return Q.ninvoke(this.addressBook, 'rootHashByFingerprint', fingerprint)
+}
+
 Driver.prototype.lookupByFingerprint = function (fingerprint) {
 //   var cached = this._fingerprintToIdentity[fingerprint]
 //   if (cached) return Q.resolve(cached)
@@ -883,13 +916,17 @@ Driver.prototype.lookupByFingerprint = function (fingerprint) {
 Driver.prototype.getKeyAndIdentity = function (fingerprint, returnPrivate) {
   var self = this
   return this.lookupByFingerprint(fingerprint)
-    .then(function (identity) {
+    .then(function (result) {
+      var identity = result.identity
       var key = returnPrivate && self.getPrivateKey(fingerprint)
       key = key || keyForFingerprint(identity, fingerprint)
-      return {
+      var ret = {
         key: key,
         identity: identity
       }
+
+      ret[ROOT_HASH] = result[ROOT_HASH]
+      return ret
     })
 }
 
@@ -957,19 +994,23 @@ Driver.prototype.lookupIdentity = function (query) {
   }
 
   if (query[ROOT_HASH]) {
-    if (query[ROOT_HASH] === this._myRootHash()) {
-      return Q.resolve(me)
-    } else {
+    if (query[ROOT_HASH] !== this._myRootHash()) {
       return Q.ninvoke(this.addressBook, 'byRootHash', query[ROOT_HASH])
     }
   } else if (query.fingerprint) {
     var pub = this.getPublicKey(query.fingerprint)
-    if (pub) {
-      return Q.resolve(me)
-    } else {
+    if (!pub) {
       return Q.ninvoke(this.addressBook, 'byFingerprint', query.fingerprint)
     }
   }
+
+  var ret = {
+    identity: me
+  }
+
+  ret[ROOT_HASH] = this._myRootHash()
+  ret[CUR_HASH] = this._myCurrentHash()
+  return Q.resolve(ret)
 }
 
 Driver.prototype.log = function (entry) {
@@ -1003,10 +1044,12 @@ Driver.prototype._onmessage = function (buf, fingerprint) {
   // this thing repeats work all over the place
   var txInfo
   var valid = validateMsg(msg)
+  var from
   Q[valid ? 'resolve' : 'reject']()
     .then(this.lookupIdentity.bind(this, { fingerprint: fingerprint }))
-    .then(function (identity) {
-      var fromKey = firstKey(identity.pubkeys, {
+    .then(function (result) {
+      from = result
+      var fromKey = firstKey(result.identity.pubkeys, {
         type: 'bitcoin',
         networkName: self.networkName,
         purpose: 'messaging'
@@ -1037,23 +1080,23 @@ Driver.prototype._onmessage = function (buf, fingerprint) {
       return self.lookupObject(txInfo)
     })
     .then(function (chainedObj) {
-      chainedObj.from = chainedObj.from && chainedObj.from.identity
-      chainedObj.to = chainedObj.to && chainedObj.to.identity
+      // chainedObj.from = chainedObj.from && chainedObj.from.identity
+      // chainedObj.to = chainedObj.to && chainedObj.to.identity
       return self.unchainResultToEntry(chainedObj)
-        .set({
-          type: EventType.msg.receivedValid,
-          dir: Dir.inbound
-        })
+    })
+    .then(function (entry) {
+      return entry.set({
+        type: EventType.msg.receivedValid,
+        dir: Dir.inbound
+      })
     })
     .catch(function (err) {
       self._debug('failed to process inbound msg', err)
       return new Entry({
         type: EventType.msg.receivedInvalid,
         msg: msg,
-        from: {
-          fingerprint: fingerprint
-        },
-        to: [toObj(ROOT_HASH, self._myRootHash())],
+        from: toObj(ROOT_HASH, from[ROOT_HASH]),
+        to: toObj(ROOT_HASH, self._myRootHash()),
         dir: Dir.inbound,
         errors: [err]
       })
@@ -1083,10 +1126,12 @@ Driver.prototype.putOnChain = function (entry) {
   var type = entry.get('txType')
   var data = entry.get('txData')
   var nextEntry = new Entry()
-    .prev(entry)
     .set(ROOT_HASH, entry.get(ROOT_HASH))
     .set(CUR_HASH, entry.get(CUR_HASH))
     .set({
+      uid: entry.get('uid'),
+      // from: entry.get('from'),
+      // to: entry.get('to'),
       txType: type,
       chain: true,
       dir: Dir.outbound
@@ -1094,6 +1139,7 @@ Driver.prototype.putOnChain = function (entry) {
 
 //   return this.lookupBTCAddress(to)
 //     .then(shareWith)
+  // console.log(entry.toJSON())
   var addr = entry.get('addressesTo')[0]
   return self.chainwriter.chain()
     .type(type)
@@ -1102,15 +1148,13 @@ Driver.prototype.putOnChain = function (entry) {
     .execute()
     .then(function (tx) {
       // ugly!
-      nextEntry
-        .set({
-          type: EventType.chain.writeSuccess,
-          tx: toBuffer(tx),
-          txId: tx.getId()
-        })
+      nextEntry.set({
+        type: EventType.chain.writeSuccess,
+        tx: toBuffer(tx),
+        txId: tx.getId()
+      })
 
       // self._debug('chained (write)', nextEntry.get(CUR_HASH), 'tx: ' + nextEntry.get('txId'))
-      return nextEntry
     })
     .catch(function (err) {
       err = toErrInstance(err)
@@ -1121,13 +1165,14 @@ Driver.prototype.putOnChain = function (entry) {
       self._debug('chaining failed', err)
       self.emit('error', err)
 
-      var errEntry = new Entry({
-          type: EventType.chain.writeError
-        })
-        .prev(entry)
+      nextEntry.set({
+        type: EventType.chain.writeError
+      })
 
-      addError(errEntry, err)
-      return errEntry
+      addError(nextEntry, err)
+    })
+    .then(function () {
+      return nextEntry
     })
 }
 
@@ -1159,12 +1204,11 @@ Driver.prototype.share = function (options) {
     public: false,
     chain: !!options.chain,
     deliver: !!options.deliver,
-    from: toObj(ROOT_HASH, this._myRootHash()),
-    to: to
+    from: toObj(ROOT_HASH, this._myRootHash())
   })
 
   var recipients
-  return Q.all(to.map(this.lookupBTCPubKey))
+  return Q.all(to.map(this.lookupIdentity, this))
     .then(function (_recipients) {
       recipients = _recipients
       return Q.ninvoke(self, '_lookupMsgs', toObj(CUR_HASH, curHash))
@@ -1178,9 +1222,10 @@ Driver.prototype.share = function (options) {
 
       var symmetricKey = obj.permission.body().decryptionKey
       return Q.all(recipients.map(function (r) {
+        var pubkey = self._getBTCKey(r.identity)
         return self.chainwriter.share()
           .shareAccessTo(curHash, symmetricKey)
-          .shareAccessWith(r)
+          .shareAccessWith(pubkey.value)
           .execute()
       }))
     })
@@ -1188,7 +1233,7 @@ Driver.prototype.share = function (options) {
       // TODO: rethink this repeated code from send()
       var entries = shares.map(function (share, i) {
         return entry.clone().set({
-          to: to[i],
+          to: toObj(ROOT_HASH, recipients[i][ROOT_HASH]),
           addressesTo: [share.address],
           addressesFrom: [self.wallet.addressString],
           txType: TxData.types.permission,
@@ -1196,7 +1241,7 @@ Driver.prototype.share = function (options) {
         })
       })
 
-      // entries.forEach(function (e) {console.log(e.toJSON())})
+      entries.forEach(setUID)
       return Q.all(entries.map(self.log, self))
     })
 }
@@ -1246,34 +1291,36 @@ Driver.prototype.send = function (options) {
     public: isPublic,
     chain: !!options.chain,
     deliver: !!options.deliver,
-    from: toObj(ROOT_HASH, this._myRootHash()),
-    to: to
+    from: toObj(ROOT_HASH, this._myRootHash())
   })
 
   var recipients
-  var lookup = isPublic ? this.lookupBTCAddress : this.lookupBTCPubKey
+  var btcKeys
+  // var lookup = isPublic ? this.lookupBTCAddress : this.lookupBTCPubKey
   // var validate = options.chain ? Q.ninvoke(Parser, 'parse', data) : Q.resolve()
   var validate = Q.ninvoke(Parser, 'parse', data)
-
   return validate
-    .then(function () {
-      return Q.all(to.map(lookup))
-    })
-    .catch(function (err) {
-      if (isPublic) {
-        return to.map(function (recipient) {
-          return recipient.fingerprint
-        })
-      } else {
-        throw err
-      }
+    .then(function (parsed) {
+      return isPublic
+        ? Q.resolve(to)
+        : Q.all(to.map(self.lookupIdentity, self))
     })
     .then(function (_recipients) {
       recipients = _recipients
+      if (isPublic) {
+        btcKeys = to
+      } else {
+        btcKeys = pluck(recipients, 'identity')
+          .map(self._getBTCKey, self)
+          .map(function (k) {
+            return k.value
+          })
+      }
+
       return self.chainwriter.create()
         .data(data)
         .setPublic(isPublic)
-        .recipients(recipients)
+        .recipients(btcKeys)
         .execute()
     })
     .then(function (resp) {
@@ -1289,7 +1336,7 @@ Driver.prototype.send = function (options) {
           return entry.clone().set({
             to: contact,
             addressesFrom: [self.wallet.addressString],
-            addressesTo: [recipients[i]],
+            addressesTo: [btcKeys[i].fingerprint],
             txType: TxData.types.public,
             txData: toBuffer(resp.key, 'hex')
           })
@@ -1297,7 +1344,7 @@ Driver.prototype.send = function (options) {
       } else {
         entries = resp.shares.map(function (share, i) {
           return entry.clone().set({
-            to: to[i],
+            to: toObj(ROOT_HASH, recipients[i][ROOT_HASH]),
             addressesTo: [share.address],
             addressesFrom: [self.wallet.addressString],
             txType: TxData.types.permission,
@@ -1306,15 +1353,24 @@ Driver.prototype.send = function (options) {
         })
       }
 
+      entries.forEach(setUID)
       return Q.all(entries.map(self.log, self))
     })
+}
+
+Driver.prototype._getBTCKey = function (identity) {
+  return firstKey(identity.pubkeys, {
+    type: 'bitcoin',
+    networkName: this.networkName,
+    purpose: KEY_PURPOSE
+  })
 }
 
 Driver.prototype.lookupBTCKey = function (recipient) {
   var self = this
   return this.lookupIdentity(recipient)
-    .then(function (identity) {
-      return firstKey(identity.pubkeys, {
+    .then(function (result) {
+      return firstKey(result.identity.pubkeys, {
         type: 'bitcoin',
         networkName: self.networkName,
         purpose: KEY_PURPOSE
@@ -1534,4 +1590,27 @@ function toErrInstance (err) {
   }
 
   return n
+}
+
+function pluck (arr, prop) {
+  var vals = []
+  for (var i = 0; i < arr.length; i++) {
+    vals.push(arr[i][prop])
+  }
+
+  return vals
+}
+
+function pick (obj) {
+  var a = {}
+  for (var i = 1; i < arguments.length; i++) {
+    var p = arguments[i]
+    a[p] = obj[p]
+  }
+
+  return a
+}
+
+function setUID (entry) {
+  entry.set('uid', getUID(entry))
 }

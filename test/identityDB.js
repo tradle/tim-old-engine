@@ -9,6 +9,7 @@ var Entry = require('logbase').Entry
 var fakeKeeper = require('tradle-test-helpers').fakeKeeper
 var createIdentityDB = require('../lib/identityDB')
 var ted = require('./fixtures/ted-pub')
+var EventType = require('../lib/eventType')
 var ROOT_HASH = constants.ROOT_HASH
 var CUR_HASH = constants.CUR_HASH
 
@@ -23,7 +24,7 @@ test('identity store', function (t) {
   var keeperMap = {}
   var hash = ted[ROOT_HASH] = ted[CUR_HASH] = 'abc'
   keeperMap[hash] = ted
-  var entry = new Entry(extend({ type: 'someEntryType' }, ted))
+  var entry = new Entry(extend({ type: EventType.chain.readSuccess }, ted))
   log.append(entry)
   entry.set('name', 'bill')
   log.append(entry)
@@ -40,7 +41,7 @@ test('identity store', function (t) {
       identities.byFingerprint(ted.pubkeys[0].fingerprint, function (err, storedTed) {
         if (err) throw err
 
-        t.deepEqual(storedTed, ted)
+        t.deepEqual(storedTed.identity, ted)
       })
 
       testStreams()
@@ -52,7 +53,7 @@ test('identity store', function (t) {
       if (err) throw err
 
       t.equal(stored.length, 1)
-      t.deepEqual(stored[0].value, ted)
+      t.deepEqual(stored[0].value.identity, ted)
     })
 
     collect(identities.createKeyStream(), function (err, stored) {
@@ -66,7 +67,7 @@ test('identity store', function (t) {
       if (err) throw err
 
       t.equal(stored.length, 1)
-      t.equal(stored[0], ted)
+      t.equal(stored[0].identity, ted)
     })
   }
 })

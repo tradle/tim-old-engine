@@ -17,7 +17,8 @@ var map = require('map-stream')
 var safe = require('safecb')
 var Q = require('q')
 var DHT = require('bittorrent-dht')
-var Keeper = require('bitkeeper-js')
+// var Keeper = require('bitkeeper-js')
+var FakeKeeper = require('tradle-test-helpers').fakeKeeper
 var Zlorp = require('zlorp')
 Zlorp.ANNOUNCE_INTERVAL = Zlorp.LOOKUP_INTERVAL = 5000
 var ChainedObj = require('chained-obj')
@@ -50,6 +51,8 @@ var TYPE = constants.TYPE
 var ROOT_HASH = constants.ROOT_HASH
 var CUR_HASH = constants.CUR_HASH
 var PREV_HASH = constants.PREV_HASH
+var NONCE = constants.NONCE
+var SIG = constants.SIG
 var STORAGE_DIR = path.resolve('./storage')
 // var tedHash = tedPub[ROOT_HASH] = 'c67905793f6cc0f0ab8d20aecfec441932ffb13d'
 // var billHash = billPub[ROOT_HASH] ='fb07729c0cef307ab7c28cb76088cc60dbc98cdd'
@@ -70,9 +73,13 @@ var driverBill
 var driverTed
 var driverRufus
 var reinitCount = 0
+var nonce
 var chainThrottle = 5000
 var testTimerName = 'test took'
+var sharedKeeper
 test.beforeEach = function (cb) {
+  nonce = 1
+  sharedKeeper = FakeKeeper.empty()
   init(function () {
     console.time(testTimerName)
     cb()
@@ -142,13 +149,13 @@ rimraf.sync(STORAGE_DIR)
 
 test('delivered/chained/both', function (t) {
   t.plan(4)
-  t.timeoutAfter(60000)
+  // t.timeoutAfter(60000)
   publishIdentities([driverBill, driverTed], function () {
     var msgs = [
       { chain: true, deliver: false },
       { chain: false, deliver: true },
       { chain: true, deliver: true }
-    ]
+    ].map(toMsg)
 
     msgs.forEach(function (msg) {
       driverTed.send(extend({
@@ -234,11 +241,14 @@ test('self publish, edit, republish', function (t) {
 
   function republish (next) {
     driverBill.identityJSON.name.firstName = 'blah'
+    driverBill.identityJSON[NONCE] = '232'
     driverBill.publishMyIdentity()
     driverTed.once('unchained', function (info) {
       driverTed.lookupObject(info)
         .done(function (chainedObj) {
+          console.log('Ted unchained latest Bill')
           var loaded = chainedObj.parsed.data
+          delete loaded[SIG]
           t.equal(loaded[PREV_HASH], driverBill.identityMeta[PREV_HASH])
           t.equal(loaded[ROOT_HASH], driverBill.identityMeta[ROOT_HASH])
           t.deepEqual(loaded, driverBill.identityJSON)
@@ -254,13 +264,13 @@ test('self publish, edit, republish', function (t) {
     collect(tStream, checkIdentities.bind(driverTed))
   }
 
-  function checkIdentities (err, identities) {
+  function checkIdentities (err, results) {
     if (err) throw err
 
-    // console.log(this.identityJSON.name.firstName)
-    t.equal(identities.length, 1)
-    identities.forEach(function (ident) {
-      t.deepEqual(ident, driverBill.identityJSON)
+    t.equal(results.length, 1)
+    results.forEach(function (r) {
+      delete r.identity[SIG]
+      t.deepEqual(r.identity, driverBill.identityJSON)
     })
 
     if (++identitiesChecked === 2) {
@@ -287,8 +297,10 @@ test('throttle chaining', function (t) {
     }
   }
 
+  var msg = { blah: 'yo' }
+  msg[NONCE] = '123'
   driverBill.publish({
-      msg: { blah: 'yo' },
+      msg: msg,
       to: [{ fingerprint: driverTed.wallet.addressString }]
     })
     .done()
@@ -300,13 +312,13 @@ test('throttle chaining', function (t) {
 
 test('delivery check', function (t) {
   t.plan(2)
-  t.timeoutAfter(60000)
+  // t.timeoutAfter(60000)
   publishIdentities([driverBill, driverTed], function () {
     var billCoords = {
       fingerprint: billPub.pubkeys[0].fingerprint
     }
 
-    var msg = { hey: 'blah' }
+    var msg = toMsg({ hey: 'blah' })
 
     driverTed.send({
       msg: msg,
@@ -334,7 +346,8 @@ test('delivery check', function (t) {
           'syncInterval',
           'chainThrottle'
         ]), {
-          keeper: new Keeper({ dht: driverBill.dht, storage: STORAGE_DIR })
+          // keeper: new Keeper({ dht: driverBill.dht, storage: STORAGE_DIR })
+          keeper: sharedKeeper
         }))
 
         driverBill.on('message', checkReceived)
@@ -354,7 +367,6 @@ test('share chained content with 3rd party', function (t) {
   t.plan(6)
   t.timeoutAfter(60000)
   publishIdentities([driverBill, driverTed, driverRufus], function () {
-    console.log('STARTING')
     // make sure all the combinations work
     // make it easier to check by sending settings as messages
     var msgs = [
@@ -364,7 +376,7 @@ test('share chained content with 3rd party', function (t) {
     ].map(function (m) {
       m[TYPE] = 'message'
       return m
-    })
+    }).map(toMsg)
 
     // send all msgs to ted
     msgs.forEach(function (msg) {
@@ -465,6 +477,7 @@ test('message resolution - contents match on p2p and chain channels', function (
 
     var msg = { hey: 'ho' }
     msg[TYPE] = 'blahblah'
+    msg = toMsg(msg)
 
     var messagesChained = 0
     Builder()
@@ -495,7 +508,7 @@ test('message resolution - contents match on p2p and chain channels', function (
     function checkMessage (m) {
       if (Buffer.isBuffer(m)) m = JSON.parse(m)
 
-      // delete m[constants.SIG]
+      delete m[constants.SIG]
       t.deepEqual(m, msg)
     }
 
@@ -506,6 +519,10 @@ test('message resolution - contents match on p2p and chain channels', function (
 
       function checkLast (err, messages) {
         if (err) throw err
+
+        messages.sort(function (a, b) {
+          return a.dateUnchained - b.dateUnchained
+        })
 
         checkMessage(messages.pop().parsed.data)
       }
@@ -569,7 +586,8 @@ function init (cb) {
     pathPrefix: 'bill' + reinitCount,
     identity: bill,
     identityKeys: billPriv,
-    keeper: new Keeper({ dht: billDHT, storage: STORAGE_DIR + '/bill' }),
+    keeper: sharedKeeper,
+    // keeper: new Keeper({ dht: billDHT, storage: STORAGE_DIR + '/bill' }),
     // kiki: kiki.kiki(billPriv),
     wallet: billWallet,
     dht: billDHT,
@@ -580,7 +598,8 @@ function init (cb) {
     pathPrefix: 'ted' + reinitCount,
     identity: ted,
     identityKeys: tedPriv,
-    keeper: new Keeper({ dht: tedDHT, storage: STORAGE_DIR + '/ted' }),
+    keeper: sharedKeeper,
+    // keeper: new Keeper({ dht: tedDHT, storage: STORAGE_DIR + '/ted' }),
     // kiki: kiki.kiki(tedPriv),
     wallet: walletFor(tedPriv, blockchain, 'messaging'),
     dht: tedDHT,
@@ -591,7 +610,8 @@ function init (cb) {
     pathPrefix: 'rufus' + reinitCount,
     identity: rufus,
     identityKeys: rufusPriv,
-    keeper: new Keeper({ dht: rufusDHT, storage: STORAGE_DIR + '/rufus' }),
+    keeper: sharedKeeper,
+    // keeper: new Keeper({ dht: rufusDHT, storage: STORAGE_DIR + '/rufus' }),
     // kiki: kiki.kiki(rufusPriv),
     wallet: walletFor(rufusPriv, blockchain, 'messaging'),
     dht: rufusDHT,
@@ -692,6 +712,11 @@ function getSigningKey (keys) {
   })
 
   return key && toKey(key)
+}
+
+function toMsg (msg) {
+  msg[NONCE] = nonce++
+  return msg
 }
 
 // function overrideDgram () {
