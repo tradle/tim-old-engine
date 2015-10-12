@@ -51,7 +51,7 @@ var ROOT_HASH = constants.ROOT_HASH
 var PREV_HASH = constants.PREV_HASH
 var CUR_HASH = constants.CUR_HASH
 var PREFIX = constants.OP_RETURN_PREFIX
-var NONCE = constants.NONCE
+// var NONCE = constants.NONCE
 var CONFIRMATIONS_BEFORE_CONFIRMED = 1000000 // for now
 var MAX_CHAIN_RETRIES = 3
 var MAX_UNCHAIN_RETRIES = 10
@@ -460,6 +460,7 @@ Driver.prototype.transactions = function () {
 }
 
 Driver.prototype.unchainResultToEntry = function (chainedObj) {
+  var self = this
   var success = !(chainedObj.errors && chainedObj.errors.length)
   var type = success ?
     EventType.chain.readSuccess :
@@ -506,9 +507,8 @@ Driver.prototype.unchainResultToEntry = function (chainedObj) {
 
     if (party[ROOT_HASH]) return party[ROOT_HASH]
 
-    if (typeof party.keys !== 'function') debugger
     var fingerprint = party.keys()[0].toJSON().fingerprint
-    return self.rootHashByFingerprint(fingerprint)
+    return self.lookupRootHash(fingerprint)
   })
 
   return Q.allSettled(tasks)
