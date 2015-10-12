@@ -457,7 +457,6 @@ test('message resolution - contents match on p2p and chain channels', function (
   t.timeoutAfter(60000)
 
   publishIdentities([driverBill, driverTed], function () {
-    console.log('STARTING')
     ;[driverBill, driverTed].forEach(function (driver) {
       driver.on('unchained', onUnchained.bind(driver))
     })
@@ -495,7 +494,6 @@ test('message resolution - contents match on p2p and chain channels', function (
       })
 
     function onUnchained (info) {
-      var self = this
       this.lookupObject(info)
         .done(function (chainedObj) {
           checkMessage(chainedObj.parsed.data)
@@ -715,7 +713,7 @@ function getSigningKey (keys) {
 }
 
 function toMsg (msg) {
-  msg[NONCE] = nonce++
+  msg[NONCE] = '' + nonce++
   return msg
 }
 
