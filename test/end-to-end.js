@@ -10,7 +10,7 @@ var rimraf = require('rimraf')
 var find = require('array-find')
 var pick = require('object.pick')
 var crypto = require('crypto')
-var extend = require('xtend/mutable')
+var extend = require('xtend')
 var memdown = require('memdown')
 var collect = require('stream-collector')
 var map = require('map-stream')
@@ -93,59 +93,44 @@ test.afterEach = function (cb) {
   })
 }
 
-// var NAMES = ['bill', 'ted', 'rufus']
-// var basePort = 51086
-
-// test('zlorp', function (t) {
-//   var billDHT = dhtFor(bill)
-//   billDHT.listen(billPort)
-//   var a = new Zlorp({
-//     name: 'bill',
-//     available: true,
-//     leveldown: memdown,
-//     port: billPort,
-//     dht: billDHT,
-//     key: toKey(find(billPriv, function (k) {
-//       return k.type === 'dsa' && k.purpose === 'sign'
-//     })).priv()
-//   })
-
-//   var tedDHT = dhtFor(ted)
-//   tedDHT.listen(tedPort)
-//   var b = new Zlorp({
-//     name: 'ted',
-//     available: true,
-//     leveldown: memdown,
-//     port: tedPort,
-//     dht: tedDHT,
-//     key: toKey(find(tedPriv, function (k) {
-//       return k.type === 'dsa' && k.purpose === 'sign'
-//     })).priv()
-//   })
-
-//   billDHT.addNode('127.0.0.1:' + tedPort, tedDHT.nodeId)
-//   tedDHT.addNode('127.0.0.1:' + billPort, billDHT.nodeId)
-
-//   a.send(new Buffer('yo'), b.fingerprint)
-//   b.on('data', function () {
-//     a.destroy()
-//     b.destroy()
-//     t.end()
-//   })
-
-//   b.on('connect', function () {
-//     console.log('connect')
-//   })
-
-//   b.on('knock', function () {
-//     console.log('knock')
-//   })
-
-//   console.log('BILL', a.key.fingerprint())
-//   console.log('TED', b.key.fingerprint())
-// })
-
 rimraf.sync(STORAGE_DIR)
+
+test('no chaining in readOnly mode', function (t) {
+  driverTed.readOnly = true
+  var msg = toMsg({ blah: 'yo' })
+  t.throws(function () {
+    driverTed.send({
+      msg: msg,
+      to: [{
+        fingerprint: billPub.pubkeys[0].fingerprint
+      }],
+      chain: true
+    })
+  })
+
+  // for now
+  // TODO: close dbs safely when they're closed before being fully open
+  setTimeout(t.end, 300)
+})
+
+test('no chaining attempted if low balance', function (t) {
+  t.plan(2)
+  driverBill.wallet.balance = function (cb) {
+    process.nextTick(function () {
+      cb(null, 1000)
+    })
+  }
+
+  driverBill._updateBalance()
+    .done(function () {
+      driverBill.publishMyIdentity()
+      driverBill.on('chaining', t.fail)
+      driverBill.on('lowbalance', function () {
+        t.pass()
+        setTimeout(t.pass, 1000)
+      })
+    })
+})
 
 test('delivered/chained/both', function (t) {
   t.plan(4)
@@ -231,17 +216,24 @@ test('self publish, edit, republish', function (t) {
   function failToRepeatPublish (next) {
     driverTed.on('unchained', t.fail)
     driverBill.publishMyIdentity()
-    driverBill.publishMyIdentity()
-    driverBill.publishMyIdentity()
-    setTimeout(function () {
-      driverTed.removeListener('unchained', t.fail)
-      next()
-    }, 1500)
+      .then(t.fail)
+      .catch(t.pass)
+      .done(function () {
+        driverTed.removeListener('unchained', t.fail)
+        next()
+      })
+
+    t.throws(function () {
+      // can't publish twice simultaneously
+      driverBill.publishMyIdentity()
+    })
   }
 
   function republish (next) {
-    driverBill.identityJSON.name.firstName = 'blah'
-    driverBill.identityJSON[NONCE] = '232'
+    var newBill = extend({}, driverBill.identityJSON)
+    newBill.name = { firstName: 'Bill 2' }
+    newBill[NONCE] = '232'
+    driverBill.setIdentity(newBill)
     driverBill.publishMyIdentity()
     driverTed.once('unchained', function (info) {
       driverTed.lookupObject(info)
@@ -652,6 +644,7 @@ function teardown (cb) {
 function publishIdentities (drivers, cb) {
   var togo = drivers.length * drivers.length
   drivers.forEach(function (d) {
+    global.d = d
     d.on('unchained', onUnchained)
     d.publishMyIdentity()
   })
@@ -716,50 +709,3 @@ function toMsg (msg) {
   msg[NONCE] = '' + nonce++
   return msg
 }
-
-// function overrideDgram () {
-//   var createSocket = dgram.createSocket
-//   var id = 0
-//   dgram.createSocket = function () {
-//     var s = createSocket.apply(dgram, arguments)
-//     s.once('listening', function () {
-//       s.socket._id = s._id
-//     })
-
-//     s._id = id++
-//     if ([51, 55, 75, 79].indexOf(s._id) !== -1) {
-//       console.log('socket', s._id)
-//       printStack()
-//     }
-
-//     return s
-//   }
-// }
-
-// function printStack (from, to) {
-//   var trace = stackTrace.get()
-//   if (!from) from = 0
-//   if (!to) to = trace.length - 1
-//   trace = trace.slice(from + 1, to + 1)
-//   if (trace.length) {
-//     trace.forEach(function (t) {
-//       console.log(t.toString())
-//     })
-//   }
-// }
-
-// setInterval(function () {
-//   var handles = process._getActiveHandles()
-//   console.log(handles.length, 'handles open')
-//   var types = handles.map(function (h) {
-//     var type = h.constructor.toString().match(/function (.*?)\s*\(/)[1]
-//     if (type === 'Socket') {
-//       if (h instanceof dgram.Socket) type += ' (raw)'
-//       if (h._tag) type += ' ' + h._tag
-//     }
-
-//     return type + h._id
-//   })
-
-//   console.log(types)
-// }, 2000).unref()

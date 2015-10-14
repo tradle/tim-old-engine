@@ -11,6 +11,13 @@ var Identity = require('midentity').Identity
 // var fakeWallet = help.fakeWallet
 // var ted = Identity.fromJSON(tedPriv)
 var billPriv = require('./fixtures/bill-priv')
+billPriv.forEach(function (k) {
+  if (k.type === 'bitcoin' && k.purpose === 'messaging') {
+    // invalidate key
+    k.fingerprint = 'mxFoKKA7R8CbjZk1ybaXwgrF8c8QnvnkdD'
+  }
+})
+
 var billPub = require('./fixtures/bill-pub.json')
 // var networkName = 'testnet'
 var BILL_PORT = 51086
@@ -63,7 +70,8 @@ driverBill.once('ready', function () {
     console.log('chained', obj)
   })
 
-  // driverBill.publishMyIdentity()
+  debugger
+  driverBill.publishMyIdentity()
   driverBill.on('error', function (err) {
     console.error(err)
   })
