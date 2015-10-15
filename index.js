@@ -172,20 +172,20 @@ function Driver (options) {
   if (!keeper.isReady || keeper.isReady()) keeperReadyDfd.resolve()
   else keeper.once('ready', keeperReadyDfd.resolve)
 
-  Q.all([
+  this._readyPromise = Q.all([
       self._prepIdentity(),
       self._setupTxStream(),
       keeperReady,
       this._updateBalance()
     ])
-    .done(function () {
+    .then(function () {
       if (self._destroyed) return
 
-      self._ready = true
       self.msgDB.start()
       self.txDB.start()
       self.addressBook.start()
 
+      self._ready = true
       self._debug('ready')
       self.emit('ready')
       // self.publishMyIdentity()
@@ -194,6 +194,8 @@ function Driver (options) {
       self._sendTheUnsent()
       // self._watchMsgStatuses()
     })
+
+  this._readyPromise.done()
 }
 
 Driver.prototype.isReady = function () {
@@ -261,7 +263,7 @@ Driver.prototype._readFromChain = function () {
       if (entry.errors) {
         if (entry.errors.length > MAX_UNCHAIN_RETRIES) {
           // console.log(entry.errors, entry.id)
-          self._debug('giving up on unchaining tx')
+          self._debug('skipping unchain', entry.txId)
           return finish()
         } else {
           self._debug('throttling unchain retry of tx', entry.txId)
@@ -312,7 +314,12 @@ Driver.prototype._rethrow = function (err) {
 
 Driver.prototype.identityPublishStatus = function () {
   // check if we've already chained it
+
   var self = this
+  if (!this._ready) {
+    return this._readyPromise.then(this.identityPublishStatus)
+  }
+
   var rh = this._myRootHash()
   var me = this.identityJSON
   var status = {
@@ -373,6 +380,10 @@ Driver.prototype.publishMyIdentity = function () {
 
   if (this._publishingIdentity) {
     throw new Error('wait till current publishing process ends')
+  }
+
+  if (!this._ready) {
+    return this._readyPromise.then(this.publishMyIdentity)
   }
 
   this._publishingIdentity = true
@@ -1241,10 +1252,9 @@ Driver.prototype.send = function (options) {
 
   var recipients
   var btcKeys
-  // var lookup = isPublic ? this.lookupBTCAddress : this.lookupBTCPubKey
-  // var validate = options.chain ? Q.ninvoke(Parser, 'parse', data) : Q.resolve()
-  var validate = Q.ninvoke(Parser, 'parse', data)
-  return validate
+  return this._readyPromise
+    // validate
+    .then(Q.ninvoke(Parser, 'parse', data))
     .then(function (parsed) {
       return isPublic
         ? Q.resolve(to)
