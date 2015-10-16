@@ -315,8 +315,6 @@ Driver.prototype._rethrow = function (err) {
 
 Driver.prototype.identityPublishStatus = function () {
   // check if we've already chained it
-
-  var self = this
   if (!this._ready) {
     return this._readyPromise.then(this.identityPublishStatus)
   }

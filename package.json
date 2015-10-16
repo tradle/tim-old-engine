@@ -8,7 +8,6 @@
     "style": "standard $(git ls-files '**.js')"
   },
   "pre-commit": [
-    "style",
     "test"
   ],
   "keywords": [
@@ -44,7 +43,7 @@
     "level-live-stream": "^1.4.9",
     "levelup": "^0.18.0",
     "lexicographic-integer": "^1.1.0",
-    "logbase": "^2.1.0",
+    "logbase": "^3.1.2",
     "map-stream": "0.0.6",
     "midentity": "^1.0.2",
     "multiplex-utp": "^1.0.1",
@@ -56,7 +55,7 @@
     "safecb": "0.0.1",
     "simple-wallet": "tradle/simple-wallet",
     "stream-collector": "^1.0.1",
-    "stream-combiner2": "^1.0.2",
+    "stream-combiner2": "~1.0.2",
     "tradle-constants": "^1.1.0",
     "tradle-permission": "tradle/permission",
     "tradle-tx-data": "tradle/tx-data",
