@@ -290,6 +290,9 @@ Driver.prototype._readFromChain = function () {
       if (!chainedObj.errors.length && chainedObj.parsed) {
         if (chainedObj.txType === TxData.types.public) {
           self.keeper.put(chainedObj.key, chainedObj.data)
+            .then(function () {
+              self._push(chainedObj.key, chainedObj.data)
+            })
         } else {
           self.keeper.put(chainedObj.key, chainedObj.encryptedData)
           self.keeper.put(chainedObj.permissionKey, chainedObj.encryptedPermission)
@@ -1293,9 +1296,7 @@ Driver.prototype.send = function (options) {
     .then(function (resp) {
       copyDHTKeys(entry, resp.key)
       self._debug('stored (write)', entry.get(ROOT_HASH))
-      if (isPublic && self.keeper.push) {
-        self.keeper.push(resp)
-      }
+      if (isPublic) self._push(resp)
 
       var entries
       if (isPublic) {
@@ -1323,6 +1324,12 @@ Driver.prototype.send = function (options) {
       entries.forEach(setUID)
       return Q.all(entries.map(self.log, self))
     })
+}
+
+Driver.prototype._push = function () {
+  if (this.keeper.push) {
+    this.keeper.push.apply(this.keeper, arguments)
+  }
 }
 
 Driver.prototype._getBTCKey = function (identity) {
