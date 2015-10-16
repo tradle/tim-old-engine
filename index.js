@@ -261,7 +261,7 @@ Driver.prototype._readFromChain = function () {
       }
 
       if (entry.errors) {
-        if (entry.errors.length > MAX_UNCHAIN_RETRIES) {
+        if (entry.errors.length >= MAX_UNCHAIN_RETRIES) {
           // console.log(entry.errors, entry.id)
           self._debug('skipping unchain', entry.txId)
           return finish()
@@ -286,6 +286,15 @@ Driver.prototype._readFromChain = function () {
       // if (chainedObj.parsed) {
       //   self._debug('unchained (read)', chainedObj.key, chainedObj.errors)
       // }
+
+      if (chainedObj.parsed) {
+        if (chainedObj.txType === TxData.types.public) {
+          self.keeper.put(chainedObj.key, chainedObj.data)
+        } else {
+          self.keeper.put(chainedObj.key, chainedObj.encryptedData)
+          self.keeper.put(chainedObj.permissionKey, chainedObj.encryptedPermission)
+        }
+      }
 
       self.unchainResultToEntry(chainedObj)
         .done(function (entry) {
@@ -798,6 +807,7 @@ Driver.prototype._setupDBs = function () {
     leveldown: this.leveldown,
     log: this._log,
     keeper: this.keeper,
+    timeout: false,
     autostart: false
   })
 
@@ -805,6 +815,7 @@ Driver.prototype._setupDBs = function () {
   this.msgDB = createMsgDB(this._prefix('messages.db'), {
     leveldown: this.leveldown,
     log: this._log,
+    timeout: false,
     autostart: false
   })
 
@@ -829,6 +840,7 @@ Driver.prototype._setupDBs = function () {
   this.txDB = createTxDB(this._prefix('txs.db'), {
     leveldown: this.leveldown,
     log: this._log,
+    timeout: false,
     autostart: false
   })
 
