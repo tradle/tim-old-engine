@@ -287,7 +287,7 @@ Driver.prototype._readFromChain = function () {
       //   self._debug('unchained (read)', chainedObj.key, chainedObj.errors)
       // }
 
-      if (chainedObj.parsed) {
+      if (!chainedObj.errors.length && chainedObj.parsed) {
         if (chainedObj.txType === TxData.types.public) {
           self.keeper.put(chainedObj.key, chainedObj.data)
         } else {
