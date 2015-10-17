@@ -8,7 +8,7 @@ var debug = require('debug')('tim')
 var reemit = require('re-emitter')
 var bitcoin = require('bitcoinjs-lib')
 var extend = require('xtend/mutable')
-var utils = require('tradle-utils')
+var tutils = require('tradle-utils')
 var map = require('map-stream')
 var pump = require('pump')
 var find = require('array-find')
@@ -31,7 +31,6 @@ var lb = require('logbase')
 var Entry = lb.Entry
 var unchainer = require('./lib/unchainer')
 var filter = require('./lib/filterStream')
-var getDHTKey = require('./lib/getDHTKey')
 var constants = require('tradle-constants')
 var EventType = require('./lib/eventType')
 var Dir = require('./lib/dir')
@@ -39,11 +38,8 @@ var updateChainedObj = require('./lib/updateChainedObj')
 var createIdentityDB = require('./lib/identityDB')
 var createMsgDB = require('./lib/msgDB')
 var createTxDB = require('./lib/txDB')
-var toObj = require('./lib/toObj')
 var errors = require('./lib/errors')
-var errToJSON = require('./lib/errToJSON')
-var currentTime = require('./lib/now')
-var getUID = require('./lib/getUID')
+var utils = require('./lib/utils')
 var TYPE = constants.TYPE
 var ROOT_HASH = constants.ROOT_HASH
 var PREV_HASH = constants.PREV_HASH
@@ -58,13 +54,6 @@ var CHAIN_WRITE_THROTTLE = 60000
 var CHAIN_READ_THROTTLE = 60000
 var MIN_BALANCE = 10000
 var KEY_PURPOSE = 'messaging'
-var MSG_SCHEMA = {
-  txData: 'Buffer',
-  txType: 'Number',
-  encryptedPermission: 'Buffer',
-  encryptedData: 'Buffer'
-}
-
 var noop = function () {}
 
 // var MessageType = Driver.MessageType = {
@@ -96,7 +85,7 @@ function Driver (options) {
   }, options)
 
   EventEmitter.call(this)
-  utils.bindPrototypeFunctions(this)
+  tutils.bindPrototypeFunctions(this)
   extend(this, options)
 
   this.otrKey = toKey(
@@ -204,7 +193,7 @@ Driver.prototype.isReady = function () {
 
 Driver.prototype._prepIdentity = function () {
   var self = this
-  return Q.nfcall(getDHTKey, this.identityJSON)
+  return utils.getDHTKey(this.identityJSON)
     .then(function (key) {
       copyDHTKeys(self.identityMeta, key)
     })
@@ -341,7 +330,7 @@ Driver.prototype.identityPublishStatus = function () {
 
   return Q.all([
       Q.ninvoke(this.msgDB, 'byRootHash', rh),
-      Q.ninvoke(utils, 'getStorageKeyFor', toBuffer(me))
+      Q.ninvoke(tutils, 'getStorageKeyFor', utils.toBuffer(me))
     ])
     .spread(function (entries, curHash) {
       curHash = curHash.toString('hex')
@@ -425,7 +414,7 @@ Driver.prototype.publishMyIdentity = function () {
     return Q.ninvoke(builder, 'build')
       .then(function (result) {
         self.setIdentity(update)
-        extend(self.identityMeta, pick(update, PREV_HASH, ROOT_HASH))
+        extend(self.identityMeta, utils.pick(update, PREV_HASH, ROOT_HASH))
         return Q.all([
           self._prepIdentity(),
           self._publishIdentity(result.form)
@@ -442,9 +431,8 @@ Driver.prototype.messages = function () {
   return this.msgDB
 }
 
-Driver.prototype.decryptedMessagesStream = function (opts) {
+Driver.prototype.decryptedMessagesStream = function () {
   var self = this
-  opts = opts || {}
   return this.msgDB.createValueStream()
     .pipe(map(function (info, cb) {
       // console.log(info)
@@ -490,7 +478,7 @@ Driver.prototype.unchainResultToEntry = function (chainedObj) {
   }
 
   if ('tx' in chainedObj) {
-    entry.set('tx', toBuffer(chainedObj.tx))
+    entry.set('tx', utils.toBuffer(chainedObj.tx))
   }
 
   if ('id' in chainedObj) {
@@ -513,14 +501,14 @@ Driver.prototype.unchainResultToEntry = function (chainedObj) {
   return Q.allSettled(tasks)
     .spread(function (from, to) {
       if (from.value) {
-        entry.set('from', toObj(ROOT_HASH, from.value))
+        entry.set('from', utils.toObj(ROOT_HASH, from.value))
       }
 
       if (to.value) {
-        entry.set('to', toObj(ROOT_HASH, to.value))
+        entry.set('to', utils.toObj(ROOT_HASH, to.value))
       }
 
-      if (success) setUID(entry)
+      if (success) utils.setUID(entry)
       return entry
     })
 }
@@ -685,7 +673,7 @@ Driver.prototype._sendTheUnsent = function () {
             errors: entry.errors || []
           })
 
-          addError(nextEntry, err)
+          utils.addError(nextEntry, err)
           return nextEntry
         })
         .nodeify(cb)
@@ -784,7 +772,7 @@ Driver.prototype._streamTxs = function (fromHeight, skipIds) {
         var nextEntry = new Entry(extend(entry || {}, txInfo, {
           type: type,
           txId: id,
-          tx: toBuffer(txInfo.tx),
+          tx: utils.toBuffer(txInfo.tx),
           dir: self._getTxDir(txInfo.tx)
         }))
 
@@ -863,7 +851,7 @@ Driver.prototype._sendP2P = function (entry) {
       var fingerprint = getFingerprint(result.identity)
       self._debug(KEY_PURPOSE, fingerprint)
       self._debug('sending msg p2p', chainedObj.parsed.data)
-      var msg = msgToBuffer(getMsgProps(chainedObj))
+      var msg = utils.msgToBuffer(utils.getMsgProps(chainedObj))
       return Q.ninvoke(self.p2p, 'send', msg, fingerprint)
     })
 }
@@ -947,7 +935,7 @@ Driver.prototype.getPublicKey = function (fingerprint, identity) {
 }
 
 Driver.prototype.getPrivateKey = function (where) {
-  return firstKey(this.identityKeys, where)
+  return utils.firstKey(this.identityKeys, where)
 }
 
 Driver.prototype.getBlockchainKey = function () {
@@ -1006,7 +994,7 @@ Driver.prototype._onmessage = function (buf, fingerprint) {
   var msg
 
   try {
-    msg = bufferToMsg(buf)
+    msg = utils.bufferToMsg(buf)
   } catch (err) {
     return this.emit('warn', 'received message not in JSON format', buf)
   }
@@ -1015,13 +1003,13 @@ Driver.prototype._onmessage = function (buf, fingerprint) {
 
   // this thing repeats work all over the place
   var txInfo
-  var valid = validateMsg(msg)
+  var valid = utils.validateMsg(msg)
   var from
   Q[valid ? 'resolve' : 'reject']()
     .then(this.lookupIdentity.bind(this, { fingerprint: fingerprint }))
     .then(function (result) {
       from = result
-      var fromKey = firstKey(result.identity.pubkeys, {
+      var fromKey = utils.firstKey(result.identity.pubkeys, {
         type: 'bitcoin',
         networkName: self.networkName,
         purpose: 'messaging'
@@ -1067,8 +1055,8 @@ Driver.prototype._onmessage = function (buf, fingerprint) {
       return new Entry({
         type: EventType.msg.receivedInvalid,
         msg: msg,
-        from: toObj(ROOT_HASH, from[ROOT_HASH]),
-        to: toObj(ROOT_HASH, self._myRootHash()),
+        from: utils.toObj(ROOT_HASH, from[ROOT_HASH]),
+        to: utils.toObj(ROOT_HASH, self._myRootHash()),
         dir: Dir.inbound,
         errors: [err]
       })
@@ -1119,15 +1107,15 @@ Driver.prototype.putOnChain = function (entry) {
       // ugly!
       nextEntry.set({
         type: EventType.chain.writeSuccess,
-        tx: toBuffer(tx),
+        tx: utils.toBuffer(tx),
         txId: tx.getId()
       })
 
       // self._debug('chained (write)', nextEntry.get(CUR_HASH), 'tx: ' + nextEntry.get('txId'))
     })
     .catch(function (err) {
-      err = errors.ChainWriteError(toErrInstance(err), {
-        timestamp: currentTime()
+      err = errors.ChainWriteError(utils.toErrInstance(err), {
+        timestamp: utils.now()
       })
 
       self._debug('chaining failed', err)
@@ -1137,7 +1125,7 @@ Driver.prototype.putOnChain = function (entry) {
         type: EventType.chain.writeError
       })
 
-      addError(nextEntry, err)
+      utils.addError(nextEntry, err)
     })
     .then(function () {
       return nextEntry
@@ -1172,7 +1160,7 @@ Driver.prototype.share = function (options) {
     public: false,
     chain: !!options.chain,
     deliver: !!options.deliver,
-    from: toObj(ROOT_HASH, this._myRootHash())
+    from: utils.toObj(ROOT_HASH, this._myRootHash())
   })
 
   var recipients
@@ -1199,15 +1187,15 @@ Driver.prototype.share = function (options) {
       // TODO: rethink this repeated code from send()
       var entries = shares.map(function (share, i) {
         return entry.clone().set({
-          to: toObj(ROOT_HASH, recipients[i][ROOT_HASH]),
+          to: utils.toObj(ROOT_HASH, recipients[i][ROOT_HASH]),
           addressesTo: [share.address],
           addressesFrom: [self.wallet.addressString],
           txType: TxData.types.permission,
-          txData: toBuffer(share.encryptedKey, 'hex')
+          txData: utils.toBuffer(share.encryptedKey, 'hex')
         })
       })
 
-      entries.forEach(setUID)
+      entries.forEach(utils.setUID)
       return Q.all(entries.map(self.log, self))
     })
 }
@@ -1241,7 +1229,7 @@ Driver.prototype.send = function (options) {
     throw new Error('this instance is readOnly, it cannot write to the blockchain')
   }
 
-  var data = toBuffer(options.msg)
+  var data = utils.toBuffer(options.msg)
   // assert(TYPE in data, 'structured messages must specify type property: ' + TYPE)
 
   // either "public" or it has recipients
@@ -1250,7 +1238,7 @@ Driver.prototype.send = function (options) {
 
   var to = options.to
   if (!to && isPublic) {
-    var me = toObj(ROOT_HASH, this._myRootHash())
+    var me = utils.toObj(ROOT_HASH, this._myRootHash())
     to = [me]
   }
 
@@ -1262,7 +1250,7 @@ Driver.prototype.send = function (options) {
     public: isPublic,
     chain: !!options.chain,
     deliver: !!options.deliver,
-    from: toObj(ROOT_HASH, this._myRootHash())
+    from: utils.toObj(ROOT_HASH, this._myRootHash())
   })
 
   var recipients
@@ -1280,7 +1268,7 @@ Driver.prototype.send = function (options) {
       if (isPublic) {
         btcKeys = to
       } else {
-        btcKeys = pluck(recipients, 'identity')
+        btcKeys = utils.pluck(recipients, 'identity')
           .map(self._getBTCKey, self)
           .map(function (k) {
             return k.value
@@ -1306,22 +1294,22 @@ Driver.prototype.send = function (options) {
             addressesFrom: [self.wallet.addressString],
             addressesTo: [btcKeys[i].fingerprint],
             txType: TxData.types.public,
-            txData: toBuffer(resp.key, 'hex')
+            txData: utils.toBuffer(resp.key, 'hex')
           })
         })
       } else {
         entries = resp.shares.map(function (share, i) {
           return entry.clone().set({
-            to: toObj(ROOT_HASH, recipients[i][ROOT_HASH]),
+            to: utils.toObj(ROOT_HASH, recipients[i][ROOT_HASH]),
             addressesTo: [share.address],
             addressesFrom: [self.wallet.addressString],
             txType: TxData.types.permission,
-            txData: toBuffer(share.encryptedKey, 'hex')
+            txData: utils.toBuffer(share.encryptedKey, 'hex')
           })
         })
       }
 
-      entries.forEach(setUID)
+      entries.forEach(utils.setUID)
       return Q.all(entries.map(self.log, self))
     })
 }
@@ -1333,7 +1321,7 @@ Driver.prototype._push = function () {
 }
 
 Driver.prototype._getBTCKey = function (identity) {
-  return firstKey(identity.pubkeys, {
+  return utils.firstKey(identity.pubkeys, {
     type: 'bitcoin',
     networkName: this.networkName,
     purpose: KEY_PURPOSE
@@ -1344,7 +1332,7 @@ Driver.prototype.lookupBTCKey = function (recipient) {
   var self = this
   return this.lookupIdentity(recipient)
     .then(function (result) {
-      return firstKey(result.identity.pubkeys, {
+      return utils.firstKey(result.identity.pubkeys, {
         type: 'bitcoin',
         networkName: self.networkName,
         purpose: KEY_PURPOSE
@@ -1404,63 +1392,11 @@ Driver.prototype._debug = function () {
 Driver.prototype._getTxDir = function (tx) {
   var self = this
   var isOutbound = tx.ins.some(function (input) {
-    var addr = utils.getAddressFromInput(input, self.networkName)
+    var addr = tutils.getAddressFromInput(input, self.networkName)
     return addr === self.wallet.addressString
   })
 
   return isOutbound ? Dir.outbound : Dir.inbound
-}
-
-function validateMsg (msg) {
-  try {
-    typeforce(MSG_SCHEMA, msg)
-    return true
-  } catch (err) {
-    return false
-  }
-}
-
-function getMsgProps (info) {
-  return {
-    txData: info.encryptedKey,
-    txType: info.txType, // no need to send this really
-    encryptedPermission: info.encryptedPermission,
-    encryptedData: info.encryptedData
-  }
-}
-
-function msgToBuffer (msg) {
-  if (!validateMsg(msg)) throw new Error('invalid msg')
-
-  msg = extend({}, msg)
-  for (var p in MSG_SCHEMA) {
-    var type = MSG_SCHEMA[p]
-    if (type === 'Buffer') {
-      msg[p] = msg[p].toString('base64')
-    }
-  }
-
-  return toBuffer(msg, 'binary')
-}
-
-function bufferToMsg (buf) {
-  var msg = JSON.parse(buf.toString('binary'))
-  for (var p in MSG_SCHEMA) {
-    var type = MSG_SCHEMA[p]
-    if (type === 'Buffer') {
-      msg[p] = new Buffer(msg[p], 'base64')
-    }
-  }
-
-  return msg
-}
-
-function toBuffer (data, enc) {
-  if (typeof data.toBuffer === 'function') return data.toBuffer()
-  if (Buffer.isBuffer(data)) return data
-  if (typeof data === 'object') data = utils.stringify(data)
-
-  return new Buffer(data, enc || 'binary')
 }
 
 function getFingerprint (identity) {
@@ -1512,12 +1448,6 @@ function validateRecipients (recipients) {
   })
 }
 
-function addError (entry, err) {
-  var errs = entry.get('errors') || []
-  errs.push(errToJSON(err))
-  entry.set('errors', errs)
-}
-
 function throttleIfRetrying (entry, throttle, cb) {
   var errors = entry.errors
   if (!errors || !errors.length) {
@@ -1525,7 +1455,7 @@ function throttleIfRetrying (entry, throttle, cb) {
   }
 
   var lastErr = errors[errors.length - 1]
-  var now = currentTime()
+  var now = utils.now()
   var wait = lastErr.timestamp + throttle - now
   if (wait < 0) {
     return cb()
@@ -1534,18 +1464,6 @@ function throttleIfRetrying (entry, throttle, cb) {
   // just in case the device clock time-traveled
   wait = Math.min(wait, throttle)
   setTimeout(cb, wait)
-}
-
-function firstKey (keys, where) {
-  if (typeof where === 'string') where = { fingerprint: where }
-
-  return find(keys, function (k) {
-    for (var p in where) {
-      if (where[p] !== k[p]) return
-    }
-
-    return true
-  })
 }
 
 // function prettyPrint (json) {
@@ -1559,35 +1477,3 @@ var toObjectStream = map.bind(null, function (data, cb) {
 
   cb(null, data.value)
 })
-
-function toErrInstance (err) {
-  var n = new Error(err.message)
-  for (var p in err) {
-    n[p] = err[p]
-  }
-
-  return n
-}
-
-function pluck (arr, prop) {
-  var vals = []
-  for (var i = 0; i < arr.length; i++) {
-    vals.push(arr[i][prop])
-  }
-
-  return vals
-}
-
-function pick (obj) {
-  var a = {}
-  for (var i = 1; i < arguments.length; i++) {
-    var p = arguments[i]
-    a[p] = obj[p]
-  }
-
-  return a
-}
-
-function setUID (entry) {
-  entry.set('uid', getUID(entry))
-}
