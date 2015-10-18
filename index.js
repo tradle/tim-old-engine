@@ -303,7 +303,6 @@ Driver.prototype._readFromChain = function () {
 }
 
 Driver.prototype._remove = function (info) {
-  var self = this
   this.lookupObject(info)
     .catch(function (err) {
       return err.progress
@@ -345,7 +344,8 @@ Driver.prototype.identityPublishStatus = function () {
   var me = this.identityJSON
   var status = {
     ever: false,
-    current: false
+    current: false,
+    queued: false
   }
 
   return Q.all([
@@ -354,23 +354,38 @@ Driver.prototype.identityPublishStatus = function () {
     ])
     .spread(function (entries, curHash) {
       curHash = curHash.toString('hex')
-      status.ever = true
 
-      var timestamp = 0
-      var last
-      entries.forEach(function (e) {
-        if (e.timestamp > timestamp) {
-          last = e
-          timestamp = e.timestamp
-        }
+      var unchained = entries.filter(function (e) {
+        return e.dateUnchained
       })
 
-      if (last[CUR_HASH] === curHash) {
-        status.queued = true
-        if (last.tx) {
-          status.current = true
-        }
-      }
+      status.ever = !!unchained.length
+      status.current = unchained.some(function (e) {
+        return e[CUR_HASH] === curHash
+      })
+
+      status.queued = entries.some(function (e) {
+        return e[CUR_HASH] === curHash
+      })
+
+      // curHash = curHash.toString('hex')
+      // status.ever = true
+
+      // var timestamp = 0
+      // var last
+      // entries.forEach(function (e) {
+      //   if (e.timestamp > timestamp) {
+      //     last = e
+      //     timestamp = e.timestamp
+      //   }
+      // })
+
+      // if (last[CUR_HASH] === curHash) {
+      //   status.queued = true
+      //   if (last.tx) {
+      //     status.current = true
+      //   }
+      // }
 
       return status
     })
@@ -708,38 +723,43 @@ Driver.prototype._sendTheUnsent = function () {
 }
 
 Driver.prototype._setupTxStream = function () {
-  // TODO: use txDB for this instead
-  var self = this
-  var defer = Q.defer()
-  var lastBlock
-  var lastBlockTxIds = []
-  var chainTypes = EventType.chain
-  var rs = this._log.createReadStream({ reverse: true })
-    .pipe(filter(function (entry, cb) {
-      var eType = entry.get('type')
-      return eType === chainTypes.readSuccess || eType === chainTypes.readError
-    }))
-    .on('data', function (entry) {
-      var txId = bitcoin.Transaction.fromBuffer(entry.get('tx')).getId()
-      lastBlockTxIds.unshift(txId)
-      if (typeof lastBlock === 'undefined') {
-        lastBlock = entry.get('height')
-      } else {
-        if (entry.get('height') < lastBlock) {
-          rs.destroy()
-        }
-      }
-    })
-    .on('error', this._rethrow)
-    .once('close', function () {
-      // start CONFIRMATIONS_BEFORE_CONFIRMED blocks back
-      lastBlock = lastBlock || 0
-      lastBlock = Math.max(0, lastBlock - CONFIRMATIONS_BEFORE_CONFIRMED)
-      self._streamTxs(lastBlock, lastBlockTxIds)
-      defer.resolve()
-    })
+  // Uncomment when Blockr supports querying by height
 
-  return defer.promise
+  // TODO: use txDB for this instead
+  // var self = this
+  // var defer = Q.defer()
+  // var lastBlock
+  // var lastBlockTxIds = []
+  // var chainTypes = EventType.chain
+  // var rs = this._log.createReadStream({ reverse: true })
+  //   .pipe(filter(function (entry, cb) {
+  //     var eType = entry.get('type')
+  //     return eType === chainTypes.readSuccess || eType === chainTypes.readError
+  //   }))
+  //   .on('data', function (entry) {
+  //     var txId = bitcoin.Transaction.fromBuffer(entry.get('tx')).getId()
+  //     lastBlockTxIds.unshift(txId)
+  //     if (typeof lastBlock === 'undefined') {
+  //       lastBlock = entry.get('height')
+  //     } else {
+  //       if (entry.get('height') < lastBlock) {
+  //         rs.destroy()
+  //       }
+  //     }
+  //   })
+  //   .on('error', this._rethrow)
+  //   .once('close', function () {
+  //     // start CONFIRMATIONS_BEFORE_CONFIRMED blocks back
+  //     lastBlock = lastBlock || 0
+  //     lastBlock = Math.max(0, lastBlock - CONFIRMATIONS_BEFORE_CONFIRMED)
+  //     self._streamTxs(lastBlock, lastBlockTxIds)
+  //     defer.resolve()
+  //   })
+  //
+  // return defer.promise
+
+  this._streamTxs(0, [])
+  return Q.resolve()
 }
 
 Driver.prototype._streamTxs = function (fromHeight, skipIds) {
