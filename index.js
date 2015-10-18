@@ -377,6 +377,20 @@ Driver.prototype._catchUpWithBlockchain = function () {
 
       var tasks = txInfos.map(function (txInfo) {
         return Q.ninvoke(self.txDB, 'get', txInfo.tx.getId())
+          .then(function (entry) {
+            // var erroredOut
+            // if (entry.errors && entry.errors.length) {
+            //   var maxRetries = entry.dir === Dir.outbound
+            //     ? MAX_CHAIN_RETRIES
+            //     : MAX_UNCHAIN_RETRIES
+
+            //   erroredOut = entry.errors.length >= maxRetries
+            // }
+
+            var hasErrors = entry.errors && entry.errors.length
+            var processed = entry.dateUnchained || entry.dateChained || hasErrors
+            if (!processed) throw new Error('not ready')
+          })
       })
 
       Q.all(tasks)
