@@ -251,15 +251,19 @@ Driver.prototype._readFromChain = function () {
         return finish()
       }
 
-      if (entry.errors) {
-        if (entry.errors.length >= MAX_UNCHAIN_RETRIES) {
+      // clear old errors
+      var errs = entry.errors
+      delete entry.errors
+
+      if (errs) {
+        if (errs.length >= MAX_UNCHAIN_RETRIES) {
           // console.log(entry.errors, entry.id)
           self._debug('skipping unchain', entry.txId)
           self._remove(entry)
           return finish()
         } else {
           self._debug('throttling unchain retry of tx', entry.txId)
-          return throttleIfRetrying(entry, CHAIN_READ_THROTTLE, function () {
+          return throttleIfRetrying(errs, CHAIN_READ_THROTTLE, function () {
             finish(null, entry)
           })
         }
@@ -270,7 +274,7 @@ Driver.prototype._readFromChain = function () {
       function finish (err, ret) {
         if (err || !ret) self._rmPending(entry.txId)
 
-        cb.apply(null, arguments)
+        cb(err, ret)
       }
     }),
     this.unchainer,
@@ -584,11 +588,14 @@ Driver.prototype._writeToChain = function () {
   pump(
     this._getToChainStream(),
     map(function (entry, cb) {
-      if (entry.errors && entry.errors.length) {
+      var errs = entry.errors
+      if (errs && errs.length) {
         self._debug('throttling chaining')
       }
 
-      throttleIfRetrying(entry, throttle, tryAgain)
+      // don't write same errors into next log entry
+      delete entry.errors
+      throttleIfRetrying(errs, throttle, tryAgain)
 
       function tryAgain () {
         if (self._balance < MIN_BALANCE) {
@@ -704,8 +711,7 @@ Driver.prototype._sendTheUnsent = function () {
         })
         .catch(function (err) {
           nextEntry.set({
-            type: EventType.msg.sendError,
-            errors: entry.errors || []
+            type: EventType.msg.sendError
           })
 
           utils.addError(nextEntry, err)
@@ -817,6 +823,9 @@ Driver.prototype._streamTxs = function (fromHeight, skipIds) {
           tx: utils.toBuffer(txInfo.tx),
           dir: self._getTxDir(txInfo.tx)
         }))
+
+        // clear errors
+        nextEntry.set('errors', [])
 
         if (entry) nextEntry.prev(new Entry(entry))
         cb(null, nextEntry)
@@ -1100,7 +1109,7 @@ Driver.prototype._onmessage = function (buf, fingerprint) {
         from: utils.toObj(ROOT_HASH, from[ROOT_HASH]),
         to: utils.toObj(ROOT_HASH, self._myRootHash()),
         dir: Dir.inbound,
-        errors: [err]
+        errors: [utils.errToJSON(err)]
       })
     })
     .done(function (entry) {
@@ -1490,8 +1499,7 @@ function validateRecipients (recipients) {
   })
 }
 
-function throttleIfRetrying (entry, throttle, cb) {
-  var errors = entry.errors
+function throttleIfRetrying (errors, throttle, cb) {
   if (!errors || !errors.length) {
     return cb()
   }
