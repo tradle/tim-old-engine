@@ -81,7 +81,8 @@ function Driver (options) {
     pathPrefix: 'String',
     syncInterval: '?Number',
     chainThrottle: '?Number',
-    readOnly: '?Boolean'
+    readOnly: '?Boolean',
+    relay: '?Object'
   }, options)
 
   EventEmitter.call(this)
@@ -127,7 +128,8 @@ function Driver (options) {
     leveldown: leveldown,
     port: this.port,
     dht: dht,
-    key: this.otrKey.priv()
+    key: this.otrKey.priv(),
+    relay: this.relay
   })
 
   this.chainwriter = new ChainWriter({
@@ -253,6 +255,7 @@ Driver.prototype._readFromChain = function () {
         if (entry.errors.length >= MAX_UNCHAIN_RETRIES) {
           // console.log(entry.errors, entry.id)
           self._debug('skipping unchain', entry.txId)
+          self._remove(entry)
           return finish()
         } else {
           self._debug('throttling unchain retry of tx', entry.txId)
@@ -276,17 +279,17 @@ Driver.prototype._readFromChain = function () {
       //   self._debug('unchained (read)', chainedObj.key, chainedObj.errors)
       // }
 
-      if (!chainedObj.errors.length && chainedObj.parsed) {
-        if (chainedObj.txType === TxData.types.public) {
-          self.keeper.put(chainedObj.key, chainedObj.data)
-            .then(function () {
-              self._push(chainedObj.key, chainedObj.data)
-            })
-        } else {
-          self.keeper.put(chainedObj.key, chainedObj.encryptedData)
-          self.keeper.put(chainedObj.permissionKey, chainedObj.encryptedPermission)
-        }
-      }
+      // if (!chainedObj.errors.length && chainedObj.parsed) {
+      //   if (chainedObj.txType === TxData.types.public) {
+      //     self.keeper.put(chainedObj.key, chainedObj.data)
+      //       .then(function () {
+      //         self._push(chainedObj.key, chainedObj.data)
+      //       })
+      //   } else {
+      //     self.keeper.put(chainedObj.key, chainedObj.encryptedData)
+      //     self.keeper.put(chainedObj.permissionKey, chainedObj.encryptedPermission)
+      //   }
+      // }
 
       self.unchainResultToEntry(chainedObj)
         .done(function (entry) {
@@ -297,6 +300,25 @@ Driver.prototype._readFromChain = function () {
     this._log,
     this._rethrow
   )
+}
+
+Driver.prototype._remove = function (info) {
+  var self = this
+  this.lookupObject(info)
+    .catch(function (err) {
+      return err.progress
+    })
+    .then(function (chainedObj) {
+      var tasks = ['key', 'permissionKey']
+        .map(function (p) {
+          return chainedObj[p]
+        })
+        .filter(function (key) {
+          return !!key
+        })
+
+      return Q.all(tasks)
+    })
 }
 
 Driver.prototype._rmPending = function (txId) {
@@ -751,7 +773,9 @@ Driver.prototype._streamTxs = function (fromHeight, skipIds) {
 
       self._pendingTxs.push(id)
       self.txDB.get(id, function (err, entry) {
-        if (err && !err.notFound) {
+        var badErr = err && !err.notFound
+        var handled = !err && entry.confirmations > CONFIRMATIONS_BEFORE_CONFIRMED
+        if (badErr || handled) {
           self._rmPending(id)
           return cb(err)
         }
