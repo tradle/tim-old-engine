@@ -66,6 +66,7 @@ var fakeWallet = help.fakeWallet
 var networkName = 'testnet'
 // var blockchain = new Fakechain({ networkName: networkName })
 var Driver = require('../')
+Driver.CATCH_UP_INTERVAL = 1000
 var currentTime = require('../lib/utils').now
 // var TestDriver = require('./helpers/testDriver')
 
@@ -95,6 +96,32 @@ test.afterEach = function (cb) {
 
 rimraf.sync(STORAGE_DIR)
 
+test('wipe dbs, get publish status on reload', function (t) {
+  t.plan(4)
+
+  Q.nfcall(publishIdentities, [driverBill])
+    .then(driverBill.destroy)
+    .then(function () {
+      return Q.all(['messages', 'addressBook', 'txs'].map(function (dbName) {
+        dbName = 'bill' + reinitCount + '-' + dbName + '.db'
+        return Q.ninvoke(memdown, 'destroy', dbName)
+      }))
+    })
+    .then(function () {
+      driverBill = cloneDeadDriver(driverBill)
+      driverBill.once('unchained', function (info) {
+        t.equal(info[TYPE], constants.TYPES.IDENTITY)
+      })
+
+      return driverBill.identityPublishStatus()
+    })
+    .done(function (status) {
+      t.ok(status.ever)
+      t.ok(status.current)
+      t.notOk(status.queued)
+    })
+})
+
 test('no chaining in readOnly mode', function (t) {
   driverTed.readOnly = true
   var msg = toMsg({ blah: 'yo' })
@@ -123,7 +150,7 @@ test('no chaining attempted if low balance', function (t) {
 
   driverBill._updateBalance()
     .done(function () {
-      driverBill.publishMyIdentity()
+      driverBill.publishMyIdentity().done()
       driverBill.on('chaining', t.fail)
       driverBill.on('lowbalance', function () {
         t.pass()
@@ -201,7 +228,7 @@ test('self publish, edit, republish', function (t) {
 
   function publish (next) {
     var togo = 2
-    driverBill.publishMyIdentity()
+    driverBill.publishMyIdentity().done()
     ;[driverBill, driverTed].forEach(function (driver) {
       driver.once('unchained', function (info) {
         driver.lookupObject(info)
@@ -325,23 +352,7 @@ test('delivery check', function (t) {
     driverBill.on('unchained', t.fail)
     driverBill.destroy()
       .done(function () {
-        driverBill = new Driver(extend(pick(driverBill, [
-          'pathPrefix',
-          'identity',
-          'identityKeys',
-          'wallet',
-          'dht',
-          'port',
-          'networkName',
-          'blockchain',
-          'leveldown',
-          'syncInterval',
-          'chainThrottle'
-        ]), {
-          // keeper: new Keeper({ dht: driverBill.dht, storage: STORAGE_DIR })
-          keeper: sharedKeeper
-        }))
-
+        driverBill = cloneDeadDriver(driverBill)
         driverBill.on('message', checkReceived)
         driverBill.on('unchained', t.fail)
       })
@@ -646,7 +657,7 @@ function publishIdentities (drivers, cb) {
   drivers.forEach(function (d) {
     global.d = d
     d.on('unchained', onUnchained)
-    d.publishMyIdentity()
+    d.publishMyIdentity().done()
   })
 
   function onUnchained (info) {
@@ -708,4 +719,23 @@ function getSigningKey (keys) {
 function toMsg (msg) {
   msg[NONCE] = '' + nonce++
   return msg
+}
+
+function cloneDeadDriver (driver) {
+  return new Driver(extend(pick(driver, [
+    'pathPrefix',
+    'identity',
+    'identityKeys',
+    'wallet',
+    'dht',
+    'port',
+    'networkName',
+    'blockchain',
+    'leveldown',
+    'syncInterval',
+    'chainThrottle'
+  ]), {
+    // keeper: new Keeper({ dht: driverBill.dht, storage: STORAGE_DIR })
+    keeper: sharedKeeper
+  }))
 }

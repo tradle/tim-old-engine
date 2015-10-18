@@ -8,6 +8,7 @@ var debug = require('debug')('tim')
 var reemit = require('re-emitter')
 var bitcoin = require('bitcoinjs-lib')
 var extend = require('xtend/mutable')
+var collect = require('stream-collector')
 var tutils = require('tradle-utils')
 var map = require('map-stream')
 var pump = require('pump')
@@ -54,6 +55,7 @@ var CHAIN_WRITE_THROTTLE = 60000
 var CHAIN_READ_THROTTLE = 60000
 var MIN_BALANCE = 10000
 var KEY_PURPOSE = 'messaging'
+Driver.CATCH_UP_INTERVAL = 10000
 var noop = function () {}
 
 // var MessageType = Driver.MessageType = {
@@ -153,6 +155,7 @@ function Driver (options) {
   })
 
   // in-memory cache of recent conversants
+  this._catchUpWithBlockchain()
   this._fingerprintToIdentity = {}
   this._pendingTxs = []
   this._setupP2P()
@@ -339,7 +342,57 @@ Driver.prototype._rethrow = function (err) {
   }
 }
 
+Driver.prototype._catchUpWithBlockchain = function () {
+  var self = this
+  if (this._caughtUpPromise) return this._caughtUpPromise
+
+  var catchUp = Q.defer()
+  this._caughtUpPromise = catchUp.promise
+  tryAgain()
+  return this._caughtUpPromise
+
+  function tryAgain () {
+    var stream = cbstreams.stream.txs({
+      api: self.blockchain,
+      confirmations: CONFIRMATIONS_BEFORE_CONFIRMED,
+      addresses: [
+        self.wallet.addressString,
+        constants.IDENTITY_PUBLISH_ADDRESS
+      ]
+    })
+
+    stream.on('error', function (err) {
+      if (/no txs/.test(err.message)) {
+        stream.close()
+        catchUp.resolve()
+      }
+    })
+
+    collect(stream, function (err, txInfos) {
+      if (self._caughtUpPromise.inspect().state !== 'pending') {
+        return
+      }
+
+      if (err) return scheduleRetry()
+
+      var tasks = txInfos.map(function (txInfo) {
+        return Q.ninvoke(self.txDB, 'get', txInfo.tx.getId())
+      })
+
+      Q.all(tasks)
+        .then(catchUp.resolve)
+        .catch(scheduleRetry)
+    })
+  }
+
+  function scheduleRetry () {
+    self._debug('not caught up yet with blockchain...')
+    setTimeout(tryAgain, Driver.CATCH_UP_INTERVAL)
+  }
+}
+
 Driver.prototype.identityPublishStatus = function () {
+  var self = this
   // check if we've already chained it
   if (!this._ready) {
     return this._readyPromise.then(this.identityPublishStatus)
@@ -353,10 +406,13 @@ Driver.prototype.identityPublishStatus = function () {
     queued: false
   }
 
-  return Q.all([
-      Q.ninvoke(this.msgDB, 'byRootHash', rh),
-      Q.ninvoke(tutils, 'getStorageKeyFor', utils.toBuffer(me))
-    ])
+  return this._catchUpWithBlockchain()
+    .then(function () {
+      return Q.all([
+        Q.ninvoke(self.msgDB, 'byRootHash', rh),
+        Q.ninvoke(tutils, 'getStorageKeyFor', utils.toBuffer(me))
+      ])
+    })
     .spread(function (entries, curHash) {
       curHash = curHash.toString('hex')
 
@@ -369,7 +425,7 @@ Driver.prototype.identityPublishStatus = function () {
         return e[CUR_HASH] === curHash
       })
 
-      status.queued = entries.some(function (e) {
+      status.queued = !status.current && entries.some(function (e) {
         return e[CUR_HASH] === curHash
       })
 
