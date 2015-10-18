@@ -301,6 +301,7 @@ Driver.prototype._readFromChain = function () {
           cb(null, entry)
         })
     }),
+    jsonifyTransform(),
     this._log,
     this._rethrow
   )
@@ -520,9 +521,9 @@ Driver.prototype.unchainResultToEntry = function (chainedObj) {
     entry.set('tx', utils.toBuffer(chainedObj.tx))
   }
 
-  if ('id' in chainedObj) {
-    entry.prev(chainedObj.id)
-  }
+  // if ('id' in chainedObj) {
+  //   entry.prev(chainedObj.id)
+  // }
 
   var tasks = ['from', 'to'].map(function (party) {
     return chainedObj[party]
@@ -630,6 +631,7 @@ Driver.prototype._writeToChain = function () {
     //   console.log('after chain write', data.toJSON())
     //   return true
     // }),
+    jsonifyTransform(),
     this._log,
     this._rethrow
   )
@@ -723,6 +725,7 @@ Driver.prototype._sendTheUnsent = function () {
     //   console.log('after sendTheUnsent', data.toJSON())
     //   return true
     // }),
+    jsonifyTransform(),
     this._log,
     this._rethrow
   )
@@ -827,10 +830,11 @@ Driver.prototype._streamTxs = function (fromHeight, skipIds) {
         // clear errors
         nextEntry.set('errors', [])
 
-        if (entry) nextEntry.prev(new Entry(entry))
+        // if (entry) nextEntry.prev(new Entry(entry))
         cb(null, nextEntry)
       }
     }),
+    jsonifyTransform(),
     this._log,
     this._rethrow
   )
@@ -1025,6 +1029,7 @@ Driver.prototype.lookupIdentity = function (query) {
 }
 
 Driver.prototype.log = function (entry) {
+  jsonifyErrors(entry)
   return Q.ninvoke(this._log, 'append', entry)
     .then(function () {
       // pass through for convenience
@@ -1109,10 +1114,11 @@ Driver.prototype._onmessage = function (buf, fingerprint) {
         from: utils.toObj(ROOT_HASH, from[ROOT_HASH]),
         to: utils.toObj(ROOT_HASH, self._myRootHash()),
         dir: Dir.inbound,
-        errors: [utils.errToJSON(err)]
+        errors: [err]
       })
     })
     .done(function (entry) {
+      jsonifyErrors(entry)
       return self._log.append(entry)
     })
 }
@@ -1467,26 +1473,17 @@ function copyDHTKeys (dest, src, curHash) {
     if (typeof src === 'string') {
       curHash = src
     } else {
-      curHash = getEntryProp(src, CUR_HASH) || getEntryProp(src, ROOT_HASH)
+      curHash = utils.getEntryProp(src, CUR_HASH) || utils.getEntryProp(src, ROOT_HASH)
     }
 
     src = dest
   }
 
-  var rh = getEntryProp(src, ROOT_HASH)
-  var ph = getEntryProp(src, PREV_HASH)
-  setEntryProp(dest, ROOT_HASH, rh || curHash)
-  setEntryProp(dest, PREV_HASH, ph)
-  setEntryProp(dest, CUR_HASH, curHash)
-}
-
-function getEntryProp (obj, name) {
-  return obj instanceof Entry ? obj.get(name) : obj[name]
-}
-
-function setEntryProp (obj, name, val) {
-  if (obj instanceof Entry) obj.set(name, val)
-  else obj[name] = val
+  var rh = utils.getEntryProp(src, ROOT_HASH)
+  var ph = utils.getEntryProp(src, PREV_HASH)
+  utils.setEntryProp(dest, ROOT_HASH, rh || curHash)
+  utils.setEntryProp(dest, PREV_HASH, ph)
+  utils.setEntryProp(dest, CUR_HASH, curHash)
 }
 
 function validateRecipients (recipients) {
@@ -1527,3 +1524,16 @@ var toObjectStream = map.bind(null, function (data, cb) {
 
   cb(null, data.value)
 })
+
+var jsonifyTransform = map.bind(null, function (entry, cb) {
+  cb(null, jsonifyErrors(entry))
+})
+
+var jsonifyErrors = function (entry) {
+  var errs = utils.getEntryProp(entry, 'errors')
+  if (errs) {
+    utils.setEntryProp(entry, 'errors', errs.map(utils.errToJSON))
+  }
+
+  return entry
+}
