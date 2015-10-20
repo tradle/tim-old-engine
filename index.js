@@ -31,11 +31,9 @@ var Parser = ChainedObj.Parser
 var lb = require('logbase')
 var Entry = lb.Entry
 var unchainer = require('./lib/unchainer')
-var filter = require('./lib/filterStream')
 var constants = require('tradle-constants')
 var EventType = require('./lib/eventType')
 var Dir = require('./lib/dir')
-var updateChainedObj = require('./lib/updateChainedObj')
 var createIdentityDB = require('./lib/identityDB')
 var createMsgDB = require('./lib/msgDB')
 var createTxDB = require('./lib/txDB')
@@ -552,7 +550,7 @@ Driver.prototype.publishMyIdentity = function () {
     var priv = self.getPrivateKey({ purpose: 'update' })
     var update = extend({}, self.identityJSON)
     var prevHash = self._myCurrentHash() || self._myRootHash()
-    updateChainedObj(update, prevHash)
+    utils.updateChainedObj(update, prevHash)
 
     var builder = Builder()
       .data(update)
@@ -667,7 +665,7 @@ Driver.prototype._getToChainStream = function () {
       tail: true
     }),
     toObjectStream(),
-    filter(function (entry) {
+    utils.filterStream(function (entry) {
       return !entry.tx &&
               entry.chain &&
              !entry.dateChained &&
@@ -752,7 +750,7 @@ Driver.prototype._getUnsentStream = function () {
       old: true
     }),
     toObjectStream(),
-    filter(function (entry) {
+    utils.filterStream(function (entry) {
       if (entry.dateSent ||
           entry.txType === TxData.types.public ||
           !entry.to ||
