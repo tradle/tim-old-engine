@@ -34,7 +34,7 @@
     "bittorrent-dht": "tradle/bittorrent-dht",
     "cb-streams": "^1.1.1",
     "chained-obj": "^1.1.1",
-    "chainloader": "^1.0.0",
+    "chainloader": "^1.1.0",
     "debug": "^2.2.0",
     "deep-equal": "^1.0.1",
     "error": "^7.0.2",
@@ -67,7 +67,6 @@
     "zlorp": "tradle/zlorp#utp"
   },
   "devDependencies": {
-    "bitkeeper-js": "tradle/bitkeeper-js",
     "cb-blockr": "tradle/cb-blockr",
     "memdown": "^1.0.0",
     "pre-commit": "^1.0.10",

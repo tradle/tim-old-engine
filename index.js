@@ -39,8 +39,15 @@ var updateChainedObj = require('./lib/updateChainedObj')
 var createIdentityDB = require('./lib/identityDB')
 var createMsgDB = require('./lib/msgDB')
 var createTxDB = require('./lib/txDB')
-var errors = require('./lib/errors')
+var Errors = require('./lib/errors')
 var utils = require('./lib/utils')
+var RETRY_UNCHAIN_ERRORS = [
+  ChainLoader.Errors.ParticipantsNotFound,
+  ChainLoader.Errors.FileNotFound
+].map(function (ErrType) {
+  return ErrType.type
+})
+
 var TYPE = constants.TYPE
 var ROOT_HASH = constants.ROOT_HASH
 var PREV_HASH = constants.PREV_HASH
@@ -51,11 +58,11 @@ var CONFIRMATIONS_BEFORE_CONFIRMED = 1000000 // for now
 var MAX_CHAIN_RETRIES = 3
 var MAX_UNCHAIN_RETRIES = 10
 var MAX_RESEND_RETRIES = 10
-var CHAIN_WRITE_THROTTLE = 60000
-var CHAIN_READ_THROTTLE = 60000
 var MIN_BALANCE = 10000
 var KEY_PURPOSE = 'messaging'
-Driver.CATCH_UP_INTERVAL = 10000
+Driver.CHAIN_WRITE_THROTTLE = 60000
+Driver.CHAIN_READ_THROTTLE = 60000
+Driver.CATCH_UP_INTERVAL = 2000
 var noop = function () {}
 
 // var MessageType = Driver.MessageType = {
@@ -237,9 +244,9 @@ Driver.prototype._readFromChain = function () {
     return this.txDB.once('live', this._readFromChain)
   }
 
-  if (this._unchaining) return
+  if (this._queuedUnchains) return
 
-  this._unchaining = true
+  this._queuedUnchains = {}
 
   pump(
     this.txDB.liveStream({
@@ -250,6 +257,7 @@ Driver.prototype._readFromChain = function () {
     map(function (entry, cb) {
       // was read from chain and hasn't been processed yet
       // self._debug('unchaining tx', entry.txId)
+      var txId = entry.txId
       if (!entry.dateDetected || entry.dateUnchained) {
         return finish()
       }
@@ -258,25 +266,35 @@ Driver.prototype._readFromChain = function () {
       var errs = entry.errors
       delete entry.errors
 
-      if (errs) {
-        if (errs.length >= MAX_UNCHAIN_RETRIES) {
-          // console.log(entry.errors, entry.id)
-          self._debug('skipping unchain', entry.txId)
-          self._remove(entry)
-          return finish()
-        } else {
-          self._debug('throttling unchain retry of tx', entry.txId)
-          return throttleIfRetrying(errs, CHAIN_READ_THROTTLE, function () {
-            finish(null, entry)
-          })
-        }
+      if (!errs || !errs.length) return finish(null, entry)
+
+      var shouldTryAgain = errs.every(function (err) {
+        return RETRY_UNCHAIN_ERRORS.indexOf(err.type) !== -1
+      })
+
+      if (!shouldTryAgain) return finish(null, entry)
+
+      if (errs.length >= MAX_UNCHAIN_RETRIES) {
+        // console.log(entry.errors, entry.id)
+        self._debug('skipping unchain after', errs.length, 'errors for tx:', txId)
+        self._remove(entry)
+        return finish()
       }
 
-      finish(null, entry)
+      if (self._queuedUnchains[txId]) {
+        return self._debug('already schedulded unchaining!')
+      }
+
+      self._queuedUnchains[txId] = true
+      self._debug('throttling unchain retry of tx', txId)
+      throttleIfRetrying(errs, Driver.CHAIN_READ_THROTTLE, function () {
+        finish(null, entry)
+      })
 
       function finish (err, ret) {
-        if (err || !ret) self._rmPending(entry.txId)
+        if (err || !ret) self._rmPending(txId)
 
+        delete self._queuedUnchains[txId]
         cb(err, ret)
       }
     }),
@@ -311,6 +329,7 @@ Driver.prototype._readFromChain = function () {
 }
 
 Driver.prototype._remove = function (info) {
+  var self = this
   this.lookupObject(info)
     .catch(function (err) {
       return err.progress
@@ -346,12 +365,23 @@ Driver.prototype._catchUpWithBlockchain = function () {
   var self = this
   if (this._caughtUpPromise) return this._caughtUpPromise
 
+  var done
+  var txIds
   var catchUp = Q.defer()
   this._caughtUpPromise = catchUp.promise
+    .then(function () {
+      self._debug('caught up with blockchain')
+    })
+    .finally(function () {
+      done = true
+    })
+
   tryAgain()
   return this._caughtUpPromise
 
   function tryAgain () {
+    if (txIds) return checkDBs()
+
     var stream = cbstreams.stream.txs({
       api: self.blockchain,
       confirmations: CONFIRMATIONS_BEFORE_CONFIRMED,
@@ -363,45 +393,52 @@ Driver.prototype._catchUpWithBlockchain = function () {
 
     stream.on('error', function (err) {
       if (/no txs/.test(err.message)) {
+        done = true
         stream.close()
         catchUp.resolve()
       }
     })
 
     collect(stream, function (err, txInfos) {
-      if (self._caughtUpPromise.inspect().state !== 'pending') {
-        return
-      }
+      if (done) return
 
       if (err) return scheduleRetry()
 
-      var tasks = txInfos.map(function (txInfo) {
-        return Q.ninvoke(self.txDB, 'get', txInfo.tx.getId())
-          .then(function (entry) {
-            // var erroredOut
-            // if (entry.errors && entry.errors.length) {
-            //   var maxRetries = entry.dir === Dir.outbound
-            //     ? MAX_CHAIN_RETRIES
-            //     : MAX_UNCHAIN_RETRIES
-
-            //   erroredOut = entry.errors.length >= maxRetries
-            // }
-
-            var hasErrors = entry.errors && entry.errors.length
-            var processed = entry.dateUnchained || entry.dateChained || hasErrors
-            if (!processed) throw new Error('not ready')
-          })
+      txIds = txInfos.map(function (txInfo) {
+        return txInfo.tx.getId()
       })
 
-      Q.all(tasks)
-        .then(catchUp.resolve)
-        .catch(scheduleRetry)
+      checkDBs()
     })
+  }
+
+  function checkDBs () {
+    var tasks = txIds.map(function (txId) {
+      return Q.ninvoke(self.txDB, 'get', txId)
+        .then(function (entry) {
+          // var erroredOut
+          // if (entry.errors && entry.errors.length) {
+          //   var maxRetries = entry.dir === Dir.outbound
+          //     ? MAX_CHAIN_RETRIES
+          //     : MAX_UNCHAIN_RETRIES
+
+          //   erroredOut = entry.errors.length >= maxRetries
+          // }
+
+          var hasErrors = entry.errors && entry.errors.length
+          var processed = entry.dateUnchained || entry.dateChained || hasErrors
+          if (!processed) throw new Error('not ready')
+        })
+    })
+
+    Q.all(tasks)
+      .then(catchUp.resolve)
+      .catch(scheduleRetry)
   }
 
   function scheduleRetry () {
     self._debug('not caught up yet with blockchain...')
-    setTimeout(tryAgain, Driver.CATCH_UP_INTERVAL)
+    setTimeout(checkDBs, Driver.CATCH_UP_INTERVAL)
   }
 }
 
@@ -654,7 +691,7 @@ Driver.prototype._writeToChain = function () {
   if (this._chaining) return
 
   this._chaining = true
-  var throttle = this.chainThrottle || CHAIN_WRITE_THROTTLE
+  var throttle = this.chainThrottle || Driver.CHAIN_WRITE_THROTTLE
 
   pump(
     this._getToChainStream(),
@@ -873,7 +910,7 @@ Driver.prototype._streamTxs = function (fromHeight, skipIds) {
       self._pendingTxs.push(id)
       self.txDB.get(id, function (err, entry) {
         var badErr = err && !err.notFound
-        var handled = !err && entry.confirmations > CONFIRMATIONS_BEFORE_CONFIRMED
+        var handled = entry && entry.confirmations > CONFIRMATIONS_BEFORE_CONFIRMED
         if (badErr || handled) {
           self._rmPending(id)
           return cb(err)
@@ -973,7 +1010,7 @@ Driver.prototype._sendP2P = function (entry) {
       this.lookupObject(entry)
     ])
     .spread(function (result, chainedObj) {
-      var fingerprint = getFingerprint(result.identity)
+      var fingerprint = utils.getOTRKeyFingerprint(result.identity)
       self._debug(KEY_PURPOSE, fingerprint)
       self._debug('sending msg p2p', chainedObj.parsed.data)
       var msg = utils.msgToBuffer(utils.getMsgProps(chainedObj))
@@ -1001,6 +1038,11 @@ Driver.prototype.lookupObject = function (info) {
       chainedObj.parsed = parsed
       return chainedObj
     })
+    .catch(function (err) {
+      // repeats unchainer
+      err.progress = chainedObj || info
+      throw err
+    })
 }
 
 Driver.prototype.lookupRootHash = function (fingerprint) {
@@ -1022,7 +1064,7 @@ Driver.prototype.getKeyAndIdentity = function (fingerprint, returnPrivate) {
     .then(function (result) {
       var identity = result.identity
       var key = returnPrivate && self.getPrivateKey(fingerprint)
-      key = key || keyForFingerprint(identity, fingerprint)
+      key = key || utils.keyForFingerprint(identity, fingerprint)
       var ret = {
         key: key,
         identity: identity
@@ -1241,8 +1283,8 @@ Driver.prototype.putOnChain = function (entry) {
       // self._debug('chained (write)', nextEntry.get(CUR_HASH), 'tx: ' + nextEntry.get('txId'))
     })
     .catch(function (err) {
-      err = errors.ChainWriteError(utils.toErrInstance(err), {
-        timestamp: utils.now()
+      err = Errors.ChainWrite({
+        message: Errors.getMessage(err)
       })
 
       self._debug('chaining failed', err)
@@ -1526,18 +1568,6 @@ Driver.prototype._getTxDir = function (tx) {
   return isOutbound ? Dir.outbound : Dir.inbound
 }
 
-function getFingerprint (identity) {
-  return find(identity.pubkeys, function (k) {
-    return k.type === 'dsa'
-  }).fingerprint
-}
-
-function keyForFingerprint (identityJSON, fingerprint) {
-  return find(identityJSON.pubkeys, function (k) {
-    return k.fingerprint === fingerprint
-  })
-}
-
 function copyDHTKeys (dest, src, curHash) {
   if (typeof curHash === 'undefined') {
     if (typeof src === 'string') {
@@ -1572,6 +1602,11 @@ function throttleIfRetrying (errors, throttle, cb) {
   }
 
   var lastErr = errors[errors.length - 1]
+  if (!lastErr.timestamp) {
+    debug('bad error: ', lastErr)
+    throw new Error('error is missing timestamp')
+  }
+
   var now = utils.now()
   var wait = lastErr.timestamp + throttle - now
   if (wait < 0) {
@@ -1602,6 +1637,10 @@ var jsonifyTransform = map.bind(null, function (entry, cb) {
 var jsonifyErrors = function (entry) {
   var errs = utils.getEntryProp(entry, 'errors')
   if (errs) {
+    errs.forEach(function (err) {
+      if (!err.timestamp) err.timestamp = utils.now()
+    })
+
     utils.setEntryProp(entry, 'errors', errs.map(utils.errToJSON))
   }
 
