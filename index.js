@@ -436,7 +436,7 @@ Driver.prototype._catchUpWithBlockchain = function () {
 
   function scheduleRetry () {
     self._debug('not caught up yet with blockchain...')
-    setTimeout(checkDBs, Driver.CATCH_UP_INTERVAL)
+    setTimeout(tryAgain, Driver.CATCH_UP_INTERVAL)
   }
 }
 
