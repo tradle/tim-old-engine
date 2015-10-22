@@ -506,7 +506,7 @@ Driver.prototype.identityPublishStatus = function () {
     })
 }
 
-Driver.prototype._publishIdentity = function (identity) {
+Driver.prototype.publishIdentity = function (identity) {
   identity = identity || this.identityJSON
   return this.publish({
     msg: identity,
@@ -535,7 +535,7 @@ Driver.prototype.publishMyIdentity = function () {
   this._publishingIdentity = true
   return this.identityPublishStatus()
     .then(function (status) {
-      if (!status.ever) return self._publishIdentity()
+      if (!status.ever) return self.publishIdentity()
       if (status.queued || status.current) {
         return Q.reject('already published this version') // chaining or chained
       }
@@ -562,7 +562,7 @@ Driver.prototype.publishMyIdentity = function () {
         extend(self.identityMeta, utils.pick(update, PREV_HASH, ROOT_HASH))
         return Q.all([
           self._prepIdentity(),
-          self._publishIdentity(result.form)
+          self.publishIdentity(result.form)
         ])
       })
   }
@@ -752,7 +752,7 @@ Driver.prototype._getUnsentStream = function () {
     toObjectStream(),
     utils.filterStream(function (entry) {
       if (entry.dateSent ||
-          entry.txType === TxData.types.public ||
+//           entry.txType === TxData.types.public ||
           !entry.to ||
           !entry.deliver ||
           entry.dir !== Dir.outbound ||
@@ -775,8 +775,9 @@ Driver.prototype._getUnsentStream = function () {
 }
 
 Driver.prototype.name = function () {
-  if (this.identityJSON.name) {
-    return this.identityJSON.name.firstName
+  var name = this.identityJSON.name
+  if (name) {
+    return name.firstName
   } else {
     return this.identityJSON.pubkeys[0].fingerprint
   }
@@ -1010,7 +1011,8 @@ Driver.prototype._sendP2P = function (entry) {
     .spread(function (result, chainedObj) {
       var fingerprint = utils.getOTRKeyFingerprint(result.identity)
       self._debug(KEY_PURPOSE, fingerprint)
-      self._debug('sending msg p2p', chainedObj.parsed.data)
+      self._debug('sending msg p2p', chainedObj.parsed.data[TYPE])
+      // debugger
       var msg = utils.msgToBuffer(utils.getMsgProps(chainedObj))
       return Q.ninvoke(self.p2p, 'send', msg, fingerprint)
     })
@@ -1155,6 +1157,29 @@ Driver.prototype._prefix = function (path) {
   return this.pathPrefix + '-' + path
 }
 
+// Driver.prototype.importIdentity = function (identity) {
+//   var self = this
+
+//   if (identity[ROOT_HASH]) {
+//     return Q.reject(new Error('only version one identities can be imported'))
+//   }
+
+//   return utils.getDHTKey(identity)
+//     .then(function (key) {
+//       return self.keeper.put(key, identity)
+//     })
+//     .then(function () {
+//       var entry = new Entry({
+//           type: EventType.misc.importIdentity
+//         })
+//         .set(ROOT_HASH, key)
+//         .set(CUR_HASH, key)
+//         .set(TYPE, constants.TYPES.IDENTITY)
+
+//       return self.log(entry)
+//     })
+// }
+
 Driver.prototype._onmessage = function (buf, fingerprint) {
   var self = this
   var msg
@@ -1169,9 +1194,28 @@ Driver.prototype._onmessage = function (buf, fingerprint) {
 
   // this thing repeats work all over the place
   var txInfo
+  var promiseValid
   var valid = utils.validateMsg(msg)
+  if (valid) promiseValid = Q.resolve()
+  else promiseValid = Q.reject(new Error('received invalid msg'))
+
+  // var isIdentity
+  // var isPublic = msg.txType === TxData.types.public
+  // if (isPublic) {
+  //   try {
+  //     parsed = JSON.parse(msg.data)
+  //     if (parsed[TYPE] === constants.TYPES.IDENTITY) {
+  //       return promiseValid.then(this.importIdentity.bind(this, parsed))
+  //     } else {
+  //       promiseValid = Q.reject(new Error('only identities allowed'))
+  //     }
+  //   } catch (err) {
+  //     promiseValid = Q.reject(new Error('received invalid cleartext msg'))
+  //   }
+  // }
+
   var from
-  Q[valid ? 'resolve' : 'reject']()
+  return promiseValid
     .then(this.lookupIdentity.bind(this, { fingerprint: fingerprint }))
     .then(function (result) {
       from = result
@@ -1366,6 +1410,28 @@ Driver.prototype.share = function (options) {
       return Q.all(entries.map(self.log, self))
     })
 }
+
+// Driver.prototype.chain = function (info) {
+//   var self = this
+//   var getInfo = typeof info === 'string'
+//     ? Q.ninvoke(this.msgDB, 'get', info)
+//     : Q.resolve(info)
+
+//   getInfo
+//     .then(function (info) {
+//       if (info.tx) throw new Error('already chained')
+
+//       return self.log(new Entry({
+//         type: EventType.msg.new,
+//         deliver: false,
+//         chain: true
+//       }))
+//     })
+//     .then(function () {
+
+//     })
+// }
+
 
 /**
  * send an object (and optionally chain it)

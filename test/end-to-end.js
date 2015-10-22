@@ -69,6 +69,7 @@ var Driver = require('../')
 Driver.CATCH_UP_INTERVAL = 1000
 var currentTime = require('../lib/utils').now
 // var TestDriver = require('./helpers/testDriver')
+var noop = function () {}
 
 var driverBill
 var driverTed
@@ -95,6 +96,76 @@ test.afterEach = function (cb) {
 }
 
 rimraf.sync(STORAGE_DIR)
+
+test('the reader and the writer', function (t) {
+  t.timeoutAfter(20000)
+
+  var togo = 4
+  var reader = driverBill
+  reader.readOnly = true
+
+  var readerCoords = [{
+    fingerprint: reader.identityJSON.pubkeys[0].fingerprint
+  }]
+
+  var writer = driverTed
+  var writerCoords = [{
+    fingerprint: writer.identityJSON.pubkeys[0].fingerprint
+  }]
+
+  writer.publishMyIdentity().done()
+  writer.publishIdentity(reader.identityJSON)
+  reader.on('unchained', onUnchainedIdentity)
+  writer.on('unchained', onUnchainedIdentity)
+  var msg = toMsg({
+    hey: 'ho'
+  })
+
+  writer.once('message', function (info) {
+    writer.lookupObject(info)
+      .then(function (obj) {
+        return writer.send({
+          chain: true,
+          deliver: false,
+          public: info.public,
+          msg: obj.parsed.data,
+          to: readerCoords
+        })
+      })
+      .done()
+
+    reader.once('unchained', function (info) {
+      reader.lookupObject(info)
+        .done(function (obj) {
+          t.deepEqual(obj.parsed.data, msg)
+          t.end()
+        })
+    })
+  })
+
+  function onUnchainedIdentity () {
+    if (--togo) return
+
+    reader.removeListener('unchained', onUnchainedIdentity)
+    writer.removeListener('unchained', onUnchainedIdentity)
+
+    // reader.send({
+    //   chain: false,
+    //   deliver: true,
+    //   public: true,
+    //   msg: extend(reader.identityJSON),
+    //   to: writerCoords
+    // })
+    // .then(function () {
+      reader.send({
+        chain: false,
+        deliver: true,
+        msg: msg,
+        to: writerCoords
+      })
+    // })
+  }
+})
 
 test('wipe dbs, get publish status on reload', function (t) {
   t.plan(4)
@@ -535,31 +606,6 @@ test('message resolution - contents match on p2p and chain channels', function (
 function init (cb) {
   reinitCount++
 
-  // commonOpts = {
-  //   networkName: networkName,
-  //   leveldown: memdown,
-  //   syncInterval: 100,
-  //   chainThrottle: chainThrottle
-  // }
-
-  // driverBill = TestDriver.fake(extend({
-  //   identity: bill,
-  //   identityKeys: billPriv,
-  //   port: billPort,
-  //   syncInterval: 100
-  // }, commonOpts))
-
-  // driverTed = TestDriver.fake(extend({
-  //   identity: ted,
-  //   identityKeys: tedPriv,
-  //   port: tedPort,
-  //   blockchain: driverBill.blockchain
-  // }, commonOpts))
-
-  // ;[driverBill, driverTed].forEach(function (d) {
-  //   d.dht.addNode('127.0.0.1:' + BOOTSTRAP_DHT_PORT, bootstrapDHT.nodeId)
-  // })
-
   var billWallet = walletFor(billPriv, null, 'messaging')
   var blockchain = billWallet.blockchain
   var commonOpts = {
@@ -653,12 +699,15 @@ function teardown (cb) {
 }
 
 function publishIdentities (drivers, cb) {
+  var defer = Q.defer()
   var togo = drivers.length * drivers.length
   drivers.forEach(function (d) {
     global.d = d
     d.on('unchained', onUnchained)
     d.publishMyIdentity().done()
   })
+
+  return defer.promise.nodeify(cb || noop)
 
   function onUnchained (info) {
     if (--togo) return
