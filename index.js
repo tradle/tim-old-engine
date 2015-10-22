@@ -270,7 +270,7 @@ Driver.prototype._readFromChain = function () {
         return RETRY_UNCHAIN_ERRORS.indexOf(err.type) !== -1
       })
 
-      if (!shouldTryAgain) return finish(null, entry)
+      if (!shouldTryAgain) return finish()
 
       if (errs.length >= MAX_UNCHAIN_RETRIES) {
         // console.log(entry.errors, entry.id)
@@ -1157,29 +1157,6 @@ Driver.prototype._prefix = function (path) {
   return this.pathPrefix + '-' + path
 }
 
-// Driver.prototype.importIdentity = function (identity) {
-//   var self = this
-
-//   if (identity[ROOT_HASH]) {
-//     return Q.reject(new Error('only version one identities can be imported'))
-//   }
-
-//   return utils.getDHTKey(identity)
-//     .then(function (key) {
-//       return self.keeper.put(key, identity)
-//     })
-//     .then(function () {
-//       var entry = new Entry({
-//           type: EventType.misc.importIdentity
-//         })
-//         .set(ROOT_HASH, key)
-//         .set(CUR_HASH, key)
-//         .set(TYPE, constants.TYPES.IDENTITY)
-
-//       return self.log(entry)
-//     })
-// }
-
 Driver.prototype._onmessage = function (buf, fingerprint) {
   var self = this
   var msg
@@ -1198,21 +1175,6 @@ Driver.prototype._onmessage = function (buf, fingerprint) {
   var valid = utils.validateMsg(msg)
   if (valid) promiseValid = Q.resolve()
   else promiseValid = Q.reject(new Error('received invalid msg'))
-
-  // var isIdentity
-  // var isPublic = msg.txType === TxData.types.public
-  // if (isPublic) {
-  //   try {
-  //     parsed = JSON.parse(msg.data)
-  //     if (parsed[TYPE] === constants.TYPES.IDENTITY) {
-  //       return promiseValid.then(this.importIdentity.bind(this, parsed))
-  //     } else {
-  //       promiseValid = Q.reject(new Error('only identities allowed'))
-  //     }
-  //   } catch (err) {
-  //     promiseValid = Q.reject(new Error('received invalid cleartext msg'))
-  //   }
-  // }
 
   var from
   return promiseValid
@@ -1249,11 +1211,7 @@ Driver.prototype._onmessage = function (buf, fingerprint) {
       // TODO optimize
       return self.lookupObject(txInfo)
     })
-    .then(function (chainedObj) {
-      // chainedObj.from = chainedObj.from && chainedObj.from.identity
-      // chainedObj.to = chainedObj.to && chainedObj.to.identity
-      return self.unchainResultToEntry(chainedObj)
-    })
+    .then(self.unchainResultToEntry)
     .then(function (entry) {
       return entry.set({
         type: EventType.msg.receivedValid,
@@ -1271,10 +1229,11 @@ Driver.prototype._onmessage = function (buf, fingerprint) {
         errors: [err]
       })
     })
-    .done(function (entry) {
+    .then(function (entry) {
       jsonifyErrors(entry)
-      return self._log.append(entry)
+      return self.log(entry)
     })
+    .done()
 }
 
 Driver.prototype._myRootHash = function () {

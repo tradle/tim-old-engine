@@ -114,6 +114,7 @@ test('the reader and the writer', function (t) {
   }]
 
   writer.publishMyIdentity().done()
+  // publish reader's identity for them
   writer.publishIdentity(reader.identityJSON)
   reader.on('unchained', onUnchainedIdentity)
   writer.on('unchained', onUnchainedIdentity)
@@ -149,6 +150,21 @@ test('the reader and the writer', function (t) {
     reader.removeListener('unchained', onUnchainedIdentity)
     writer.removeListener('unchained', onUnchainedIdentity)
 
+    reader.identityPublishStatus()
+      .then(function (status) {
+        t.ok(status.ever)
+        t.ok(status.current)
+      })
+      .then(function () {
+        return reader.send({
+          chain: false,
+          deliver: true,
+          msg: msg,
+          to: writerCoords
+        })
+      })
+      .done()
+
     // reader.send({
     //   chain: false,
     //   deliver: true,
@@ -157,12 +173,7 @@ test('the reader and the writer', function (t) {
     //   to: writerCoords
     // })
     // .then(function () {
-      reader.send({
-        chain: false,
-        deliver: true,
-        msg: msg,
-        to: writerCoords
-      })
+
     // })
   }
 })
