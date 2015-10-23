@@ -52,7 +52,7 @@ var PREV_HASH = constants.PREV_HASH
 var CUR_HASH = constants.CUR_HASH
 var PREFIX = constants.OP_RETURN_PREFIX
 // var NONCE = constants.NONCE
-var CONFIRMATIONS_BEFORE_CONFIRMED = 1000000 // for now
+var CONFIRMATIONS_BEFORE_CONFIRMED = 10
 var MAX_CHAIN_RETRIES = 3
 var MAX_UNCHAIN_RETRIES = 10
 var MAX_RESEND_RETRIES = 10
@@ -1300,6 +1300,14 @@ Driver.prototype.putOnChain = function (entry) {
     .then(function () {
       return nextEntry
     })
+}
+
+Driver.prototype.chain = function (options) {
+  return this.send(extend({
+    public: false,
+    chain: true,
+    deliver: false
+  }, options))
 }
 
 Driver.prototype.publish = function (options) {
