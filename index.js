@@ -71,6 +71,12 @@ var noop = function () {}
 module.exports = Driver
 util.inherits(Driver, EventEmitter)
 
+// TODO: export other deps
+Driver.Zlorp = Zlorp
+Driver.Kiki = kiki
+Driver.Identity = Identity
+Driver.Wallet = Wallet
+
 function Driver (options) {
   var self = this
 
