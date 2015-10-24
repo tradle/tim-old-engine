@@ -825,7 +825,9 @@ Driver.prototype._sendTheUnsent = function () {
           utils.addError(nextEntry, err)
           return nextEntry
         })
-        .nodeify(cb)
+        .done(function (entry) {
+          cb(null, entry)
+        })
     }),
     // filter(function (data) {
     //   console.log('after sendTheUnsent', data.toJSON())
