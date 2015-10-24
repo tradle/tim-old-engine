@@ -97,6 +97,50 @@ test.afterEach = function (cb) {
 
 rimraf.sync(STORAGE_DIR)
 
+test('resending', function (t) {
+  t.timeoutAfter(15000)
+  publishIdentities([driverBill, driverTed], function () {
+    var msg = toMsg({ hey: 'bro' })
+    var z = driverTed.p2p
+    var send = z.send
+    var attempts = 0
+    z.send = function (msg, finger, cb) {
+      attempts++
+      if (attempts < 5) {
+        // should resend after this
+        process.nextTick(function () {
+          cb(new Error('failed to send'))
+        })
+      } else {
+        send.apply(z, arguments)
+      }
+    }
+
+    driverTed.send({
+      msg: msg,
+      deliver: true,
+      to: [{
+        fingerprint: billPub.pubkeys[0].fingerprint
+      }]
+    })
+
+    driverBill.on('message', function (info) {
+      t.pass('msg resent after failed send')
+      driverTed.destroy()
+        .then(function () {
+          driverTed = cloneDeadDriver(driverTed)
+          return Q.nfcall(collect, driverTed._getUnsentStream({ tail: false }))
+        })
+        .then(function (results) {
+          // msg should not be queued for resend
+          t.equal(results.length, 0, 'msg not requeued after succesfully sent')
+          t.end()
+        })
+        .done()
+    })
+  })
+})
+
 test('the reader and the writer', function (t) {
   t.timeoutAfter(20000)
 

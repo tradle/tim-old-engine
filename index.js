@@ -742,13 +742,13 @@ Driver.prototype._writeToChain = function () {
   )
 }
 
-Driver.prototype._getUnsentStream = function () {
+Driver.prototype._getUnsentStream = function (options) {
   var self = this
   return pump(
-    this.msgDB.liveStream({
+    this.msgDB.liveStream(extend({
       tail: true,
       old: true
-    }),
+    }, options || {})),
     toObjectStream(),
     utils.filterStream(function (entry) {
       if (entry.dateSent ||
@@ -787,7 +787,7 @@ Driver.prototype._markSending = function (entry) {
   this._currentlySending.push(entry.uid)
 }
 
-Driver.prototype._markSent = function (entry) {
+Driver.prototype._markNotSending = function (entry) {
   var idx = this._currentlySending.indexOf(entry.uid)
   this._currentlySending.splice(idx, 1)
 }
@@ -804,14 +804,15 @@ Driver.prototype._sendTheUnsent = function () {
 
   this._sending = true
   this._currentlySending = []
-  this.msgDB.on('sent', this._markSent)
+  this.msgDB.on('sent', this._markNotSending)
 
   pump(
     this._getUnsentStream(),
     map(function (entry, cb) {
       var nextEntry = new Entry()
-      nextEntry.set(ROOT_HASH, entry[ROOT_HASH])
-      nextEntry.set('uid', entry.uid)
+        .set(ROOT_HASH, entry[ROOT_HASH])
+        .set('uid', entry.uid)
+
       self._markSending(entry)
       self._sendP2P(entry)
         .then(function () {
@@ -823,6 +824,7 @@ Driver.prototype._sendTheUnsent = function () {
           })
 
           utils.addError(nextEntry, err)
+          self._markNotSending(nextEntry)
           return nextEntry
         })
         .done(function (entry) {
