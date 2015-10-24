@@ -447,7 +447,7 @@ Driver.prototype.identityPublishStatus = function () {
     return this._readyPromise.then(this.identityPublishStatus)
   }
 
-  var rh = this._myRootHash()
+  var rh = this.myRootHash()
   var me = this.identityJSON
   var status = {
     ever: false,
@@ -536,8 +536,12 @@ Driver.prototype.publishMyIdentity = function () {
   return this.identityPublishStatus()
     .then(function (status) {
       if (!status.ever) return self.publishIdentity()
-      if (status.queued || status.current) {
-        return Q.reject('already published this version') // chaining or chained
+      if (status.queued) {
+        return Q.reject(new Error('already publishing this version'))
+      }
+
+      if (status.current) {
+        return Q.reject(new Error('already published this version'))
       }
 
       return publish()
@@ -549,7 +553,7 @@ Driver.prototype.publishMyIdentity = function () {
   function publish () {
     var priv = self.getPrivateKey({ purpose: 'update' })
     var update = extend({}, self.identityJSON)
-    var prevHash = self._myCurrentHash() || self._myRootHash()
+    var prevHash = self.myCurrentHash() || self.myRootHash()
     utils.updateChainedObj(update, prevHash)
 
     var builder = Builder()
@@ -912,11 +916,15 @@ Driver.prototype._streamTxs = function (fromHeight, skipIds) {
 
       self._pendingTxs.push(id)
       self.txDB.get(id, function (err, entry) {
-        var badErr = err && !err.notFound
+        var unexpectedErr = err && !err.notFound
+        if (unexpectedErr) {
+          self._debug('unexpected txDB error: ' + JSON.stringify(unexpectedError))
+        }
+
         var handled = entry && entry.confirmations > CONFIRMATIONS_BEFORE_CONFIRMED
-        if (badErr || handled) {
+        if (unexpectedErr || handled) {
           self._rmPending(id)
-          return cb(err)
+          return cb()
         }
 
         save(entry)
@@ -1051,7 +1059,7 @@ Driver.prototype.lookupObject = function (info) {
 
 Driver.prototype.lookupRootHash = function (fingerprint) {
   var pub = this.getPublicKey(fingerprint)
-  if (pub) return Q.resolve(this._myRootHash())
+  if (pub) return Q.resolve(this.myRootHash())
 
   return Q.ninvoke(this.addressBook, 'rootHashByFingerprint', fingerprint)
 }
@@ -1125,7 +1133,7 @@ Driver.prototype.lookupIdentity = function (query) {
   }
 
   if (query[ROOT_HASH]) {
-    if (query[ROOT_HASH] !== this._myRootHash()) {
+    if (query[ROOT_HASH] !== this.myRootHash()) {
       return Q.ninvoke(this.addressBook, 'byRootHash', query[ROOT_HASH])
     }
   } else if (query.fingerprint) {
@@ -1139,8 +1147,8 @@ Driver.prototype.lookupIdentity = function (query) {
     identity: me
   }
 
-  ret[ROOT_HASH] = this._myRootHash()
-  ret[CUR_HASH] = this._myCurrentHash()
+  ret[ROOT_HASH] = this.myRootHash()
+  ret[CUR_HASH] = this.myCurrentHash()
   return Q.resolve(ret)
 }
 
@@ -1228,7 +1236,7 @@ Driver.prototype._onmessage = function (buf, fingerprint) {
         type: EventType.msg.receivedInvalid,
         msg: msg,
         from: utils.toObj(ROOT_HASH, from[ROOT_HASH]),
-        to: utils.toObj(ROOT_HASH, self._myRootHash()),
+        to: utils.toObj(ROOT_HASH, self.myRootHash()),
         dir: Dir.inbound,
         errors: [err]
       })
@@ -1240,11 +1248,11 @@ Driver.prototype._onmessage = function (buf, fingerprint) {
     .done()
 }
 
-Driver.prototype._myRootHash = function () {
+Driver.prototype.myRootHash = function () {
   return this.identityMeta[ROOT_HASH]
 }
 
-Driver.prototype._myCurrentHash = function () {
+Driver.prototype.myCurrentHash = function () {
   return this.identityMeta[CUR_HASH]
 }
 
@@ -1342,7 +1350,7 @@ Driver.prototype.share = function (options) {
     public: false,
     chain: !!options.chain,
     deliver: !!options.deliver,
-    from: utils.toObj(ROOT_HASH, this._myRootHash())
+    from: utils.toObj(ROOT_HASH, this.myRootHash())
   })
 
   var recipients
@@ -1442,7 +1450,7 @@ Driver.prototype.send = function (options) {
 
   var to = options.to
   if (!to && isPublic) {
-    var me = utils.toObj(ROOT_HASH, this._myRootHash())
+    var me = utils.toObj(ROOT_HASH, this.myRootHash())
     to = [me]
   }
 
@@ -1454,7 +1462,7 @@ Driver.prototype.send = function (options) {
     public: isPublic,
     chain: !!options.chain,
     deliver: !!options.deliver,
-    from: utils.toObj(ROOT_HASH, this._myRootHash())
+    from: utils.toObj(ROOT_HASH, this.myRootHash())
   })
 
   var recipients

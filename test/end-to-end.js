@@ -771,7 +771,7 @@ function publishIdentities (drivers, cb) {
       d.removeListener('unchained', onUnchained)
     })
 
-    cb()
+    defer.resolve()
   }
 }
 
