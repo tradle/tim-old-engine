@@ -2,12 +2,14 @@
 
 [![Build status](https://travis-ci.org/tradle/tim.svg)](https://travis-ci.org/tradle/tim)
 
-Tradle's P2P chat with plaintext and structured messages, and the ability to externalize messages onto a blockchain (currently bitcoin's).
+TiM is Tradle's SDK that is designed to support real-time messages with an option to be backed by the blockchain. Mesages can be plain or structured messages. TiM is designed to work on mobiles, desktops and servers. Having one code base is important to minimize the security reviews. 
+
+TiM is designed to work with intermittent connections, common on mobile devices. For that it keeps an internal log of all actions and events, and resumes operations as soon as nextwork connection is restored.
 
 _this module is used by [Tradle](https://github.com/tradle/about/wiki)_  
 _this npm module's name was graciously donated by [Sean Robertson](https://www.npmjs.com/~spro)_
 
-This module comprises a wrapper around and an API to a number of Tradle components, and a datalog of all activity.  A UI is developed separately. Currently we focus on [React Native based UI](https://github.com/pgmemk/TiM) (on iOS and hopefully soon on Android), see the [preview video](https://www.youtube.com/watch?v=S66T0dPNn5I) and the [screenshots](https://docs.google.com/document/d/1vPR4tt8S-hZAG17Z_PbKwh_Pe4mvzhAzGBZiVpfbwqs). 
+TiM provides a higher level API to a number of low level Tradle components. A UI is developed separately. Currently we focus on [React Native based UI](https://github.com/pgmemk/TiM) (on iOS and hopefully soon on Android), see the [preview video](https://www.youtube.com/watch?v=S66T0dPNn5I) and the [screenshots](https://docs.google.com/document/d/1vPR4tt8S-hZAG17Z_PbKwh_Pe4mvzhAzGBZiVpfbwqs). 
 
 Prior to React Native UI for Tim we developed a [Chrome App UI](https://github.com/tradle/chromeapp), see this [Identity verification video](https://www.youtube.com/watch?v=rrt8U4M-yMg) and a [work completion video](https://www.youtube.com/watch?v=mRnaw4pdifA). And prior to that we developed a very cool node-webkit-based [craigslist on-chain concept app](https://github.com/tradle/craigslist-on-chain) on TiM, but it is very much behind now. Let us know if you are interested in these environments.
 
