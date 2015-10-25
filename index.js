@@ -52,7 +52,7 @@ var ROOT_HASH = constants.ROOT_HASH
 var PREV_HASH = constants.PREV_HASH
 var CUR_HASH = constants.CUR_HASH
 var PREFIX = constants.OP_RETURN_PREFIX
-var NONCE = constants.NONCE
+// var NONCE = constants.NONCE
 var CONFIRMATIONS_BEFORE_CONFIRMED = 10
 var MAX_CHAIN_RETRIES = 3
 var MAX_UNCHAIN_RETRIES = 10
@@ -1339,7 +1339,6 @@ Driver.prototype.putOnChain = function (entry) {
 
 Driver.prototype.sign = function (msg) {
   typeforce('Object', msg, true) // strict
-  typeforce('String', msg[NONCE])
   if (!msg[SIGNEE]) {
     msg[SIGNEE] = this.myRootHash() + ':' + this.myCurrentHash()
   }
