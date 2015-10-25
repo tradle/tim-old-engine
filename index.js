@@ -47,6 +47,7 @@ var RETRY_UNCHAIN_ERRORS = [
 })
 
 var TYPE = constants.TYPE
+var SIGNEE = constants.SIGNEE
 var ROOT_HASH = constants.ROOT_HASH
 var PREV_HASH = constants.PREV_HASH
 var CUR_HASH = constants.CUR_HASH
@@ -102,14 +103,14 @@ function Driver (options) {
   tutils.bindPrototypeFunctions(this)
   extend(this, options)
 
-  this.otrKey = toKey(
+  this._otrKey = toKey(
     this.getPrivateKey({
       type: 'dsa',
       purpose: 'sign'
     })
   )
 
-  this.signingKey = toKey(
+  this._signingKey = toKey(
     this.getPrivateKey({
       type: 'ec',
       purpose: 'sign'
@@ -141,7 +142,7 @@ function Driver (options) {
     leveldown: leveldown,
     port: this.port,
     dht: dht,
-    key: this.otrKey.priv(),
+    key: this._otrKey.priv(),
     relay: this.relay
   })
 
@@ -201,6 +202,10 @@ function Driver (options) {
     })
 
   this._readyPromise.done()
+}
+
+Driver.prototype.ready = function () {
+  return this._readyPromise
 }
 
 Driver.prototype.isReady = function () {
@@ -384,6 +389,7 @@ Driver.prototype._catchUpWithBlockchain = function () {
   return this._caughtUpPromise
 
   function tryAgain () {
+    if (self._destroyed) return
     if (txIds) return checkDBs()
 
     var stream = cbstreams.stream.txs({
@@ -1320,6 +1326,23 @@ Driver.prototype.putOnChain = function (entry) {
     })
 }
 
+Driver.prototype.sign = function (msg) {
+  typeforce('Object', msg, true) // strict
+  typeforce('String', msg[NONCE])
+  if (!msg[SIGNEE]) {
+    msg[SIGNEE] = this.myRootHash() + ':' + this.myCurrentHash()
+  }
+
+  var b = Builder()
+    .data(msg)
+    .signWith(this._signingKey)
+
+  return Q.ninvoke(b, 'build')
+    .then(function (result) {
+      return result.form
+    })
+}
+
 Driver.prototype.chain = function (options) {
   return this.send(extend({
     public: false,
@@ -1502,10 +1525,10 @@ Driver.prototype.send = function (options) {
     .then(function (resp) {
       copyDHTKeys(entry, resp.key)
       self._debug('stored (write)', entry.get(ROOT_HASH))
-      if (isPublic) self._push(resp)
 
       var entries
       if (isPublic) {
+        self._push(resp)
         entries = to.map(function (contact, i) {
           return entry.clone().set({
             to: contact,

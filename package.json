@@ -56,7 +56,7 @@
     "simple-wallet": "tradle/simple-wallet",
     "stream-collector": "^1.0.1",
     "stream-combiner2": "~1.0.2",
-    "tradle-constants": "^1.1.0",
+    "tradle-constants": "^1.1.1",
     "tradle-permission": "tradle/permission",
     "tradle-tx-data": "tradle/tx-data",
     "tradle-utils": "^0.1.3",

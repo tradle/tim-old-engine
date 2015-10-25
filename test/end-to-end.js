@@ -720,15 +720,11 @@ function init (cb) {
     port: rufusPort
   }, commonOpts))
 
-  var togo = 3
-
-  driverBill.once('ready', finish)
-  driverTed.once('ready', finish)
-  driverRufus.once('ready', finish)
-
-  function finish () {
-    if (--togo === 0) cb()
-  }
+  return Q.all([
+    driverBill.ready(),
+    driverTed.ready(),
+    driverRufus.ready()
+  ]).done(cb)
 }
 
 function teardown (cb) {
