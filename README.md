@@ -2,9 +2,11 @@
 
 [![Build status](https://travis-ci.org/tradle/tim.svg)](https://travis-ci.org/tradle/tim)
 
-TiM is Tradle's SDK that is designed to support real-time messages with an option to be backed by the blockchain. Mesages can be plain or structured messages. TiM is designed to work on mobiles, desktops and servers. Having one code base is important to minimize the security reviews. 
+TiM is Tradle's SDK that provides real-time messaging with an option for messages to be sealed on the blockchain. Mesages can be plain or structured messages. TiM is designed to work on mobiles, desktops and servers. Having one code base is important to minimize security reviews. 
 
-TiM is designed to work with intermittent connections, common on mobile devices. For that it keeps an internal log of all actions and events, and resumes operations as soon as nextwork connection is restored.
+TiM is designed to work with intermittent connections, common on mobile devices. For that it keeps an internal log of all actions and events, and resumes operations as soon as network connection is restored.
+
+TiM's operations are covered by the patent. Patent is filed only for defensive purposes, so you are welcome to use it in your open source projects.
 
 _this module is used by [Tradle](https://github.com/tradle/about/wiki)_  
 _this npm module's name was graciously donated by [Sean Robertson](https://www.npmjs.com/~spro)_
