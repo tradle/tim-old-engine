@@ -52,7 +52,7 @@ var ROOT_HASH = constants.ROOT_HASH
 var PREV_HASH = constants.PREV_HASH
 var CUR_HASH = constants.CUR_HASH
 var PREFIX = constants.OP_RETURN_PREFIX
-// var NONCE = constants.NONCE
+var NONCE = constants.NONCE
 var CONFIRMATIONS_BEFORE_CONFIRMED = 10
 var MAX_CHAIN_RETRIES = 3
 var MAX_UNCHAIN_RETRIES = 10
@@ -96,12 +96,14 @@ function Driver (options) {
     syncInterval: '?Number',
     chainThrottle: '?Number',
     readOnly: '?Boolean',
-    relay: '?Object'
+    relay: '?Object',
+    afterBlockTimestamp: '?Number'
   }, options)
 
   EventEmitter.call(this)
   tutils.bindPrototypeFunctions(this)
   extend(this, options)
+  this.afterBlockTimestamp = this.afterBlockTimestamp || 0
 
   this._otrKey = toKey(
     this.getPrivateKey({
@@ -414,9 +416,13 @@ Driver.prototype._catchUpWithBlockchain = function () {
 
       if (err) return scheduleRetry()
 
-      txIds = txInfos.map(function (txInfo) {
-        return txInfo.tx.getId()
-      })
+      txIds = txInfos
+        .filter(function (txInfo) {
+          return txInfo.blockTimestamp > self.afterBlockTimestamp
+        })
+        .map(function (txInfo) {
+          return txInfo.tx.getId()
+        })
 
       checkDBs()
     })
@@ -921,6 +927,11 @@ Driver.prototype._streamTxs = function (fromHeight, skipIds) {
       // TODO: make more efficient
       // when we have a source of txs that
       // consistently provides block height
+      if (txInfo.blockTimestamp &&
+          txInfo.blockTimestamp <= self.afterBlockTimestamp) {
+        return cb()
+      }
+
       var id = txInfo.tx.getId()
       if (self._pendingTxs.indexOf(id) !== -1) {
         return cb() // already handled this one

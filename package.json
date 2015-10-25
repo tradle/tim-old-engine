@@ -32,7 +32,7 @@
     "bitcoinjs-lib": "^1.4.1",
     "bitjoe-js": "tradle/bitjoe-js",
     "bittorrent-dht": "tradle/bittorrent-dht",
-    "cb-streams": "^1.1.1",
+    "cb-streams": "^1.1.2",
     "chained-obj": "^1.1.1",
     "chainloader": "^1.1.0",
     "debug": "^2.2.0",
