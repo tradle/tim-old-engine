@@ -187,7 +187,9 @@ function Driver (options) {
       this._updateBalance()
     ])
     .then(function () {
-      if (self._destroyed) return
+      if (self._destroyed) {
+        return Q.reject(new Error('destroyed'))
+      }
 
       self.msgDB.start()
       self.txDB.start()
@@ -202,8 +204,6 @@ function Driver (options) {
       self._sendTheUnsent()
       // self._watchMsgStatuses()
     })
-
-  this._readyPromise.done()
 }
 
 Driver.prototype.ready = function () {
