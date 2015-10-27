@@ -52,7 +52,7 @@ var ROOT_HASH = constants.ROOT_HASH
 var PREV_HASH = constants.PREV_HASH
 var CUR_HASH = constants.CUR_HASH
 var PREFIX = constants.OP_RETURN_PREFIX
-// var NONCE = constants.NONCE
+var NONCE = constants.NONCE
 var CONFIRMATIONS_BEFORE_CONFIRMED = 10
 var MAX_CHAIN_RETRIES = 3
 var MAX_UNCHAIN_RETRIES = 10
@@ -185,6 +185,9 @@ function Driver (options) {
       self._setupTxStream(),
       keeperReady,
       this._updateBalance()
+        .catch(function (e) {
+          self._debug('unable to get balance')
+        })
     ])
     .then(function () {
       if (self._destroyed) {
@@ -574,11 +577,15 @@ Driver.prototype.publishMyIdentity = function () {
     var prevHash = self.myCurrentHash() || self.myRootHash()
     utils.updateChainedObj(update, prevHash)
 
-    var builder = Builder()
-      .data(update)
-      .signWith(toKey(priv))
+    return Q.ninvoke(tutils, 'newMsgNonce')
+      .then(function (nonce) {
+        update[NONCE] = nonce
+        var builder = Builder()
+          .data(update)
+          .signWith(toKey(priv))
 
-    return Q.ninvoke(builder, 'build')
+        return Q.ninvoke(builder, 'build')
+      })
       .then(function (result) {
         self.setIdentity(update)
         extend(self.identityMeta, utils.pick(update, PREV_HASH, ROOT_HASH))
@@ -1053,7 +1060,18 @@ Driver.prototype._sendP2P = function (entry) {
     })
 }
 
+Driver.prototype.lookupObjectByRootHash = function (rootHash) {
+  return Q.ninvoke(this.messages(), 'byRootHash', rootHash)
+    .then(this.lookupObject)
+}
+
+Driver.prototype.lookupObjectByCurHash = function (curHash) {
+  return Q.ninvoke(this.messages(), 'byCurHash', curHash)
+    .then(this.lookupObject)
+}
+
 Driver.prototype.lookupObject = function (info) {
+  var self = this
   // TODO: this unfortunately duplicates part of unchainer.js
   if (!info.txData) {
     if (info.tx) {
@@ -1254,11 +1272,12 @@ Driver.prototype._onmessage = function (buf, fingerprint) {
       })
     })
     .catch(function (err) {
+      // TODO: retry
       self._debug('failed to process inbound msg', err)
       return new Entry({
         type: EventType.msg.receivedInvalid,
         msg: msg,
-        from: utils.toObj(ROOT_HASH, from[ROOT_HASH]),
+        from: utils.toObj(ROOT_HASH, from && from[ROOT_HASH]),
         to: utils.toObj(ROOT_HASH, self.myRootHash()),
         dir: Dir.inbound,
         errors: [err]
@@ -1673,8 +1692,7 @@ function validateRecipients (recipients) {
 
   recipients.every(function (r) {
     assert(r.fingerprint || r.pubKey || r[ROOT_HASH],
-      '"recipient" must specify "fingerprint", "pubKey" or identity.' + ROOT_HASH +
-      ' (root hash of recipient identity)')
+      'invalid recipient, must be an object with a "fingerprint", "pubKey" or ' + ROOT_HASH + ' property')
   })
 }
 
