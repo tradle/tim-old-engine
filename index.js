@@ -577,9 +577,8 @@ Driver.prototype.publishMyIdentity = function () {
     var prevHash = self.myCurrentHash() || self.myRootHash()
     utils.updateChainedObj(update, prevHash)
 
-    return Q.ninvoke(tutils, 'newMsgNonce')
+    return Q.ninvoke(Builder, 'addNonce', update)
       .then(function (nonce) {
-        update[NONCE] = nonce
         var builder = Builder()
           .data(update)
           .signWith(toKey(priv))
