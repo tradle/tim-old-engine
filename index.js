@@ -103,7 +103,6 @@ function Driver (options) {
   EventEmitter.call(this)
   tutils.bindPrototypeFunctions(this)
   extend(this, options)
-  this.afterBlockTimestamp = this.afterBlockTimestamp || 0
 
   this._otrKey = toKey(
     this.getPrivateKey({
@@ -123,6 +122,11 @@ function Driver (options) {
   this.identityMeta = {}
 
   this.setIdentity(options.identity.toJSON())
+  this.afterBlockTimestamp = this.afterBlockTimestamp || 0
+  if (this.afterBlockTimestamp) {
+    this._debug('ignoring txs before', new Date(this.afterBlockTimestamp * 1000).toString())
+  }
+
   var networkName = this.networkName
   var keeper = this.keeper
   var dht = this.dht
