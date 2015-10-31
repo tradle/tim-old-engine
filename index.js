@@ -1009,6 +1009,7 @@ Driver.prototype._setupDBs = function () {
   })
 
   this.addressBook.name = this.name()
+  this._identityCache = {}
   this.msgDB = createMsgDB(this._prefix('messages.db'), {
     leveldown: this.leveldown,
     log: this._log,
@@ -1075,6 +1076,7 @@ Driver.prototype.lookupObjectByCurHash = function (curHash) {
 
 Driver.prototype.lookupObject = function (info) {
   var self = this
+
   // TODO: this unfortunately duplicates part of unchainer.js
   if (!info.txData) {
     if (info.tx) {
@@ -1169,31 +1171,47 @@ Driver.prototype.getBlockchainKey = function () {
   })
 }
 
+Driver.prototype.getCachedIdentity = function (query) {
+  return this._identityCache[tutils.stringify(query)]
+}
+
+Driver.prototype._cacheIdentity = function (query, value) {
+  this._identityCache[tutils.stringify(query)] = value
+}
+
 Driver.prototype.lookupIdentity = function (query) {
+  var self = this
+  return this._lookupIdentity(query)
+    .then(function (result) {
+      self._cacheIdentity(query, result)
+      return result
+    })
+}
+
+Driver.prototype._lookupIdentity = function (query) {
   var me = this.identityJSON
   var valid = !!query.fingerprint ^ !!query[ROOT_HASH]
   if (!valid) {
     return Q.reject(new Error('query by "fingerprint" OR "' + ROOT_HASH + '" (root hash)'))
   }
 
-  if (query[ROOT_HASH]) {
-    if (query[ROOT_HASH] !== this.myRootHash()) {
-      return Q.ninvoke(this.addressBook, 'byRootHash', query[ROOT_HASH])
+  var isMe = query[ROOT_HASH] === this.myRootHash() ||
+    (query.fingerprint && this.getPublicKey(query.fingerprint))
+
+  if (isMe) {
+    var ret = {
+      identity: me
     }
-  } else if (query.fingerprint) {
-    var pub = this.getPublicKey(query.fingerprint)
-    if (!pub) {
-      return Q.ninvoke(this.addressBook, 'byFingerprint', query.fingerprint)
-    }
+
+    ret[ROOT_HASH] = this.myRootHash()
+    ret[CUR_HASH] = this.myCurrentHash()
+    return Q.resolve(ret)
   }
 
-  var ret = {
-    identity: me
-  }
+  var cached = this.getCachedIdentity(query)
+  if (cached) return Q(cached)
 
-  ret[ROOT_HASH] = this.myRootHash()
-  ret[CUR_HASH] = this.myCurrentHash()
-  return Q.resolve(ret)
+  return Q.ninvoke(this.addressBook, 'query', query)
 }
 
 Driver.prototype.log = function (entry) {
@@ -1641,6 +1659,7 @@ Driver.prototype.destroy = function () {
     this._rawTxStream.close() // custom close method
   }
 
+  delete this._identityCache
   // async
   return Q.all([
       self.keeper.destroy(),
