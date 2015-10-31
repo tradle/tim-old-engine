@@ -68,6 +68,14 @@ var networkName = 'testnet'
 var Driver = require('../')
 Driver.CATCH_UP_INTERVAL = 1000
 var currentTime = require('../lib/utils').now
+// var timeMethod = require('../lib/timeMethod')
+
+// for (var p in Driver.prototype) {
+//   if (typeof Driver.prototype[p] === 'function') {
+//     timeMethod(Driver.prototype, p)
+//   }
+// }
+
 // var TestDriver = require('./helpers/testDriver')
 var noop = function () {}
 
@@ -101,18 +109,20 @@ test('resending', function (t) {
   t.timeoutAfter(15000)
   publishIdentities([driverBill, driverTed], function () {
     var msg = toMsg({ hey: 'bro' })
-    var z = driverTed.p2p
+    var z = driverTed.messenger
     var send = z.send
     var attempts = 0
-    z.send = function (msg, finger, cb) {
+    z.send = function () {
       attempts++
+      // var cb = [].slice.call(arguments).pop()
       if (attempts < 5) {
         // should resend after this
-        process.nextTick(function () {
-          cb(new Error('failed to send'))
-        })
+        // process.nextTick(function () {
+        return Q.reject(new Error('failed to send'))
+        // })
       } else {
-        send.apply(z, arguments)
+        debugger
+        return send.apply(z, arguments)
       }
     }
 
@@ -746,6 +756,7 @@ function teardown (cb) {
       rimraf.sync(STORAGE_DIR)
       driverBill = driverTed = driverRufus = null
       safe(cb)()
+      // timeMethod.printTotals()
     })
 }
 

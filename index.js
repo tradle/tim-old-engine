@@ -22,6 +22,7 @@ var Permission = require('tradle-permission')
 var Wallet = require('simple-wallet')
 var cbstreams = require('cb-streams')
 var Zlorp = require('zlorp')
+var Messengers = require('./lib/messengers')
 var mi = require('midentity')
 var Identity = mi.Identity
 var kiki = require('kiki')
@@ -77,6 +78,7 @@ Driver.Zlorp = Zlorp
 Driver.Kiki = kiki
 Driver.Identity = Identity
 Driver.Wallet = Wallet
+Driver.Messengers = Messengers
 
 function Driver (options) {
   var self = this
@@ -93,6 +95,7 @@ function Driver (options) {
     leveldown: 'Function',
     port: 'Number',
     pathPrefix: 'String',
+    messenger: '?Object',
     syncInterval: '?Number',
     chainThrottle: '?Number',
     readOnly: '?Boolean',
@@ -142,15 +145,26 @@ function Driver (options) {
   this._balance = 0
 
   // this._monkeypatchWallet()
-  this.p2p = new Zlorp({
-    name: this.name(),
-    available: true,
-    leveldown: leveldown,
-    port: this.port,
-    dht: dht,
-    key: this._otrKey.priv(),
-    relay: this.relay
+  this.messenger = options.messenger || new Messengers.P2P({
+    zlorp: new Zlorp({
+      name: this.name(),
+      available: true,
+      leveldown: leveldown,
+      port: this.port,
+      dht: dht,
+      key: this._otrKey.priv(),
+      relay: this.relay
+    })
   })
+
+  this.messenger.on('message', this.receiveMsg)
+
+  typeforce({
+    send: 'Function',
+    on: 'Function',
+    removeListener: 'Function',
+    destroy: 'Function'
+  }, this.messenger)
 
   this.chainwriter = new ChainWriter({
     wallet: wallet,
@@ -176,7 +190,6 @@ function Driver (options) {
   this._catchUpWithBlockchain()
   this._fingerprintToIdentity = {}
   this._pendingTxs = []
-  this._setupP2P()
 
   this._setupDBs()
   var keeperReadyDfd = Q.defer()
@@ -235,20 +248,6 @@ Driver.prototype._updateBalance = function () {
     .then(function (balance) {
       self._balance = balance
     })
-}
-
-Driver.prototype._setupP2P = function () {
-  var self = this
-
-  this.p2p.on('data', this._onmessage)
-  this.p2p.on('connect', function (fingerprint, addr) {
-    self.lookupByFingerprint(fingerprint)
-      .then(function (result) {
-        var identity = result.identity
-        self._debug('connecting to', identity.name.formatted)
-        self.emit('connect', identity, addr)
-      })
-  })
 }
 
 /**
@@ -846,7 +845,7 @@ Driver.prototype._sendTheUnsent = function () {
         .set('uid', entry.uid)
 
       self._markSending(entry)
-      self._sendP2P(entry)
+      self._doSend(entry)
         .then(function () {
           return nextEntry.set('type', EventType.msg.sendSuccess)
         })
@@ -1045,7 +1044,7 @@ Driver.prototype._setupDBs = function () {
   this.txDB.name = this.name()
 }
 
-Driver.prototype._sendP2P = function (entry) {
+Driver.prototype._doSend = function (entry) {
   // TODO:
   //   do we log that we sent it?
   //   do we log when we delivered it? How do we know it was delivered?
@@ -1054,13 +1053,10 @@ Driver.prototype._sendP2P = function (entry) {
       this.lookupIdentity(entry.to),
       this.lookupObject(entry)
     ])
-    .spread(function (result, chainedObj) {
-      var fingerprint = utils.getOTRKeyFingerprint(result.identity)
-      self._debug(KEY_PURPOSE, fingerprint)
-      self._debug('sending msg p2p', chainedObj.parsed.data[TYPE])
-      // debugger
+    .spread(function (identityInfo, chainedObj) {
+      self._debug('sending msg to peer', chainedObj.parsed.data[TYPE])
       var msg = utils.msgToBuffer(utils.getMsgProps(chainedObj))
-      return Q.ninvoke(self.p2p, 'send', msg, fingerprint)
+      return self.messenger.send(identityInfo[ROOT_HASH], msg, identityInfo)
     })
 }
 
@@ -1231,9 +1227,11 @@ Driver.prototype._prefix = function (path) {
   return this.pathPrefix + '-' + path
 }
 
-Driver.prototype._onmessage = function (buf, fingerprint) {
+Driver.prototype.receiveMsg = function (buf, senderInfo) {
   var self = this
   var msg
+
+  validateRecipients(senderInfo)
 
   try {
     msg = utils.bufferToMsg(buf)
@@ -1252,7 +1250,7 @@ Driver.prototype._onmessage = function (buf, fingerprint) {
 
   var from
   return promiseValid
-    .then(this.lookupIdentity.bind(this, { fingerprint: fingerprint }))
+    .then(this.lookupIdentity.bind(this, senderInfo))
     .then(function (result) {
       from = result
       var fromKey = utils.firstKey(result.identity.pubkeys, {
@@ -1308,7 +1306,6 @@ Driver.prototype._onmessage = function (buf, fingerprint) {
       jsonifyErrors(entry)
       return self.log(entry)
     })
-    .done()
 }
 
 Driver.prototype.myRootHash = function () {
@@ -1663,7 +1660,7 @@ Driver.prototype.destroy = function () {
   // async
   return Q.all([
       self.keeper.destroy(),
-      Q.ninvoke(self.p2p, 'destroy'),
+      self.messenger.destroy(),
       Q.ninvoke(self.addressBook, 'close'),
       Q.ninvoke(self.msgDB, 'close'),
       Q.ninvoke(self.txDB, 'close'),
