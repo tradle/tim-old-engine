@@ -55,9 +55,6 @@ var CUR_HASH = constants.CUR_HASH
 var PREFIX = constants.OP_RETURN_PREFIX
 var NONCE = constants.NONCE
 var CONFIRMATIONS_BEFORE_CONFIRMED = 10
-var MAX_CHAIN_RETRIES = 3
-var MAX_UNCHAIN_RETRIES = 10
-var MAX_RESEND_RETRIES = 10
 var MIN_BALANCE = 10000
 var KEY_PURPOSE = 'messaging'
 Driver.CHAIN_WRITE_THROTTLE = 60000
@@ -79,6 +76,7 @@ Driver.Kiki = kiki
 Driver.Identity = Identity
 Driver.Wallet = Wallet
 Driver.Messengers = Messengers
+Driver.EventType = EventType
 
 function Driver (options) {
   var self = this
@@ -280,7 +278,7 @@ Driver.prototype._readFromChain = function () {
       }
 
       // clear old errors
-      var errs = entry.errors
+      var errs = utils.getErrors(entry, 'unchain')
       delete entry.errors
 
       if (!errs || !errs.length) return finish(null, entry)
@@ -291,7 +289,7 @@ Driver.prototype._readFromChain = function () {
 
       if (!shouldTryAgain) return finish()
 
-      if (errs.length >= MAX_UNCHAIN_RETRIES) {
+      if (errs.length >= Errors.MAX_UNCHAIN) {
         // console.log(entry.errors, entry.id)
         self._debug('skipping unchain after', errs.length, 'errors for tx:', txId)
         self._remove(entry)
@@ -447,7 +445,7 @@ Driver.prototype._catchUpWithBlockchain = function () {
           //   erroredOut = entry.errors.length >= maxRetries
           // }
 
-          var hasErrors = entry.errors && entry.errors.length
+          var hasErrors = !!utils.countErrors(entry)
           var processed = entry.dateUnchained || entry.dateChained || hasErrors
           if (!processed) throw new Error('not ready')
         })
@@ -623,7 +621,7 @@ Driver.prototype.transactions = function () {
 
 Driver.prototype.unchainResultToEntry = function (chainedObj) {
   var self = this
-  var success = !(chainedObj.errors && chainedObj.errors.length)
+  var success = !utils.countErrors(chainedObj)
   var type = success ?
     EventType.chain.readSuccess :
     EventType.chain.readError
@@ -701,7 +699,7 @@ Driver.prototype._getToChainStream = function () {
               entry.chain &&
              !entry.dateChained &&
               entry.dir === Dir.outbound &&
-              (!entry.errors || entry.errors.length < MAX_CHAIN_RETRIES)
+              (utils.countErrors(entry, 'chain') < Errors.MAX_CHAIN)
     }),
     this._rethrow
   )
@@ -725,7 +723,7 @@ Driver.prototype._writeToChain = function () {
   pump(
     this._getToChainStream(),
     map(function (entry, cb) {
-      var errs = entry.errors
+      var errs = utils.getErrors(entry, 'chain')
       if (errs && errs.length) {
         self._debug('throttling chaining')
       }
@@ -791,8 +789,9 @@ Driver.prototype._getUnsentStream = function (options) {
         return
       }
 
-      if (entry.errors && entry.errors.length > MAX_RESEND_RETRIES) {
-        if (entry.errors.length === MAX_RESEND_RETRIES) {
+      var numErrors = utils.countErrors(entry, 'send')
+      if (numErrors > Errors.MAX_RESEND) {
+        if (numErrors === Errors.MAX_RESEND) {
           self._debug('giving up on sending message', entry)
         }
 
@@ -854,7 +853,12 @@ Driver.prototype._sendTheUnsent = function () {
             type: EventType.msg.sendError
           })
 
-          utils.addError(nextEntry, err)
+          utils.addError({
+            entry: nextEntry,
+            group: Errors.group.send,
+            error: err
+          })
+
           self._markNotSending(nextEntry)
           return nextEntry
         })
@@ -978,7 +982,7 @@ Driver.prototype._streamTxs = function (fromHeight, skipIds) {
         }))
 
         // clear errors
-        nextEntry.set('errors', [])
+        nextEntry.set('errors', {})
 
         // if (entry) nextEntry.prev(new Entry(entry))
         cb(null, nextEntry)
@@ -1299,7 +1303,9 @@ Driver.prototype.receiveMsg = function (buf, senderInfo) {
         from: utils.toObj(ROOT_HASH, from && from[ROOT_HASH]),
         to: utils.toObj(ROOT_HASH, self.myRootHash()),
         dir: Dir.inbound,
-        errors: [err]
+        errors: {
+          receive: err
+        }
       })
     })
     .then(function (entry) {
@@ -1367,7 +1373,11 @@ Driver.prototype.putOnChain = function (entry) {
         type: EventType.chain.writeError
       })
 
-      utils.addError(nextEntry, err)
+      utils.addError({
+        entry: nextEntry,
+        group: 'chain',
+        error: err
+      })
     })
     .then(function () {
       return nextEntry
@@ -1756,11 +1766,15 @@ var jsonifyTransform = map.bind(null, function (entry, cb) {
 var jsonifyErrors = function (entry) {
   var errs = utils.getEntryProp(entry, 'errors')
   if (errs) {
-    errs.forEach(function (err) {
-      if (!err.timestamp) err.timestamp = utils.now()
-    })
+    for (var group in errs) {
+      errs[group] = errs[group].map(function (err) {
+        if (!err.timestamp) err.timestamp = utils.now()
 
-    utils.setEntryProp(entry, 'errors', errs.map(utils.errToJSON))
+        return utils.errToJSON(err)
+      })
+
+      utils.setEntryProp(entry, 'errors', errs)
+    }
   }
 
   return entry
