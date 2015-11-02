@@ -56,8 +56,8 @@ var CUR_HASH = constants.CUR_HASH
 var PREFIX = constants.OP_RETURN_PREFIX
 var NONCE = constants.NONCE
 var CONFIRMATIONS_BEFORE_CONFIRMED = 10
-var MIN_BALANCE = 10000
 var KEY_PURPOSE = 'messaging'
+Driver.MIN_BALANCE = 10000
 Driver.CHAIN_WRITE_THROTTLE = 60000
 Driver.CHAIN_READ_THROTTLE = 60000
 Driver.SEND_THROTTLE = 10000
@@ -247,6 +247,9 @@ Driver.prototype._updateBalance = function () {
   return Q.ninvoke(this.wallet, 'balance')
     .then(function (balance) {
       self._balance = balance
+      if (balance < Driver.MIN_BALANCE) {
+        self.emit('lowbalance')
+      }
     })
 }
 
@@ -689,89 +692,114 @@ Driver.prototype.unchainResultToEntry = function (chainedObj) {
     })
 }
 
-Driver.prototype._getToChainStream = function () {
-  return pump(
-    this.msgDB.liveStream({
-      old: true,
-      tail: true
-    }),
-    toObjectStream(),
-    utils.filterStream(function (entry) {
-      return !entry.tx &&
-              entry.chain &&
-             !entry.dateChained &&
-              entry.dir === Dir.outbound &&
-              (utils.countErrors(entry, 'chain') < Errors.MAX_CHAIN)
-    }),
-    this._rethrow
-  )
+// Driver.prototype._getToChainStream = function () {
+//   return pump(
+//     this.msgDB.liveStream({
+//       old: true,
+//       tail: true
+//     }),
+//     toObjectStream(),
+//     utils.filterStream(function (entry) {
+//       return !entry.tx &&
+//               entry.chain &&
+//              !entry.dateChained &&
+//               entry.dir === Dir.outbound &&
+//               (utils.countErrors(entry, 'chain') < Errors.MAX_CHAIN)
+//     }),
+//     this._rethrow
+//   )
+// }
+
+Driver.prototype._writeToChain = function () {
+  var self = this
+  var getStream = this.msgDB.getToChainStream.bind(this.msgDB, {
+    old: true,
+    tail: true
+  })
+
+  this._processQueue({
+    name: 'writeToChain',
+    getStream: getStream,
+    processItem: this.putOnChain,
+    retryDelay: Driver.CHAIN_WRITE_THROTTLE,
+    successType: EventType.chain.writeSuccess,
+    shouldSkipQueue: function (state) {
+      return state.public
+    },
+    shouldTryLater: function (state) {
+      if (self._balance < Driver.MIN_BALANCE) {
+        self._updateBalance()
+        return true
+      }
+    }
+  })
 }
 
 /**
  * write to chain
  */
-Driver.prototype._writeToChain = function () {
-  var self = this
-  if (this._destroyed) return
+// Driver.prototype._writeToChain = function () {
+//   var self = this
+//   if (this._destroyed) return
 
-  var db = this.msgDB
+//   var db = this.msgDB
 
-  if (!db.isLive()) return db.once('live', this._writeToChain)
-  if (this._chaining) return
+//   if (!db.isLive()) return db.once('live', this._writeToChain)
+//   if (this._chaining) return
 
-  this._chaining = true
-  var throttle = this.chainThrottle || Driver.CHAIN_WRITE_THROTTLE
+//   this._chaining = true
+//   var throttle = this.chainThrottle || Driver.CHAIN_WRITE_THROTTLE
 
-  pump(
-    this._getToChainStream(),
-    map(function (entry, cb) {
-      var errs = utils.getErrors(entry, 'chain')
-      if (errs && errs.length) {
-        self._debug('throttling chaining')
-      }
+//   pump(
+//     this._getToChainStream(),
+//     map(function (entry, cb) {
+//       var errs = utils.getErrors(entry, 'chain')
+//       if (errs && errs.length) {
+//         self._debug('throttling chaining')
+//       }
 
-      // don't write same errors into next log entry
-      delete entry.errors
-      throttleIfRetrying(errs, throttle, tryAgain)
+//       // don't write same errors into next log entry
+//       delete entry.errors
+//       throttleIfRetrying(errs, throttle, tryAgain)
 
-      function tryAgain () {
-        if (self._balance < MIN_BALANCE) {
-          self.emit('lowbalance')
-          return tryAgainSoon()
-        }
+//       function tryAgain () {
+//         if (self._balance < MIN_BALANCE) {
+//           self.emit('lowbalance')
+//           return tryAgainSoon()
+//         }
 
-        var nextEntry
-        self.putOnChain(new Entry(entry))
-          .then(function (_nextEntry) {
-            nextEntry = _nextEntry
-            return self._updateBalance()
-          })
-          .done(function () {
-            cb(null, nextEntry)
-          })
-      }
+//         var nextEntry
+//         self.putOnChain(new Entry(entry))
+//           .then(function (_nextEntry) {
+//             nextEntry = _nextEntry
+//             return self._updateBalance()
+//           })
+//           .done(function () {
+//             cb(null, nextEntry)
+//           })
+//       }
 
-      function tryAgainSoon () {
-        self._debug('paused chaining, low balance')
-        var timeout = setTimeout(function () {
-          if (self._destroyed) return
+//       function tryAgainSoon () {
+//         self._debug('paused chaining, low balance')
+//         var timeout = setTimeout(function () {
+//           if (self._destroyed) return
 
-          self._updateBalance()
-            .finally(tryAgain)
-        }, throttle)
+//           self._updateBalance()
+//             .finally(tryAgain)
+//         }, throttle)
 
-        if (timeout.unref) timeout.unref()
-      }
-    }),
-    // filter(function (data) {
-    //   console.log('after chain write', data.toJSON())
-    //   return true
-    // }),
-    jsonifyTransform(),
-    this._log,
-    this._rethrow
-  )
-}
+//         if (timeout.unref) timeout.unref()
+//       }
+//     }),
+//     // filter(function (data) {
+//     //   console.log('after chain write', data.toJSON())
+//     //   return true
+//     // }),
+//     jsonifyTransform(),
+//     this._log,
+//     this._rethrow
+//   )
+// }
 
 Driver.prototype._sendTheUnsent = function () {
   var getStream = this.msgDB.getToSendStream.bind(this.msgDB, {
@@ -783,25 +811,10 @@ Driver.prototype._sendTheUnsent = function () {
     name: 'sendTheUnsent',
     getStream: getStream,
     processItem: this._trySend,
-    throttle: Driver.SEND_THROTTLE,
+    retryDelay: Driver.SEND_THROTTLE,
     successType: EventType.msg.sendSuccess
   })
 }
-
-// Driver.prototype._writeToChain = function () {
-//   var getStream = this.msgDB.getToChainStream.bind(this.msgDB, {
-//     old: true,
-//     tail: true
-//   })
-
-//   this._processQueue({
-//     name: 'writeToChain',
-//     getStream: getStream,
-//     processItem: this.putOnChain,
-//     throttle: Driver.CHAIN_WRITE_THROTTLE,
-//     successType: EventType.chain.writeSuccess
-//   })
-// }
 
 Driver.prototype._processQueue = function (opts) {
   var self = this
@@ -812,21 +825,27 @@ Driver.prototype._processQueue = function (opts) {
     successType: 'Number',
     getStream: 'Function',
     processItem: 'Function',
-    skipFilter: '?Function',
-    delay: '?Function'
+    shouldSkipQueue: '?Function',
+    shouldTryLater: '?Function'
   }, opts)
 
+  var name = opts.name
   this._processingQueue = this._processingQueue || {}
-  if (this._processingQueue[opts.name]) return
+  if (this._processingQueue[name]) return
 
-  this._processingQueue[opts.name] = true
+  this._processingQueue[name] = true
 
   // queues by recipient root hash
   var queues = {}
-  var skipFilter = opts.skipFilter || alwaysFalse
-  var maybeDelay = opts.delay || alwaysFalse
+  var lastProcessTime = 0
+  var shouldSkipQueue = opts.shouldSkipQueue || alwaysFalse
+  var shouldTryLater = opts.shouldTryLater || alwaysFalse
   var processItem = opts.processItem
-  var throttle = opts.throttle
+  if (opts.throttle) {
+    processItem = toThrottled(processItem, opts.throttle)
+  }
+
+  var retryDelay = opts.retryDelay
   var successType = opts.successType
   var stream = opts.getStream()
   var sync
@@ -843,10 +862,13 @@ Driver.prototype._processQueue = function (opts) {
       }
 
       self.msgDB.get(data.value, function (err, state) {
-        if (err) throw err
+        if (err) {
+          self._debug('error on "get" from msgDB', err)
+          throw err
+        }
 
-        if (skipFilter(state)) {
-          processItem(state)
+        if (shouldSkipQueue(state)) {
+          runASAP(state)
         } else {
           insert(state)
           processQueue(state.to[ROOT_HASH])
@@ -857,32 +879,44 @@ Driver.prototype._processQueue = function (opts) {
     })
   )
 
+  function runASAP (state) {
+    if (shouldTryLater(state)) {
+      setTimeout(runASAP.bind(null, state), retryDelay)
+    } else {
+      processItem(state)
+    }
+  }
+
   function processQueue (rid) {
     var q = queues[rid] = queues[rid] || []
     if (!q.length || q.processing || q.waiting) return
 
+    self._debug('processing queue', name)
+    q.processing = true
     var next = q[0]
     delete next.errors
-    var delay = maybeDelay(next)
-      ? promiseDelay(throttle)
-      : Q.resolve()
+    if (shouldTryLater(next)) {
+      return promiseDelay(retryDelay)
+        .done(processQueue.bind(null, rid))
+    }
 
-    return delay
-      .then(function () {
-        return processItem(next)
-      })
+    return processItem(next)
       .done(function (entry) {
+        self._debug('processed item from queue', name)
+        q.processing = false
         if (utils.getEntryProp(entry, 'type') === successType) {
           q.shift()
           processQueue(rid)
         } else {
+          self._debug('throttling queue', name)
           q.waiting = true
-          setTimeout(keepGoing, throttle)
+          setTimeout(keepGoing, retryDelay)
         }
       })
 
     function keepGoing () {
       q.waiting = false
+      // probably not needed
       self.msgDB.onLive(function () {
         processQueue(rid)
       })
@@ -902,9 +936,14 @@ Driver.prototype._processQueue = function (opts) {
   }
 
   function remove (data) {
-    var idx
+    var idx = -1
+    var uid = data.value
+    var rid = utils.parseUID(uid).to
+    var q = queues[rid]
+    if (!q || !q.length) return
+
     q.some(function (item, i) {
-      if (item.uid === data.value) {
+      if (item.uid === uid) {
         idx = i
       }
     })
@@ -1496,15 +1535,15 @@ Driver.prototype.myCurrentHash = function () {
 // TODO: enforce order
 Driver.prototype.putOnChain = function (entry) {
   var self = this
-  assert(entry.get(ROOT_HASH) && entry.get(CUR_HASH), 'missing required fields')
+  assert(entry[ROOT_HASH] && entry[CUR_HASH], 'missing required fields')
 
-  var type = entry.get('txType')
-  var data = entry.get('txData')
+  var type = entry.txType
+  var data = entry.txData
   var nextEntry = new Entry()
-    .set(ROOT_HASH, entry.get(ROOT_HASH))
-    .set(CUR_HASH, entry.get(CUR_HASH))
+    .set(ROOT_HASH, entry[ROOT_HASH])
+    .set(CUR_HASH, entry[CUR_HASH])
     .set({
-      uid: entry.get('uid'),
+      uid: entry.uid,
       // from: entry.get('from'),
       // to: entry.get('to'),
       txType: type,
@@ -1515,7 +1554,7 @@ Driver.prototype.putOnChain = function (entry) {
 //   return this.lookupBTCAddress(to)
 //     .then(shareWith)
   // console.log(entry.toJSON())
-  var addr = entry.get('addressesTo')[0]
+  var addr = entry.addressesTo[0]
   this.emit('chaining')
   return self.chainwriter.chain()
     .type(type)
@@ -1551,7 +1590,8 @@ Driver.prototype.putOnChain = function (entry) {
       })
     })
     .then(function () {
-      return nextEntry
+      self._updateBalance()
+      return self.log(nextEntry)
     })
 }
 
@@ -1959,4 +1999,19 @@ function promiseDelay (millis) {
   return Q.Promise(function (resolve) {
     setTimeout(resolve, millis)
   })
+}
+
+function rateLimitPromise (fn, millis) {
+  var lastCalled = 0
+  return function () {
+    lastCalled = utils.now()
+    return fn()
+      .finally(function () {
+        var now = utils.now()
+        var delay = now - lastCalled
+        if (delay < millis) {
+          return promiseDelay(delay)
+        }
+      })
+  }
 }
