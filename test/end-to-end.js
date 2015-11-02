@@ -67,6 +67,7 @@ var networkName = 'testnet'
 // var blockchain = new Fakechain({ networkName: networkName })
 var Driver = require('../')
 Driver.CATCH_UP_INTERVAL = 1000
+Driver.SEND_THROTTLE = 1000
 var currentTime = require('../lib/utils').now
 // var timeMethod = require('../lib/timeMethod')
 
@@ -105,41 +106,69 @@ test.afterEach = function (cb) {
 
 rimraf.sync(STORAGE_DIR)
 
-test('resending', function (t) {
+test('resending / order', function (t) {
   t.timeoutAfter(15000)
   publishIdentities([driverBill, driverTed], function () {
-    var msg = toMsg({ hey: 'bro' })
+    var msgs = [
+      {
+        succeedAfter: 5
+      },
+      {
+        succeedAfter: 0
+      }
+    ].map(function (msg) {
+      msg[NONCE] = '1'
+      return msg
+    })
+
+    var encrypted = [
+      "P767yN9gJZpg6DPFoXt+g5Ho8ZDPt9Bp1KQI",
+      "P767yN9gJZpg6DPFoXt+g5Ho8ZDPt9Bp1KEI"
+    ]
+
+    var copy = msgs.map(function (m) {
+      return extend(m)
+    })
+
     var z = driverTed.messenger
     var send = z.send
-    var attempts = 0
-    z.send = function () {
-      attempts++
+    z.send = function (rh, msg) {
+      var eData = JSON.parse(msg).encryptedData
+      var decrypted = copy[encrypted.indexOf(eData)]
       // var cb = [].slice.call(arguments).pop()
-      if (attempts < 5) {
+      if (decrypted.succeedAfter-- > 0) {
         // should resend after this
-        // process.nextTick(function () {
         return Q.reject(new Error('failed to send'))
-        // })
       } else {
-        debugger
         return send.apply(z, arguments)
       }
     }
 
-    driverTed.send({
-      msg: msg,
-      deliver: true,
-      to: [{
-        fingerprint: billPub.pubkeys[0].fingerprint
-      }]
+    msgs.forEach(function (msg) {
+      driverTed.send({
+        msg: msg,
+        deliver: true,
+        to: [{
+          fingerprint: billPub.pubkeys[0].fingerprint
+        }]
+      })
     })
 
+    var togo = msgs.length
+    var received = 0
     driverBill.on('message', function (info) {
+      driverBill.lookupObject(info)
+        .done(function (obj) {
+          t.deepEqual(obj.parsed.data, msgs[received++])
+        })
+
+      if (--togo) return
+
       t.pass('msg resent after failed send')
       driverTed.destroy()
         .then(function () {
           driverTed = cloneDeadDriver(driverTed)
-          return Q.nfcall(collect, driverTed._getUnsentStream({ tail: false }))
+          return Q.nfcall(collect, driverTed.messages().getToSendStream({ tail: false }))
         })
         .then(function (results) {
           // msg should not be queued for resend

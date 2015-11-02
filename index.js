@@ -8,6 +8,7 @@ var debug = require('debug')('tim')
 var reemit = require('re-emitter')
 var bitcoin = require('bitcoinjs-lib')
 var extend = require('xtend/mutable')
+var clone = require('xtend/immutable')
 var collect = require('stream-collector')
 var tutils = require('tradle-utils')
 var map = require('map-stream')
@@ -59,6 +60,7 @@ var MIN_BALANCE = 10000
 var KEY_PURPOSE = 'messaging'
 Driver.CHAIN_WRITE_THROTTLE = 60000
 Driver.CHAIN_READ_THROTTLE = 60000
+Driver.SEND_THROTTLE = 10000
 Driver.CATCH_UP_INTERVAL = 2000
 var noop = function () {}
 
@@ -771,38 +773,209 @@ Driver.prototype._writeToChain = function () {
   )
 }
 
-Driver.prototype._getUnsentStream = function (options) {
+Driver.prototype._sendTheUnsent = function () {
+  var getStream = this.msgDB.getToSendStream.bind(this.msgDB, {
+    old: true,
+    tail: true
+  })
+
+  this._processQueue({
+    name: 'sendTheUnsent',
+    getStream: getStream,
+    processItem: this._trySend,
+    throttle: Driver.SEND_THROTTLE,
+    successType: EventType.msg.sendSuccess
+  })
+}
+
+// Driver.prototype._writeToChain = function () {
+//   var getStream = this.msgDB.getToChainStream.bind(this.msgDB, {
+//     old: true,
+//     tail: true
+//   })
+
+//   this._processQueue({
+//     name: 'writeToChain',
+//     getStream: getStream,
+//     processItem: this.putOnChain,
+//     throttle: Driver.CHAIN_WRITE_THROTTLE,
+//     successType: EventType.chain.writeSuccess
+//   })
+// }
+
+Driver.prototype._processQueue = function (opts) {
   var self = this
-  return pump(
-    this.msgDB.liveStream(extend({
-      tail: true,
-      old: true
-    }, options || {})),
-    toObjectStream(),
-    utils.filterStream(function (entry) {
-      if (entry.dateSent ||
-//           entry.txType === TxData.types.public ||
-          !entry.to ||
-          !entry.deliver ||
-          entry.dir !== Dir.outbound ||
-          self._currentlySending.indexOf(entry.uid) !== -1) {
-        return
+
+  typeforce({
+    name: 'String',
+    throttle: 'Number',
+    successType: 'Number',
+    getStream: 'Function',
+    processItem: 'Function',
+    skipFilter: '?Function',
+    delay: '?Function'
+  }, opts)
+
+  this._processingQueue = this._processingQueue || {}
+  if (this._processingQueue[opts.name]) return
+
+  this._processingQueue[opts.name] = true
+
+  // queues by recipient root hash
+  var queues = {}
+  var skipFilter = opts.skipFilter || alwaysFalse
+  var maybeDelay = opts.delay || alwaysFalse
+  var processItem = opts.processItem
+  var throttle = opts.throttle
+  var successType = opts.successType
+  var stream = opts.getStream()
+  var sync
+  stream.once('sync', function () {
+    sync = true
+  })
+
+  pump(
+    stream,
+    map(function (data, cb) {
+      if (data.type === 'del') {
+        remove(data)
+        return cb()
       }
 
-      var numErrors = utils.countErrors(entry, 'send')
-      if (numErrors > Errors.MAX_RESEND) {
-        if (numErrors === Errors.MAX_RESEND) {
-          self._debug('giving up on sending message', entry)
+      self.msgDB.get(data.value, function (err, state) {
+        if (err) throw err
+
+        if (skipFilter(state)) {
+          processItem(state)
+        } else {
+          insert(state)
+          processQueue(state.to[ROOT_HASH])
         }
 
-        return
-      }
-
-      return true
-    }),
-    this._rethrow
+        cb()
+      })
+    })
   )
+
+  function processQueue (rid) {
+    var q = queues[rid] = queues[rid] || []
+    if (!q.length || q.processing || q.waiting) return
+
+    var next = q[0]
+    delete next.errors
+    var delay = maybeDelay(next)
+      ? promiseDelay(throttle)
+      : Q.resolve()
+
+    return delay
+      .then(function () {
+        return processItem(next)
+      })
+      .done(function (entry) {
+        if (utils.getEntryProp(entry, 'type') === successType) {
+          q.shift()
+          processQueue(rid)
+        } else {
+          q.waiting = true
+          setTimeout(keepGoing, throttle)
+        }
+      })
+
+    function keepGoing () {
+      q.waiting = false
+      self.msgDB.onLive(function () {
+        processQueue(rid)
+      })
+    }
+  }
+
+  function insert (data) {
+    var rid = data.to[ROOT_HASH]
+    var q = queues[rid] = queues[rid] || []
+    if (!sync) return q.push(data)
+
+    var exists = q.some(function (item) {
+      return item.uid === data.uid
+    })
+
+    if (!exists) q.push(data)
+  }
+
+  function remove (data) {
+    var idx
+    q.some(function (item, i) {
+      if (item.uid === data.value) {
+        idx = i
+      }
+    })
+
+    if (idx !== -1) q.splice(idx, 1)
+  }
 }
+
+Driver.prototype._trySend = function (entry) {
+  // this._markSending(entry)
+  var self = this
+  var nextEntry = new Entry()
+    .set('uid', entry.uid)
+    .set(ROOT_HASH, entry[ROOT_HASH])
+
+  return Q.ninvoke(this.msgDB, 'onLive')
+    .then(function () {
+      return self._doSend(entry)
+    })
+    .then(function () {
+      return nextEntry.set('type', EventType.msg.sendSuccess)
+    })
+    .catch(function (err) {
+      nextEntry.set({
+        type: EventType.msg.sendError
+      })
+
+      utils.addError({
+        entry: nextEntry,
+        group: Errors.group.send,
+        error: err
+      })
+
+      // self._markNotSending(nextEntry)
+      return nextEntry
+    })
+    .then(this.log)
+}
+
+// Driver.prototype._getUnsentStream = function (options) {
+//   var self = this
+//   return pump(
+//     this.msgDB.liveStream(extend({
+//       tail: true,
+//       old: true
+//     }, options || {})),
+//     toObjectStream(),
+//     utils.filterStream(function (entry) {
+//       if (entry.dateSent ||
+// //           entry.txType === TxData.types.public ||
+//           !entry.to ||
+//           !entry.deliver ||
+//           entry.dir !== Dir.outbound ||
+//           self._currentlySending.indexOf(entry.uid) !== -1) {
+//         return
+//       }
+
+//       var numErrors = utils.countErrors(entry, 'send')
+//       if (numErrors > Errors.MAX_RESEND) {
+//         if (numErrors === Errors.MAX_RESEND) {
+//           self._debug('giving up on sending message', entry)
+//         }
+
+//         return
+//       }
+
+//       return true
+//     }),
+//     this._rethrow
+//   )
+// }
 
 Driver.prototype.name = function () {
   var name = this.identityJSON.name
@@ -822,59 +995,59 @@ Driver.prototype._markNotSending = function (entry) {
   this._currentlySending.splice(idx, 1)
 }
 
-Driver.prototype._sendTheUnsent = function () {
-  var self = this
-  if (this._destroyed) return
+// Driver.prototype._sendTheUnsent = function () {
+//   var self = this
+//   if (this._destroyed) return
 
-  var db = this.msgDB
+//   var db = this.msgDB
 
-  if (!db.isLive()) return db.once('live', this._sendTheUnsent)
+//   if (!db.isLive()) return db.once('live', this._sendTheUnsent)
 
-  if (this._sending) return
+//   if (this._sending) return
 
-  this._sending = true
-  this._currentlySending = []
-  this.msgDB.on('sent', this._markNotSending)
+//   this._sending = true
+//   this._currentlySending = []
+//   this.msgDB.on('sent', this._markNotSending)
 
-  pump(
-    this._getUnsentStream(),
-    map(function (entry, cb) {
-      var nextEntry = new Entry()
-        .set(ROOT_HASH, entry[ROOT_HASH])
-        .set('uid', entry.uid)
+//   pump(
+//     this._getUnsentStream(),
+//     map(function (entry, cb) {
+//       var nextEntry = new Entry()
+//         .set(ROOT_HASH, entry[ROOT_HASH])
+//         .set('uid', entry.uid)
 
-      self._markSending(entry)
-      self._doSend(entry)
-        .then(function () {
-          return nextEntry.set('type', EventType.msg.sendSuccess)
-        })
-        .catch(function (err) {
-          nextEntry.set({
-            type: EventType.msg.sendError
-          })
+//       self._markSending(entry)
+//       self._doSend(entry)
+//         .then(function () {
+//           return nextEntry.set('type', EventType.msg.sendSuccess)
+//         })
+//         .catch(function (err) {
+//           nextEntry.set({
+//             type: EventType.msg.sendError
+//           })
 
-          utils.addError({
-            entry: nextEntry,
-            group: Errors.group.send,
-            error: err
-          })
+//           utils.addError({
+//             entry: nextEntry,
+//             group: Errors.group.send,
+//             error: err
+//           })
 
-          self._markNotSending(nextEntry)
-          return nextEntry
-        })
-        .done(function (entry) {
-          cb(null, entry)
-        })
-    }),
-    // filter(function (data) {
-    //   console.log('after sendTheUnsent', data.toJSON())
-    //   return true
-    // }),
-    jsonifyTransform(),
-    this._log,
-    this._rethrow
-  )
-}
+//           self._markNotSending(nextEntry)
+//           return nextEntry
+//         })
+//         .done(function (entry) {
+//           cb(null, entry)
+//         })
+//     }),
+//     // filter(function (data) {
+//     //   console.log('after sendTheUnsent', data.toJSON())
+//     //   return true
+//     // }),
+//     jsonifyTransform(),
+//     this._log,
+//     this._rethrow
+//   )
+// }
 
 Driver.prototype._setupTxStream = function () {
   // Uncomment when Blockr supports querying by height
@@ -1053,14 +1226,12 @@ Driver.prototype._doSend = function (entry) {
   //   do we log that we sent it?
   //   do we log when we delivered it? How do we know it was delivered?
   var self = this
-  return Q.all([
-      this.lookupIdentity(entry.to),
-      this.lookupObject(entry)
-    ])
-    .spread(function (identityInfo, chainedObj) {
-      self._debug('sending msg to peer', chainedObj.parsed.data[TYPE])
-      var msg = utils.msgToBuffer(utils.getMsgProps(chainedObj))
-      return self.messenger.send(identityInfo[ROOT_HASH], msg, identityInfo)
+  return this.lookupObject(entry)
+    .then(function (obj) {
+      obj.to.identity = obj.to.identity.toJSON()
+      self._debug('sending msg to peer', obj.parsed.data[TYPE])
+      var msg = utils.msgToBuffer(utils.getMsgProps(obj))
+      return self.messenger.send(obj.to[ROOT_HASH], msg, obj.to)
     })
 }
 
@@ -1087,7 +1258,7 @@ Driver.prototype.lookupObject = function (info) {
   }
 
   var chainedObj
-  return this.chainloader.load(info)
+  return this.chainloader.load(clone(info))
     .then(function (obj) {
       chainedObj = obj
       return Q.ninvoke(Parser, 'parse', obj.data)
@@ -1778,4 +1949,14 @@ var jsonifyErrors = function (entry) {
   }
 
   return entry
+}
+
+function alwaysFalse () {
+  return false
+}
+
+function promiseDelay (millis) {
+  return Q.Promise(function (resolve) {
+    setTimeout(resolve, millis)
+  })
 }
