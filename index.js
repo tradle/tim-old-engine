@@ -186,6 +186,8 @@ function Driver (options) {
     lookup: this.lookupByDHTKey
   })
 
+  this._streams = {}
+
   // in-memory cache of recent conversants
   this._catchUpWithBlockchain()
   this._fingerprintToIdentity = {}
@@ -268,11 +270,14 @@ Driver.prototype._readFromChain = function () {
 
   this._queuedUnchains = {}
 
+  var stream = this.txDB.liveStream({
+    old: true,
+    tail: true
+  })
+
+  this._streams.txDB = stream
   pump(
-    this.txDB.liveStream({
-      old: true,
-      tail: true
-    }),
+    stream,
     toObjectStream(),
     map(function (entry, cb) {
       // was read from chain and hasn't been processed yet
@@ -336,13 +341,20 @@ Driver.prototype._readFromChain = function () {
       //   }
       // }
 
+      if (!utils.countErrors(chainedObj) &&
+        chainedObj.txType === TxData.types.public) {
+        self._debug('saving to keeper')
+        self.keeper.put(chainedObj.key, chainedObj.data)
+      }
+
+
       self.unchainResultToEntry(chainedObj)
         .done(function (entry) {
           self._rmPending(entry.txId)
           cb(null, entry)
         })
     }),
-    jsonifyTransform(),
+    utils.jsonifyTransform(),
     this._log,
     this._rethrow
   )
@@ -692,24 +704,6 @@ Driver.prototype.unchainResultToEntry = function (chainedObj) {
     })
 }
 
-// Driver.prototype._getToChainStream = function () {
-//   return pump(
-//     this.msgDB.liveStream({
-//       old: true,
-//       tail: true
-//     }),
-//     toObjectStream(),
-//     utils.filterStream(function (entry) {
-//       return !entry.tx &&
-//               entry.chain &&
-//              !entry.dateChained &&
-//               entry.dir === Dir.outbound &&
-//               (utils.countErrors(entry, 'chain') < Errors.MAX_CHAIN)
-//     }),
-//     this._rethrow
-//   )
-// }
-
 Driver.prototype._writeToChain = function () {
   var self = this
   var getStream = this.msgDB.getToChainStream.bind(this.msgDB, {
@@ -717,11 +711,13 @@ Driver.prototype._writeToChain = function () {
     tail: true
   })
 
+  var throttle = this.chainThrottle || Driver.CHAIN_WRITE_THROTTLE
   this._processQueue({
     name: 'writeToChain',
     getStream: getStream,
     processItem: this.putOnChain,
-    retryDelay: Driver.CHAIN_WRITE_THROTTLE,
+    throttle: throttle,
+    retryDelay: throttle,
     successType: EventType.chain.writeSuccess,
     shouldSkipQueue: function (state) {
       return state.public
@@ -734,72 +730,6 @@ Driver.prototype._writeToChain = function () {
     }
   })
 }
-
-/**
- * write to chain
- */
-// Driver.prototype._writeToChain = function () {
-//   var self = this
-//   if (this._destroyed) return
-
-//   var db = this.msgDB
-
-//   if (!db.isLive()) return db.once('live', this._writeToChain)
-//   if (this._chaining) return
-
-//   this._chaining = true
-//   var throttle = this.chainThrottle || Driver.CHAIN_WRITE_THROTTLE
-
-//   pump(
-//     this._getToChainStream(),
-//     map(function (entry, cb) {
-//       var errs = utils.getErrors(entry, 'chain')
-//       if (errs && errs.length) {
-//         self._debug('throttling chaining')
-//       }
-
-//       // don't write same errors into next log entry
-//       delete entry.errors
-//       throttleIfRetrying(errs, throttle, tryAgain)
-
-//       function tryAgain () {
-//         if (self._balance < MIN_BALANCE) {
-//           self.emit('lowbalance')
-//           return tryAgainSoon()
-//         }
-
-//         var nextEntry
-//         self.putOnChain(new Entry(entry))
-//           .then(function (_nextEntry) {
-//             nextEntry = _nextEntry
-//             return self._updateBalance()
-//           })
-//           .done(function () {
-//             cb(null, nextEntry)
-//           })
-//       }
-
-//       function tryAgainSoon () {
-//         self._debug('paused chaining, low balance')
-//         var timeout = setTimeout(function () {
-//           if (self._destroyed) return
-
-//           self._updateBalance()
-//             .finally(tryAgain)
-//         }, throttle)
-
-//         if (timeout.unref) timeout.unref()
-//       }
-//     }),
-//     // filter(function (data) {
-//     //   console.log('after chain write', data.toJSON())
-//     //   return true
-//     // }),
-//     jsonifyTransform(),
-//     this._log,
-//     this._rethrow
-//   )
-// }
 
 Driver.prototype._sendTheUnsent = function () {
   var getStream = this.msgDB.getToSendStream.bind(this.msgDB, {
@@ -821,7 +751,7 @@ Driver.prototype._processQueue = function (opts) {
 
   typeforce({
     name: 'String',
-    throttle: 'Number',
+    retryDelay: 'Number',
     successType: 'Number',
     getStream: 'Function',
     processItem: 'Function',
@@ -842,7 +772,7 @@ Driver.prototype._processQueue = function (opts) {
   var shouldTryLater = opts.shouldTryLater || alwaysFalse
   var processItem = opts.processItem
   if (opts.throttle) {
-    processItem = toThrottled(processItem, opts.throttle)
+    processItem = utils.rateLimitPromiseFn(processItem, opts.throttle)
   }
 
   var retryDelay = opts.retryDelay
@@ -853,6 +783,7 @@ Driver.prototype._processQueue = function (opts) {
     sync = true
   })
 
+  this._streams[name] = stream
   pump(
     stream,
     map(function (data, cb) {
@@ -880,6 +811,7 @@ Driver.prototype._processQueue = function (opts) {
   )
 
   function runASAP (state) {
+    if (self._destroyed) return
     if (shouldTryLater(state)) {
       setTimeout(runASAP.bind(null, state), retryDelay)
     } else {
@@ -896,7 +828,7 @@ Driver.prototype._processQueue = function (opts) {
     var next = q[0]
     delete next.errors
     if (shouldTryLater(next)) {
-      return promiseDelay(retryDelay)
+      return utils.promiseDelay(retryDelay)
         .done(processQueue.bind(null, rid))
     }
 
@@ -915,6 +847,7 @@ Driver.prototype._processQueue = function (opts) {
       })
 
     function keepGoing () {
+      if (self._destroyed) return
       q.waiting = false
       // probably not needed
       self.msgDB.onLive(function () {
@@ -964,9 +897,11 @@ Driver.prototype._trySend = function (entry) {
       return self._doSend(entry)
     })
     .then(function () {
+      self._debug('msg sent successfully')
       return nextEntry.set('type', EventType.msg.sendSuccess)
     })
     .catch(function (err) {
+      self._debug('msg send failed', err.message)
       nextEntry.set({
         type: EventType.msg.sendError
       })
@@ -982,39 +917,6 @@ Driver.prototype._trySend = function (entry) {
     })
     .then(this.log)
 }
-
-// Driver.prototype._getUnsentStream = function (options) {
-//   var self = this
-//   return pump(
-//     this.msgDB.liveStream(extend({
-//       tail: true,
-//       old: true
-//     }, options || {})),
-//     toObjectStream(),
-//     utils.filterStream(function (entry) {
-//       if (entry.dateSent ||
-// //           entry.txType === TxData.types.public ||
-//           !entry.to ||
-//           !entry.deliver ||
-//           entry.dir !== Dir.outbound ||
-//           self._currentlySending.indexOf(entry.uid) !== -1) {
-//         return
-//       }
-
-//       var numErrors = utils.countErrors(entry, 'send')
-//       if (numErrors > Errors.MAX_RESEND) {
-//         if (numErrors === Errors.MAX_RESEND) {
-//           self._debug('giving up on sending message', entry)
-//         }
-
-//         return
-//       }
-
-//       return true
-//     }),
-//     this._rethrow
-//   )
-// }
 
 Driver.prototype.name = function () {
   var name = this.identityJSON.name
@@ -1033,60 +935,6 @@ Driver.prototype._markNotSending = function (entry) {
   var idx = this._currentlySending.indexOf(entry.uid)
   this._currentlySending.splice(idx, 1)
 }
-
-// Driver.prototype._sendTheUnsent = function () {
-//   var self = this
-//   if (this._destroyed) return
-
-//   var db = this.msgDB
-
-//   if (!db.isLive()) return db.once('live', this._sendTheUnsent)
-
-//   if (this._sending) return
-
-//   this._sending = true
-//   this._currentlySending = []
-//   this.msgDB.on('sent', this._markNotSending)
-
-//   pump(
-//     this._getUnsentStream(),
-//     map(function (entry, cb) {
-//       var nextEntry = new Entry()
-//         .set(ROOT_HASH, entry[ROOT_HASH])
-//         .set('uid', entry.uid)
-
-//       self._markSending(entry)
-//       self._doSend(entry)
-//         .then(function () {
-//           return nextEntry.set('type', EventType.msg.sendSuccess)
-//         })
-//         .catch(function (err) {
-//           nextEntry.set({
-//             type: EventType.msg.sendError
-//           })
-
-//           utils.addError({
-//             entry: nextEntry,
-//             group: Errors.group.send,
-//             error: err
-//           })
-
-//           self._markNotSending(nextEntry)
-//           return nextEntry
-//         })
-//         .done(function (entry) {
-//           cb(null, entry)
-//         })
-//     }),
-//     // filter(function (data) {
-//     //   console.log('after sendTheUnsent', data.toJSON())
-//     //   return true
-//     // }),
-//     jsonifyTransform(),
-//     this._log,
-//     this._rethrow
-//   )
-// }
 
 Driver.prototype._setupTxStream = function () {
   // Uncomment when Blockr supports querying by height
@@ -1200,7 +1048,7 @@ Driver.prototype._streamTxs = function (fromHeight, skipIds) {
         cb(null, nextEntry)
       }
     }),
-    jsonifyTransform(),
+    utils.jsonifyTransform(),
     this._log,
     this._rethrow
   )
@@ -1425,7 +1273,7 @@ Driver.prototype._lookupIdentity = function (query) {
 }
 
 Driver.prototype.log = function (entry) {
-  jsonifyErrors(entry)
+  utils.jsonifyErrors(entry)
   return Q.ninvoke(this._log, 'append', entry)
     .then(function () {
       // pass through for convenience
@@ -1518,10 +1366,7 @@ Driver.prototype.receiveMsg = function (buf, senderInfo) {
         }
       })
     })
-    .then(function (entry) {
-      jsonifyErrors(entry)
-      return self.log(entry)
-    })
+    .then(this.log)
 }
 
 Driver.prototype.myRootHash = function () {
@@ -1877,6 +1722,10 @@ Driver.prototype.destroy = function () {
     this._rawTxStream.close() // custom close method
   }
 
+  for (var name in this._streams) {
+    this._streams[name].destroy()
+  }
+
   delete this._identityCache
   // async
   return Q.all([
@@ -1887,6 +1736,10 @@ Driver.prototype.destroy = function () {
       Q.ninvoke(self.txDB, 'close'),
       Q.ninvoke(self._log, 'close')
     ])
+    .then(function () {
+      self._debug('destroyed!')
+    })
+
     // .then(function () {
     //   self.removeAllListeners()
     // })
@@ -1970,48 +1823,6 @@ var toObjectStream = map.bind(null, function (data, cb) {
   cb(null, data.value)
 })
 
-var jsonifyTransform = map.bind(null, function (entry, cb) {
-  cb(null, jsonifyErrors(entry))
-})
-
-var jsonifyErrors = function (entry) {
-  var errs = utils.getEntryProp(entry, 'errors')
-  if (errs) {
-    for (var group in errs) {
-      errs[group] = errs[group].map(function (err) {
-        if (!err.timestamp) err.timestamp = utils.now()
-
-        return utils.errToJSON(err)
-      })
-
-      utils.setEntryProp(entry, 'errors', errs)
-    }
-  }
-
-  return entry
-}
-
 function alwaysFalse () {
   return false
-}
-
-function promiseDelay (millis) {
-  return Q.Promise(function (resolve) {
-    setTimeout(resolve, millis)
-  })
-}
-
-function rateLimitPromise (fn, millis) {
-  var lastCalled = 0
-  return function () {
-    lastCalled = utils.now()
-    return fn()
-      .finally(function () {
-        var now = utils.now()
-        var delay = now - lastCalled
-        if (delay < millis) {
-          return promiseDelay(delay)
-        }
-      })
-  }
 }

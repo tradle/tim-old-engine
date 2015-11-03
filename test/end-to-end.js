@@ -42,11 +42,12 @@ var rufusPriv = require('./fixtures/rufus-priv')
 var rufus = Identity.fromJSON(rufusPub)
 var constants = require('tradle-constants')
 // var testDrivers = require('./helpers/testDriver')
-var billPort = 51086
-var tedPort = 51087
-var rufusPort = 51088
+var BASE_PORT = 33333
+var billPort = BASE_PORT++
+var tedPort = BASE_PORT++
+var rufusPort = BASE_PORT++
 var bootstrapDHT
-var BOOTSTRAP_DHT_PORT = 54321
+var BOOTSTRAP_DHT_PORT = BASE_PORT++
 var TYPE = constants.TYPE
 var ROOT_HASH = constants.ROOT_HASH
 var CUR_HASH = constants.CUR_HASH
@@ -69,6 +70,15 @@ var Driver = require('../')
 Driver.CATCH_UP_INTERVAL = 1000
 Driver.SEND_THROTTLE = 1000
 var currentTime = require('../lib/utils').now
+// var TimeMethod = require('time-method')
+// var timTimer = TimeMethod(Driver.prototype)
+// timTimer.millis()
+// for (var p in Driver.prototype) {
+//   if (typeof Driver.prototype[p] === 'function') {
+//     timTimer.time(p)
+//   }
+// }
+
 // var timeMethod = require('../lib/timeMethod')
 
 // for (var p in Driver.prototype) {
@@ -85,7 +95,7 @@ var driverTed
 var driverRufus
 var reinitCount = 0
 var nonce
-var chainThrottle = 5000
+var chainThrottle = 1000
 var testTimerName = 'test took'
 var sharedKeeper
 test.beforeEach = function (cb) {
@@ -106,8 +116,12 @@ test.afterEach = function (cb) {
 
 rimraf.sync(STORAGE_DIR)
 
-test('resending / order', function (t) {
-  t.timeoutAfter(15000)
+  // console.log(process._getActiveHandles().map(function (fn) {
+  //   return getFunctionName(fn.constructor)
+  // }))
+
+test('resending & order guarantees', function (t) {
+  t.timeoutAfter(20000)
   publishIdentities([driverBill, driverTed], function () {
     var msgs = [
       {
@@ -134,8 +148,12 @@ test('resending / order', function (t) {
     var send = z.send
     z.send = function (rh, msg) {
       var eData = JSON.parse(msg).encryptedData
-      var decrypted = copy[encrypted.indexOf(eData)]
-      // var cb = [].slice.call(arguments).pop()
+      var idx = encrypted.indexOf(eData)
+      var decrypted = copy[idx]
+      if (decrypted.succeedAfter < msgs[idx].succeedAfter) {
+        t.pass('resending')
+      }
+
       if (decrypted.succeedAfter-- > 0) {
         // should resend after this
         return Q.reject(new Error('failed to send'))
@@ -317,7 +335,7 @@ test('no chaining attempted if low balance', function (t) {
     .done(function () {
       driverBill.publishMyIdentity().done()
       driverBill.on('chaining', t.fail)
-      driverBill.on('lowbalance', function () {
+      driverBill.once('lowbalance', function () {
         t.pass()
         setTimeout(t.pass, 1000)
       })
@@ -326,7 +344,7 @@ test('no chaining attempted if low balance', function (t) {
 
 test('delivered/chained/both', function (t) {
   t.plan(4)
-  // t.timeoutAfter(60000)
+  //t.timeoutAfter(60000)
   publishIdentities([driverBill, driverTed], function () {
     var msgs = [
       { chain: true, deliver: false },
@@ -496,7 +514,7 @@ test('throttle chaining', function (t) {
 
 test('delivery check', function (t) {
   t.plan(2)
-  // t.timeoutAfter(60000)
+  //t.timeoutAfter(60000)
   publishIdentities([driverBill, driverTed], function () {
     var billCoords = {
       fingerprint: billPub.pubkeys[0].fingerprint
@@ -697,6 +715,13 @@ test('message resolution - contents match on p2p and chain channels', function (
   })
 })
 
+// return setInterval(function () {
+//   console.log(process._getActiveHandles().map(function (fn) {
+//     return getFunctionName(fn.constructor)
+//   }))
+// }, 2000).unref()
+
+
 function init (cb) {
   reinitCount++
 
@@ -784,9 +809,14 @@ function teardown (cb) {
     .done(function () {
       rimraf.sync(STORAGE_DIR)
       driverBill = driverTed = driverRufus = null
+      // printStats()
       safe(cb)()
-      // timeMethod.printTotals()
     })
+}
+
+function printStats () {
+  console.log(timTimer.getStats())
+  timTimer.reset()
 }
 
 function publishIdentities (drivers, cb) {
@@ -878,4 +908,8 @@ function cloneDeadDriver (driver) {
     // keeper: new Keeper({ dht: driverBill.dht, storage: STORAGE_DIR })
     keeper: sharedKeeper
   }))
+}
+
+function getFunctionName(fn) {
+  return fn.name || fn.toString().match(/function (.*?)\s*\(/)[1];
 }
