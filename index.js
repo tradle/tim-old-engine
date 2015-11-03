@@ -350,7 +350,7 @@ Driver.prototype._readFromChain = function () {
 
       self.unchainResultToEntry(chainedObj)
         .done(function (entry) {
-          self._rmPending(entry.txId)
+          self._rmPending(utils.getEntryProp(entry, 'txId'))
           cb(null, entry)
         })
     }),
