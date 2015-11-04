@@ -892,10 +892,10 @@ Driver.prototype._trySend = function (entry) {
     .set('uid', entry.uid)
     .set(ROOT_HASH, entry[ROOT_HASH])
 
-  return Q.ninvoke(this.msgDB, 'onLive')
-    .then(function () {
+  // return Q.ninvoke(this.msgDB, 'onLive')
+  //   .then(function () {
       return self._doSend(entry)
-    })
+    // })
     .then(function () {
       self._debug('msg sent successfully')
       return nextEntry.set('type', EventType.msg.sendSuccess)
@@ -1505,6 +1505,7 @@ Driver.prototype.share = function (options) {
     .then(function (obj) {
       entry.set(CUR_HASH, curHash)
         .set(ROOT_HASH, obj[ROOT_HASH])
+        .set(TYPE, obj[TYPE])
 
       var symmetricKey = obj.permission.body().decryptionKey
       return Q.all(recipients.map(function (r) {
@@ -1611,8 +1612,11 @@ Driver.prototype.send = function (options) {
   var btcKeys
   return this._readyPromise
     // validate
-    .then(Q.ninvoke(Parser, 'parse', data))
+    .then(function () {
+      return Q.ninvoke(Parser, 'parse', data)
+    })
     .then(function (parsed) {
+      entry.set(TYPE, parsed.data[TYPE])
       return isPublic
         ? Q.resolve(to)
         : Q.all(to.map(self.lookupIdentity, self))
