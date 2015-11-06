@@ -29,7 +29,7 @@
   "license": "ISC",
   "dependencies": {
     "array-find": "^1.0.0",
-    "bitcoinjs-lib": "^1.4.1",
+    "bitcoinjs-lib": "mvayngrib/bitcoinjs-lib#lazy1.4.5",
     "bitjoe-js": "tradle/bitjoe-js",
     "bittorrent-dht": "tradle/bittorrent-dht",
     "cb-streams": "^1.1.2",
@@ -60,9 +60,9 @@
     "tradle-constants": "^1.1.1",
     "tradle-permission": "tradle/permission",
     "tradle-tx-data": "tradle/tx-data",
-    "tradle-utils": "^0.1.5",
+    "tradle-utils": "^0.2.1",
     "tradle-verifier": "tradle/tradle-verifier",
-    "typeforce": "^1.1.2",
+    "typeforce": "^1.4.0",
     "uniq": "^1.0.1",
     "xtend": "^4.0.0",
     "zlorp": "tradle/zlorp#talko2"
@@ -75,6 +75,7 @@
     "standard": "^4.5.2",
     "tape": "^4.0.0",
     "tape-extra": "^1.0.0",
+    "time-method": "^1.0.1",
     "tradle-test-helpers": "tradle/test-helpers"
   }
 }
