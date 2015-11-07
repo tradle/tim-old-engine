@@ -72,22 +72,12 @@ Driver.SEND_THROTTLE = 1000
 var currentTime = require('../lib/utils').now
 // var TimeMethod = require('time-method')
 // var timTimer = TimeMethod(Driver.prototype)
-// timTimer.millis()
 // for (var p in Driver.prototype) {
 //   if (typeof Driver.prototype[p] === 'function') {
 //     timTimer.time(p)
 //   }
 // }
 
-// var timeMethod = require('../lib/timeMethod')
-
-// for (var p in Driver.prototype) {
-//   if (typeof Driver.prototype[p] === 'function') {
-//     timeMethod(Driver.prototype, p)
-//   }
-// }
-
-// var TestDriver = require('./helpers/testDriver')
 var noop = function () {}
 
 var driverBill
@@ -115,10 +105,6 @@ test.afterEach = function (cb) {
 }
 
 rimraf.sync(STORAGE_DIR)
-
-  // console.log(process._getActiveHandles().map(function (fn) {
-  //   return getFunctionName(fn.constructor)
-  // }))
 
 test('resending & order guarantees', function (t) {
   t.timeoutAfter(20000)
@@ -172,14 +158,19 @@ test('resending & order guarantees', function (t) {
       })
     })
 
-    var togo = msgs.length
+    var togo = msgs.length * 2 // send + receive
     var received = 0
+    driverBill.on('message', next.bind(null, 'received'))
+    driverTed.on('sent', next.bind(null, 'sent'))
     driverBill.on('message', function (info) {
       driverBill.lookupObject(info)
         .done(function (obj) {
           t.deepEqual(obj.parsed.data, msgs[received++])
         })
+    })
 
+    function next (event) {
+      console.log(event)
       if (--togo) return
 
       t.pass('msg resent after failed send')
@@ -194,9 +185,11 @@ test('resending & order guarantees', function (t) {
           t.end()
         })
         .done()
-    })
+    }
   })
 })
+
+// if (true) return
 
 test('the reader and the writer', function (t) {
   t.timeoutAfter(20000)
@@ -815,7 +808,17 @@ function teardown (cb) {
 }
 
 function printStats () {
-  console.log(timTimer.getStats())
+  var stats = timTimer.getStats()
+    .filter(function (s) {
+      return s.timePerInvocation > 20000000 // 20 ms
+    })
+
+  stats.forEach(function (s) {
+    s.time /= 1e6
+    s.timePerInvocation /= 1e6
+  })
+
+  console.log(stats)
   timTimer.reset()
 }
 
