@@ -24,6 +24,7 @@ var Wallet = require('simple-wallet')
 var cbstreams = require('cb-streams')
 var Zlorp = require('zlorp')
 var Messengers = require('./lib/messengers')
+var hrtime = require('monotonic-timestamp')
 var mi = require('midentity')
 var Identity = mi.Identity
 var kiki = require('kiki')
@@ -1303,6 +1304,8 @@ Driver.prototype.receiveMsg = function (buf, senderInfo) {
 
   this._debug('received msg', msg)
 
+  var timestamp = hrtime()
+
   // this thing repeats work all over the place
   var txInfo
   var promiseValid
@@ -1366,7 +1369,10 @@ Driver.prototype.receiveMsg = function (buf, senderInfo) {
         }
       })
     })
-    .then(this.log)
+    .then(function (entry) {
+      entry.set('timestamp', timestamp)
+      return self.log(entry)
+    })
 }
 
 Driver.prototype.myRootHash = function () {
