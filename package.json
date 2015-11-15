@@ -30,8 +30,8 @@
   "dependencies": {
     "array-find": "^1.0.0",
     "bitcoinjs-lib": "mvayngrib/bitcoinjs-lib#lazy1.4.5",
-    "bitjoe-js": "tradle/bitjoe-js",
-    "bittorrent-dht": "tradle/bittorrent-dht",
+    "bitjoe-js": "tradle/bitjoe-js#029c669",
+    "bittorrent-dht": "tradle/bittorrent-dht#ebf95d8",
     "cb-streams": "^1.1.2",
     "chained-obj": "^1.3.1",
     "chainloader": "^1.1.0",
@@ -54,22 +54,23 @@
     "pump": "^1.0.0",
     "q": "^1.4.1",
     "re-emitter": "^1.1.1",
+    "readable-stream": "~1.0.33",
     "safecb": "0.0.1",
-    "simple-wallet": "tradle/simple-wallet",
+    "simple-wallet": "tradle/simple-wallet#d973d8c",
     "stream-collector": "^1.0.1",
     "stream-combiner2": "~1.0.2",
     "tradle-constants": "^1.1.1",
-    "tradle-permission": "tradle/permission",
-    "tradle-tx-data": "tradle/tx-data",
+    "tradle-permission": "tradle/permission#027cf11",
+    "tradle-tx-data": "tradle/tx-data#eb0c9fb",
     "tradle-utils": "^0.2.1",
-    "tradle-verifier": "tradle/tradle-verifier",
+    "tradle-verifier": "tradle/tradle-verifier#5755765",
     "typeforce": "^1.4.0",
     "uniq": "^1.0.1",
     "xtend": "^4.0.0",
     "zlorp": "tradle/zlorp#talko2"
   },
   "devDependencies": {
-    "cb-blockr": "tradle/cb-blockr",
+    "cb-blockr": "tradle/cb-blockr#0c71bf",
     "memdown": "^1.0.0",
     "pre-commit": "^1.0.10",
     "rimraf": "^2.4.1",
@@ -77,6 +78,6 @@
     "tape": "^4.0.0",
     "tape-extra": "^1.0.0",
     "time-method": "^1.0.1",
-    "tradle-test-helpers": "tradle/test-helpers"
+    "tradle-test-helpers": "tradle/test-helpers#de573b5"
   }
 }
