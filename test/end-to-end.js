@@ -69,7 +69,7 @@ var networkName = 'testnet'
 var Driver = require('../')
 Driver.CATCH_UP_INTERVAL = 1000
 Driver.SEND_THROTTLE = 1000
-var currentTime = require('../lib/utils').now
+var utils = require('../lib/utils')
 // var TimeMethod = require('time-method')
 // var timTimer = TimeMethod(Driver.prototype)
 // for (var p in Driver.prototype) {
@@ -115,15 +115,27 @@ test('resending & order guarantees', function (t) {
       },
       {
         succeedAfter: 0
-      }
+      },
+      // {
+      //   succeedAfter: 0
+      // },
+      // {
+      //   succeedAfter: 0
+      // },
+      // {
+      //   succeedAfter: 0
+      // }
     ].map(function (msg) {
-      msg[NONCE] = '1'
+      msg[NONCE] = '' + (nonce++)
       return msg
     })
 
     var encrypted = [
       "P767yN9gJZpg6DPFoXt+g5Ho8ZDPt9Bp1KQI",
-      "P767yN9gJZpg6DPFoXt+g5Ho8ZDPt9Bp1KEI"
+      "P767yN9gJZlg6DPFoXt+g5Ho8ZDPt9Bp1KEI",
+      // "P767yN9gJZhg6DPFoXt+g5Ho8ZDPt9Bp1KEI",
+      // "P767yN9gJZ9g6DPFoXt+g5Ho8ZDPt9Bp1KEI",
+      // "P767yN9gJZ5g6DPFoXt+g5Ho8ZDPt9Bp1KEI"
     ]
 
     var copy = msgs.map(function (m) {
@@ -170,7 +182,7 @@ test('resending & order guarantees', function (t) {
     })
 
     function next (event) {
-      console.log(event)
+      // console.log(event)
       if (--togo) return
 
       t.pass('msg resent after failed send')
@@ -188,8 +200,6 @@ test('resending & order guarantees', function (t) {
     }
   })
 })
-
-// if (true) return
 
 test('the reader and the writer', function (t) {
   t.timeoutAfter(20000)
@@ -485,10 +495,10 @@ test('throttle chaining', function (t) {
     cb(new Error('this is a test error'))
 
     if (!firstErrTime) {
-      firstErrTime = currentTime()
+      firstErrTime = utils.now()
     } else {
       blockchain.transactions.propagate = propagate
-      t.ok(currentTime() - firstErrTime > chainThrottle * 0.8) // fuzzy
+      t.ok(utils.now() - firstErrTime > chainThrottle * 0.8) // fuzzy
     }
   }
 

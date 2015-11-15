@@ -752,12 +752,13 @@ Driver.prototype._processQueue = function (opts) {
 
   typeforce({
     name: 'String',
-    retryDelay: 'Number',
     successType: 'Number',
     getStream: 'Function',
     processItem: 'Function',
     shouldSkipQueue: '?Function',
-    shouldTryLater: '?Function'
+    shouldTryLater: '?Function',
+    retryDelay: '?Number',
+    retryOnFail: '?Boolean' // default: true
   }, opts)
 
   var name = opts.name
@@ -777,6 +778,7 @@ Driver.prototype._processQueue = function (opts) {
   }
 
   var retryDelay = opts.retryDelay
+  var retryOnFail = opts.retryOnFail !== false
   var successType = opts.successType
   var stream = opts.getStream()
   var sync
@@ -837,10 +839,11 @@ Driver.prototype._processQueue = function (opts) {
       .done(function (entry) {
         self._debug('processed item from queue', name)
         q.processing = false
-        if (utils.getEntryProp(entry, 'type') === successType) {
+        if (utils.getEntryProp(entry, 'type') === successType
+          || !retryOnFail) {
           q.shift()
           processQueue(rid)
-        } else {
+        } else if (retryOnFail) {
           self._debug('throttling queue', name)
           q.waiting = true
           setTimeout(keepGoing, retryDelay)
