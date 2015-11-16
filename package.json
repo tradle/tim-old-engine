@@ -78,6 +78,6 @@
     "tape": "^4.0.0",
     "tape-extra": "^1.0.0",
     "time-method": "^1.0.1",
-    "tradle-test-helpers": "tradle/test-helpers#de573b5"
+    "tradle-test-helpers": "tradle/test-helpers#cde573b"
   }
 }
