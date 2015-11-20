@@ -106,6 +106,22 @@ test.afterEach = function (cb) {
 
 rimraf.sync(STORAGE_DIR)
 
+test('pause/unpause', function (t) {
+  driverBill.pause()
+  driverTed.pause()
+  driverBill.publishMyIdentity()
+  driverTed.on('unchained', t.fail)
+  setTimeout(function () {
+    driverTed.removeListener('unchained', t.fail)
+    driverBill.resume()
+    driverTed.resume()
+    driverTed.on('unchained', function () {
+      t.pass()
+      t.end()
+    })
+  }, 5000)
+})
+
 test('resending & order guarantees', function (t) {
   t.timeoutAfter(20000)
   publishIdentities([driverBill, driverTed], function () {

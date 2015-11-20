@@ -145,6 +145,8 @@ function Driver (options) {
   // init balance while we rely on blockr for this info
   this._balance = 0
 
+  this._paused = false
+
   // this._monkeypatchWallet()
   this.messenger = options.messenger || new Messengers.P2P({
     zlorp: new Zlorp({
@@ -235,6 +237,30 @@ Driver.prototype.ready = function () {
 
 Driver.prototype.isReady = function () {
   return this._ready
+}
+
+Driver.prototype.pause = function (resumeTimeout) {
+  if (this._paused) return
+
+  this._debug('pausing...')
+  this._paused = true
+  for (var name in this._streams) {
+    this._streams[name].pause()
+  }
+
+  if (typeof resumeTimeout === 'number') {
+    setTimeout(this.resume, resumeTimeout)
+  }
+}
+
+Driver.prototype.resume = function () {
+  if (!this._paused) return
+
+  this._debug('resuming...')
+  this._paused = false
+  for (var name in this._streams) {
+    this._streams[name].resume()
+  }
 }
 
 Driver.prototype._prepIdentity = function () {
@@ -359,6 +385,15 @@ Driver.prototype._readFromChain = function () {
     this._log,
     this._rethrow
   )
+
+  this._pauseStreamIfPaused(stream)
+}
+
+Driver.prototype._pauseStreamIfPaused = function (stream) {
+  if (this._paused) {
+    debugger
+    stream.pause()
+  }
 }
 
 Driver.prototype._remove = function (info) {
@@ -813,6 +848,8 @@ Driver.prototype._processQueue = function (opts) {
     })
   )
 
+  this._pauseStreamIfPaused(stream)
+
   function runASAP (state) {
     if (self._destroyed) return
     if (shouldTryLater(state)) {
@@ -986,7 +1023,7 @@ Driver.prototype._streamTxs = function (fromHeight, skipIds) {
 
   if (!fromHeight) fromHeight = 0
 
-  this._rawTxStream = cbstreams.stream.txs({
+  this._streams.rawTxs = this._rawTxStream = cbstreams.stream.txs({
     live: true,
     interval: this.syncInterval || 60000,
     api: this.blockchain,
@@ -997,6 +1034,10 @@ Driver.prototype._streamTxs = function (fromHeight, skipIds) {
       constants.IDENTITY_PUBLISH_ADDRESS
     ]
   })
+
+  if (!this._rawTxStream.destroy) {
+    this._rawTxStream.destroy = this._rawTxStream.close.bind(this._rawTxStream)
+  }
 
   pump(
     this._rawTxStream,
@@ -1056,6 +1097,8 @@ Driver.prototype._streamTxs = function (fromHeight, skipIds) {
     this._log,
     this._rethrow
   )
+
+  this._pauseStreamIfPaused(this._rawTxStream)
 }
 
 Driver.prototype._setupDBs = function () {
@@ -1731,9 +1774,9 @@ Driver.prototype.destroy = function () {
 
   // sync
   this.chainwriter.destroy()
-  if (this._rawTxStream) {
-    this._rawTxStream.close() // custom close method
-  }
+  // if (this._rawTxStream) {
+  //   this._rawTxStream.close() // custom close method
+  // }
 
   for (var name in this._streams) {
     this._streams[name].destroy()
