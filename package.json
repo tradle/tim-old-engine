@@ -77,7 +77,7 @@
     "standard": "^4.5.2",
     "tape": "^4.0.0",
     "tape-extra": "^1.0.0",
-    "time-method": "^1.0.1",
+    "time-method": "^2.0.0",
     "tradle-test-helpers": "tradle/test-helpers#cde573b"
   }
 }
