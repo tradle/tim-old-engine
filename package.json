@@ -29,7 +29,7 @@
   "license": "ISC",
   "dependencies": {
     "array-find": "^1.0.0",
-    "bitcoinjs-lib": "mvayngrib/bitcoinjs-lib#lazy1.4.5",
+    "bitcoinjs-lib": "mvayngrib/bitcoinjs-lib#lazy1.5.7",
     "bitjoe-js": "tradle/bitjoe-js#029c669",
     "bittorrent-dht": "tradle/bittorrent-dht#ebf95d8",
     "cb-streams": "^1.3.0",
