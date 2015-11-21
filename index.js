@@ -391,7 +391,6 @@ Driver.prototype._readFromChain = function () {
 
 Driver.prototype._pauseStreamIfPaused = function (stream) {
   if (this._paused) {
-    debugger
     stream.pause()
   }
 }
