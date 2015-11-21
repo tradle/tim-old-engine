@@ -107,6 +107,7 @@ test.afterEach = function (cb) {
 rimraf.sync(STORAGE_DIR)
 
 test('pause/unpause', function (t) {
+  t.timeoutAfter(20000)
   driverBill.pause()
   driverTed.pause()
   driverBill.publishMyIdentity()
