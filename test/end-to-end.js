@@ -1,7 +1,7 @@
 
 if (process.env.MULTIPLEX) {
   console.log('multiplex over UTP')
-  require('multiplex-utp')
+  require('@tradle/multiplex-utp')
 }
 
 var path = require('path')
@@ -16,21 +16,20 @@ var collect = require('stream-collector')
 var map = require('map-stream')
 var safe = require('safecb')
 var Q = require('q')
-var DHT = require('bittorrent-dht')
+var DHT = require('@tradle/bittorrent-dht')
 // var Keeper = require('bitkeeper-js')
-var FakeKeeper = require('tradle-test-helpers').fakeKeeper
 var Zlorp = require('zlorp')
 Zlorp.ANNOUNCE_INTERVAL = Zlorp.LOOKUP_INTERVAL = 5000
-var ChainedObj = require('chained-obj')
+var ChainedObj = require('@tradle/chained-obj')
 var Builder = ChainedObj.Builder
-var kiki = require('kiki')
+var kiki = require('@tradle/kiki')
 var toKey = kiki.toKey
-var CreateRequest = require('bitjoe-js/lib/requests/create')
+var CreateRequest = require('@tradle/bitjoe-js/lib/requests/create')
 CreateRequest.prototype._generateSymmetricKey = function () {
   return new Buffer('1111111111111111111111111111111111111111111111111111111111111111', 'hex')
 }
 
-var Identity = require('midentity').Identity
+var Identity = require('@tradle/identity').Identity
 var billPub = require('./fixtures/bill-pub')
 var billPriv = require('./fixtures/bill-priv')
 var bill = Identity.fromJSON(billPub)
@@ -40,7 +39,7 @@ var ted = Identity.fromJSON(tedPub)
 var rufusPub = require('./fixtures/rufus-pub')
 var rufusPriv = require('./fixtures/rufus-priv')
 var rufus = Identity.fromJSON(rufusPub)
-var constants = require('tradle-constants')
+var constants = require('@tradle/constants')
 // var testDrivers = require('./helpers/testDriver')
 var BASE_PORT = 33333
 var billPort = BASE_PORT++
@@ -59,9 +58,10 @@ var STORAGE_DIR = path.resolve('./storage')
 // var billHash = billPub[ROOT_HASH] ='fb07729c0cef307ab7c28cb76088cc60dbc98cdd'
 // var tedHash = 'c67905793f6cc0f0ab8d20aecfec441932ffb13d'
 // var billHash = 'fb07729c0cef307ab7c28cb76088cc60dbc98cdd'
-var help = require('tradle-test-helpers')
+var help = require('@tradle/test-helpers')
 // var fakeKeeper = help.fakeKeeper
 var fakeWallet = help.fakeWallet
+var FakeKeeper = help.fakeKeeper
 // var bill = Identity.fromJSON(billPriv)
 // var ted = Identity.fromJSON(tedPriv)
 var networkName = 'testnet'
