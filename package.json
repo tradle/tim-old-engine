@@ -67,7 +67,7 @@
     "typeforce": "^1.4.0",
     "uniq": "^1.0.1",
     "xtend": "^4.0.0",
-    "zlorp": "^2.0.0"
+    "zlorp": "^2.0.1"
   },
   "devDependencies": {
     "@tradle/cb-blockr": "^3.1.1",

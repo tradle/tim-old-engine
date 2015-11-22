@@ -133,15 +133,15 @@ test('resending & order guarantees', function (t) {
       {
         succeedAfter: 0
       },
-      // {
-      //   succeedAfter: 0
-      // },
-      // {
-      //   succeedAfter: 0
-      // },
-      // {
-      //   succeedAfter: 0
-      // }
+      {
+        succeedAfter: 0
+      },
+      {
+        succeedAfter: 0
+      },
+      {
+        succeedAfter: 0
+      }
     ].map(function (msg) {
       msg[NONCE] = '' + (nonce++)
       return msg
@@ -150,9 +150,9 @@ test('resending & order guarantees', function (t) {
     var encrypted = [
       "P767yN9gJZpg6DPFoXt+g5Ho8ZDPt9Bp1KQI",
       "P767yN9gJZlg6DPFoXt+g5Ho8ZDPt9Bp1KEI",
-      // "P767yN9gJZhg6DPFoXt+g5Ho8ZDPt9Bp1KEI",
-      // "P767yN9gJZ9g6DPFoXt+g5Ho8ZDPt9Bp1KEI",
-      // "P767yN9gJZ5g6DPFoXt+g5Ho8ZDPt9Bp1KEI"
+      "P767yN9gJZhg6DPFoXt+g5Ho8ZDPt9Bp1KEI",
+      "P767yN9gJZ9g6DPFoXt+g5Ho8ZDPt9Bp1KEI",
+      "P767yN9gJZ5g6DPFoXt+g5Ho8ZDPt9Bp1KEI"
     ]
 
     var copy = msgs.map(function (m) {
@@ -194,7 +194,12 @@ test('resending & order guarantees', function (t) {
     driverBill.on('message', function (info) {
       driverBill.lookupObject(info)
         .done(function (obj) {
-          t.deepEqual(obj.parsed.data, msgs[received++])
+          if (msgs[received].succeedAfter) {
+            t.pass('msg resent after failed send')
+          }
+
+          t.deepEqual(obj.parsed.data, msgs[received])
+          received++
         })
     })
 
@@ -202,7 +207,6 @@ test('resending & order guarantees', function (t) {
       // console.log(event)
       if (--togo) return
 
-      t.pass('msg resent after failed send')
       driverTed.destroy()
         .then(function () {
           driverTed = cloneDeadDriver(driverTed)
