@@ -143,8 +143,6 @@ function Driver (options) {
   this._paused = false
 
   // this._monkeypatchWallet()
-  this._senders = {}
-  this._receivers = []
   this.messenger = options.messenger || new Messengers.P2P({
     zlorp: new Zlorp({
       name: this.name(),
@@ -157,7 +155,7 @@ function Driver (options) {
     })
   })
 
-  this.addMessenger(this.messenger)
+  this.messenger.on('message', this.receiveMsg)
 
   typeforce({
     send: 'Function',
@@ -228,18 +226,17 @@ function Driver (options) {
     })
 }
 
-Driver.prototype.addMessenger = function (messenger, rootHash) {
-  this.addSender(messenger, rootHash)
-  this.addReceiver(messenger)
+Driver.prototype.setHttpClient = function (client) {
+  this.httpClient = client
+}
+
+Driver.prototype.setHttpServer = function (server) {
+  this.httpServer = server
 }
 
 Driver.prototype.addSender = function (messenger, rootHash) {
+  typeforce('String', rootHash)
   this._senders[rootHash] = messenger
-}
-
-Driver.prototype.addReceiver = function (receiver) {
-  this._receivers.push(receiver)
-  receiver.on('message', this.receiveMsg)
 }
 
 Driver.prototype.ready = function () {
@@ -893,6 +890,8 @@ Driver.prototype._processQueue = function (opts) {
     var next = omit(rawNext, ['errors']) // defensive copy
     return processItem(next)
       .done(function (entry) {
+        if (self._destroyed) return
+
         self._debug('processed item from queue', name)
         q.processing = false
         var isFinished = utils.getEntryProp(entry, 'type') === successType
@@ -1192,7 +1191,11 @@ Driver.prototype._doSend = function (entry) {
       self._debug('sending msg to peer', obj.parsed.data[TYPE])
       var msg = utils.msgToBuffer(utils.getMsgProps(obj))
       var toRootHash = obj.to[ROOT_HASH]
-      var messenger = self._senders[toRootHash] || self.messenger
+      var messenger = self.messenger
+      if (self.httpClient && self.httpClient.hasEndpointFor(toRootHash)) {
+        messenger = self.httpClient
+      }
+
       return messenger.send(toRootHash, msg, obj.to)
     })
 }
@@ -1815,32 +1818,22 @@ Driver.prototype.destroy = function () {
     this._streams[name].destroy()
   }
 
-  this._receivers.forEach(function (r) {
-    r.removeListener('message', self.receiveMsg)
-  })
-
   var tasks = [
     self.keeper.destroy(),
+    this.messenger.destroy(),
     Q.ninvoke(self.addressBook, 'close'),
     Q.ninvoke(self.msgDB, 'close'),
     Q.ninvoke(self.txDB, 'close'),
     Q.ninvoke(self._log, 'close')
   ]
 
-  Object.keys(this._senders)
-    .forEach(function (s) {
-      var messenger = self._senders[s]
-      var idx = self._receivers.indexOf(messenger)
-      if (idx !== -1) {
-        self._receivers.splice(idx, 1)
-      }
+  if (this.httpClient) {
+    tasks.push(this.httpClient.destroy())
+  }
 
-      tasks.push(messenger.destroy())
-    })
-
-  this._receivers.forEach(function (r) {
-    tasks.push(r.destroy())
-  })
+  if (this.httpServer) {
+    tasks.push(this.httpServer.destroy())
+  }
 
   delete this._identityCache
   // async

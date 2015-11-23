@@ -825,7 +825,7 @@ test('http messenger, recipient-specific', function (t) {
         }
       })
 
-      driverTed.addReceiver(tedServer)
+      driverTed.setHttpServer(tedServer)
 
       // bill can contact ted over http
       var httpToTed = new Messengers.HttpClient({
@@ -833,7 +833,7 @@ test('http messenger, recipient-specific', function (t) {
       })
 
       httpToTed.addRecipient(driverTed.myRootHash(), 'http://127.0.0.1:' + BASE_PORT + '/')
-      driverBill.addSender(httpToTed, driverTed.myRootHash())
+      driverBill.setHttpClient(httpToTed, driverTed.myRootHash())
 
       var msg = toMsg({ hey: 'ho' })
       driverBill.send({
@@ -858,7 +858,7 @@ function init (cb) {
     // keeper: keeper,
     blockchain: blockchain,
     leveldown: memdown,
-    syncInterval: 3000,
+    syncInterval: 1000,
     chainThrottle: chainThrottle
   }
 
