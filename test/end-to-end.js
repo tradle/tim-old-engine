@@ -25,6 +25,7 @@ var ChainedObj = require('@tradle/chained-obj')
 var Builder = ChainedObj.Builder
 var kiki = require('@tradle/kiki')
 var toKey = kiki.toKey
+var ChainRequest = require('@tradle/bitjoe-js/lib/requests/chain')
 var CreateRequest = require('@tradle/bitjoe-js/lib/requests/create')
 CreateRequest.prototype._generateSymmetricKey = function () {
   return new Buffer('1111111111111111111111111111111111111111111111111111111111111111', 'hex')
@@ -70,11 +71,12 @@ var networkName = 'testnet'
 var Driver = require('../')
 Driver.CATCH_UP_INTERVAL = 1000
 Driver.SEND_THROTTLE = 1000
+Driver.CHAIN_WRITE_THROTTLE = 1000
 var utils = require('../lib/utils')
 var Messengers = require('../lib/messengers')
 var Errors = require('../lib/errors')
 Errors.MAX_RESEND = 5
-Errors.MAX_CHAIN = 3
+Errors.MAX_CHAIN = 5
 Errors.MAX_UNCHAIN = 3
 // var TimeMethod = require('time-method')
 // var timTimer = TimeMethod(Driver.prototype)
@@ -111,33 +113,6 @@ test.afterEach = function (cb) {
 }
 
 rimraf.sync(STORAGE_DIR)
-
-test('give up sending after max retries', function (t) {
-  t.timeoutAfter(15000)
-  publishIdentities([driverBill, driverTed], function () {
-    var msg = toMsg({ hey: 'ho' })
-    var tries = 0
-    driverBill.messenger.send = function (rh, msg) {
-      tries++
-      t.ok(tries <= Errors.MAX_RESEND)
-      if (tries === Errors.MAX_RESEND) {
-        setTimeout(t.end, Driver.SEND_THROTTLE * 3)
-      }
-
-      return Q.reject(new Error('failed to send'))
-    }
-
-    driverBill.send({
-      msg: msg,
-      to: [{
-        fingerprint: tedPub.pubkeys[0].fingerprint
-      }],
-      deliver: true
-    })
-    .done()
-  })
-})
-
 
 test('pause/unpause', function (t) {
   t.timeoutAfter(20000)
@@ -252,6 +227,65 @@ test('resending & order guarantees', function (t) {
         })
         .done()
     }
+  })
+})
+
+test('give up sending after max retries', function (t) {
+  t.timeoutAfter(15000)
+  publishIdentities([driverBill, driverTed], function () {
+    var msg = toMsg({ hey: 'ho' })
+    var tries = 0
+    driverBill.messenger.send = function (rh, msg) {
+      tries++
+      t.ok(tries <= Errors.MAX_RESEND)
+      if (tries === Errors.MAX_RESEND) {
+        setTimeout(t.end, Driver.SEND_THROTTLE * 3)
+      }
+
+      return Q.reject(new Error('failed to send'))
+    }
+
+    driverBill.send({
+      msg: msg,
+      to: [{
+        fingerprint: tedPub.pubkeys[0].fingerprint
+      }],
+      deliver: true
+    })
+    .done()
+  })
+})
+
+test('give up chaining after max retries', function (t) {
+  t.timeoutAfter(15000)
+  publishIdentities([driverBill, driverTed], function () {
+    driverBill.on('error', noop)
+    var msg = toMsg({ hey: 'ho' })
+    var tries = 0
+    var execute = ChainRequest.prototype.execute
+    // hack ChainRequest to fail
+    ChainRequest.prototype.execute = function () {
+      tries++
+      t.ok(tries <= Errors.MAX_CHAIN)
+      if (tries === Errors.MAX_CHAIN) {
+        setTimeout(function () {
+          // unhack ChainRequest
+          ChainRequest.prototype.execute = execute
+          t.end()
+        }, Driver.CHAIN_WRITE_THROTTLE * 3)
+      }
+
+      return Q.reject(new Error('failed to chain'))
+    }
+
+    driverBill.send({
+      msg: msg,
+      to: [{
+        fingerprint: tedPub.pubkeys[0].fingerprint
+      }],
+      chain: true
+    })
+    .done()
   })
 })
 
