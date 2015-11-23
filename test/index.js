@@ -1,3 +1,5 @@
 require('./end-to-end')
 require('./identityDB')
+require('./entries')
+require('./messengers')
 // require('./typestore')

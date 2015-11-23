@@ -10,6 +10,7 @@ var rimraf = require('rimraf')
 var find = require('array-find')
 var pick = require('object.pick')
 var crypto = require('crypto')
+var express = require('express')
 var extend = require('xtend')
 var memdown = require('memdown')
 var collect = require('stream-collector')
@@ -70,6 +71,7 @@ var Driver = require('../')
 Driver.CATCH_UP_INTERVAL = 1000
 Driver.SEND_THROTTLE = 1000
 var utils = require('../lib/utils')
+var Messengers = require('../lib/messengers')
 // var TimeMethod = require('time-method')
 // var timTimer = TimeMethod(Driver.prototype)
 // for (var p in Driver.prototype) {
@@ -739,12 +741,47 @@ test('message resolution - contents match on p2p and chain channels', function (
   })
 })
 
-// return setInterval(function () {
-//   console.log(process._getActiveHandles().map(function (fn) {
-//     return getFunctionName(fn.constructor)
-//   }))
-// }, 2000).unref()
+test('recipient-specific messengers', function (t) {
+  t.timeoutAfter(20000)
 
+  publishIdentities([driverBill, driverTed], function () {
+    // ted runs an http server
+    var app = express()
+    var server = app.listen(++BASE_PORT)
+    server.once('listening', function () {
+      var tedServer = new Messengers.HttpServer({
+        router: app,
+        receive: function (buf, from) {
+          t.equal(from[ROOT_HASH], driverBill.myRootHash())
+          server.close()
+          t.pass()
+          t.end()
+          return Q()
+        }
+      })
+
+      driverTed.addReceiver(tedServer)
+
+      // bill can contact ted over http
+      var httpToTed = new Messengers.HttpClient({
+        rootHash: driverBill.myRootHash()
+      })
+
+      httpToTed.addRecipient(driverTed.myRootHash(), 'http://127.0.0.1:' + BASE_PORT + '/')
+      driverBill.addSender(httpToTed, driverTed.myRootHash())
+
+      var msg = toMsg({ hey: 'ho' })
+      driverBill.send({
+        msg: msg,
+        to: [{
+          fingerprint: tedPub.pubkeys[0].fingerprint
+        }],
+        deliver: true
+      })
+      .done()
+    })
+  })
+})
 
 function init (cb) {
   reinitCount++

@@ -148,6 +148,8 @@ function Driver (options) {
   this._paused = false
 
   // this._monkeypatchWallet()
+  this._senders = {}
+  this._receivers = []
   this.messenger = options.messenger || new Messengers.P2P({
     zlorp: new Zlorp({
       name: this.name(),
@@ -160,7 +162,7 @@ function Driver (options) {
     })
   })
 
-  this.messenger.on('message', this.receiveMsg)
+  this.addMessenger(this.messenger)
 
   typeforce({
     send: 'Function',
@@ -229,6 +231,20 @@ function Driver (options) {
       self._sendTheUnsent()
       // self._watchMsgStatuses()
     })
+}
+
+Driver.prototype.addMessenger = function (messenger, rootHash) {
+  this.addSender(messenger, rootHash)
+  this.addReceiver(messenger)
+}
+
+Driver.prototype.addSender = function (messenger, rootHash) {
+  this._senders[rootHash] = messenger
+}
+
+Driver.prototype.addReceiver = function (receiver) {
+  this._receivers.push(receiver)
+  receiver.on('message', this.receiveMsg)
 }
 
 Driver.prototype.ready = function () {
@@ -1164,7 +1180,9 @@ Driver.prototype._doSend = function (entry) {
       obj.to.identity = obj.to.identity.toJSON()
       self._debug('sending msg to peer', obj.parsed.data[TYPE])
       var msg = utils.msgToBuffer(utils.getMsgProps(obj))
-      return self.messenger.send(obj.to[ROOT_HASH], msg, obj.to)
+      var toRootHash = obj.to[ROOT_HASH]
+      var messenger = self._senders[toRootHash] || self.messenger
+      return messenger.send(toRootHash, msg, obj.to)
     })
 }
 
@@ -1336,6 +1354,11 @@ Driver.prototype._prefix = function (path) {
 }
 
 Driver.prototype.receiveMsg = function (buf, senderInfo) {
+//   return (this._receiving || Q())
+//     .finally(this._receiveMsg.bind(this, buf, senderInfo))
+// }
+
+// Driver.prototype._receiveMsg = function (buf, senderInfo) {
   var self = this
   var msg
 
@@ -1359,7 +1382,7 @@ Driver.prototype.receiveMsg = function (buf, senderInfo) {
   else promiseValid = Q.reject(new Error('received invalid msg'))
 
   var from
-  return promiseValid
+  return this._receiving = promiseValid
     .then(this.lookupIdentity.bind(this, senderInfo))
     .then(function (result) {
       from = result
@@ -1781,16 +1804,36 @@ Driver.prototype.destroy = function () {
     this._streams[name].destroy()
   }
 
+  this._receivers.forEach(function (r) {
+    r.removeListener('message', self.receiveMsg)
+  })
+
+  var tasks = [
+    self.keeper.destroy(),
+    Q.ninvoke(self.addressBook, 'close'),
+    Q.ninvoke(self.msgDB, 'close'),
+    Q.ninvoke(self.txDB, 'close'),
+    Q.ninvoke(self._log, 'close')
+  ]
+
+  Object.keys(this._senders)
+    .forEach(function (s) {
+      var messenger = self._senders[s]
+      var idx = self._receivers.indexOf(messenger)
+      if (idx !== -1) {
+        self._receivers.splice(idx, 1)
+      }
+
+      tasks.push(messenger.destroy())
+    })
+
+  this._receivers.forEach(function (r) {
+    tasks.push(r.destroy())
+  })
+
   delete this._identityCache
   // async
-  return Q.all([
-      self.keeper.destroy(),
-      self.messenger.destroy(),
-      Q.ninvoke(self.addressBook, 'close'),
-      Q.ninvoke(self.msgDB, 'close'),
-      Q.ninvoke(self.txDB, 'close'),
-      Q.ninvoke(self._log, 'close')
-    ])
+  return Q.all(tasks)
     .then(function () {
       self._debug('destroyed!')
     })

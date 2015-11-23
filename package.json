@@ -72,6 +72,8 @@
   "devDependencies": {
     "@tradle/cb-blockr": "^3.1.1",
     "@tradle/test-helpers": "0.0.2",
+    "concat-stream": "^1.5.1",
+    "express": "^4.13.3",
     "memdown": "^1.0.0",
     "pre-commit": "^1.0.10",
     "rimraf": "^2.4.1",
