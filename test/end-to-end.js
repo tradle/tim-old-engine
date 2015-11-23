@@ -73,7 +73,7 @@ Driver.SEND_THROTTLE = 1000
 var utils = require('../lib/utils')
 var Messengers = require('../lib/messengers')
 var Errors = require('../lib/errors')
-Errors.MAX_RESEND = 3
+Errors.MAX_RESEND = 5
 Errors.MAX_CHAIN = 3
 Errors.MAX_UNCHAIN = 3
 // var TimeMethod = require('time-method')
@@ -161,7 +161,7 @@ test('resending & order guarantees', function (t) {
   publishIdentities([driverBill, driverTed], function () {
     var msgs = [
       {
-        succeedAfter: 5
+        succeedAfter: Errors.MAX_RESEND - 1
       },
       {
         succeedAfter: 0
@@ -181,7 +181,7 @@ test('resending & order guarantees', function (t) {
     })
 
     var encrypted = [
-      "P767yN9gJZpg6DPFoXt+g5Ho8ZDPt9Bp1KQI",
+      "P767yN9gJZpg6DPFoXt+g5Ho8ZDPt9Bp1KUI",
       "P767yN9gJZlg6DPFoXt+g5Ho8ZDPt9Bp1KEI",
       "P767yN9gJZhg6DPFoXt+g5Ho8ZDPt9Bp1KEI",
       "P767yN9gJZ9g6DPFoXt+g5Ho8ZDPt9Bp1KEI",
