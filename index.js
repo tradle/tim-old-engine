@@ -10,7 +10,7 @@ var bitcoin = require('@tradle/bitcoinjs-lib')
 var extend = require('xtend/mutable')
 var clone = require('xtend/immutable')
 var collect = require('stream-collector')
-var tutils = require('@tradle/utils')
+var tradleUtils = require('@tradle/utils')
 var map = require('map-stream')
 var pump = require('pump')
 var find = require('array-find')
@@ -63,23 +63,18 @@ Driver.CHAIN_WRITE_THROTTLE = 60000
 Driver.CHAIN_READ_THROTTLE = 60000
 Driver.SEND_THROTTLE = 10000
 Driver.CATCH_UP_INTERVAL = 2000
-var noop = function () {}
-
-// var MessageType = Driver.MessageType = {
-//   plaintext: 1 << 1,
-//   chained: 1 << 2
-// }
-
-module.exports = Driver
-util.inherits(Driver, EventEmitter)
-
-// TODO: export other deps
 Driver.Zlorp = Zlorp
 Driver.Kiki = kiki
 Driver.Identity = Identity
 Driver.Wallet = Wallet
 Driver.Messengers = Messengers
 Driver.EventType = EventType
+// TODO: export other deps
+
+var noop = function () {}
+
+module.exports = Driver
+util.inherits(Driver, EventEmitter)
 
 function Driver (options) {
   var self = this
@@ -105,7 +100,7 @@ function Driver (options) {
   }, options)
 
   EventEmitter.call(this)
-  tutils.bindPrototypeFunctions(this)
+  tradleUtils.bindPrototypeFunctions(this)
   extend(this, options)
 
   this._otrKey = toKey(
@@ -549,7 +544,7 @@ Driver.prototype.identityPublishStatus = function () {
     .then(function () {
       return Q.all([
         Q.ninvoke(self.msgDB, 'byRootHash', rh),
-        Q.ninvoke(tutils, 'getStorageKeyFor', utils.toBuffer(me))
+        Q.ninvoke(tradleUtils, 'getStorageKeyFor', utils.toBuffer(me))
       ])
     })
     .spread(function (entries, curHash) {
@@ -766,6 +761,8 @@ Driver.prototype._writeToChain = function () {
   this._processQueue({
     name: 'writeToChain',
     getStream: getStream,
+    maxErrors: Errors.MAX_CHAIN,
+    errorsGroup: Errors.group.chain,
     processItem: this.putOnChain,
     throttle: throttle,
     retryDelay: throttle,
@@ -791,6 +788,8 @@ Driver.prototype._sendTheUnsent = function () {
   this._processQueue({
     name: 'sendTheUnsent',
     getStream: getStream,
+    maxErrors: Errors.MAX_RESEND,
+    errorsGroup: Errors.group.send,
     processItem: this._trySend,
     retryDelay: Driver.SEND_THROTTLE,
     successType: EventType.msg.sendSuccess
@@ -805,6 +804,7 @@ Driver.prototype._processQueue = function (opts) {
     successType: 'Number',
     getStream: 'Function',
     processItem: 'Function',
+    maxErrors: '?Number',
     shouldSkipQueue: '?Function',
     shouldTryLater: '?Function',
     retryDelay: '?Number',
@@ -822,6 +822,8 @@ Driver.prototype._processQueue = function (opts) {
   var lastProcessTime = 0
   var shouldSkipQueue = opts.shouldSkipQueue || alwaysFalse
   var shouldTryLater = opts.shouldTryLater || alwaysFalse
+  var maxErrors = typeof opts.maxErrors === 'number' ? opts.maxErrors : Infinity
+  var errorsGroup = opts.errorsGroup
   var processItem = opts.processItem
   if (opts.throttle) {
     processItem = utils.rateLimitPromiseFn(processItem, opts.throttle)
@@ -880,19 +882,28 @@ Driver.prototype._processQueue = function (opts) {
 
     self._debug('processing queue', name)
     q.processing = true
-    var next = q[0]
-    delete next.errors
-    if (shouldTryLater(next)) {
+    var rawNext = q[0]
+    if (shouldTryLater(rawNext)) {
       return utils.promiseDelay(retryDelay)
         .done(processQueue.bind(null, rid))
     }
 
+    rawNext.errors = rawNext.errors || {}
+    var errors = rawNext.errors[errorsGroup] = rawNext.errors[errorsGroup] || []
+    var next = omit(rawNext, ['errors']) // defensive copy
     return processItem(next)
       .done(function (entry) {
         self._debug('processed item from queue', name)
         q.processing = false
-        if (utils.getEntryProp(entry, 'type') === successType
-          || !retryOnFail) {
+        var isFinished = utils.getEntryProp(entry, 'type') === successType
+          || !retryOnFail
+
+        if (!isFinished) {
+          errors.push.apply(errors, utils.getErrors(entry, errorsGroup))
+          isFinished = errors.length >= maxErrors
+        }
+
+        if (isFinished) {
           q.shift()
           processQueue(rid)
         } else if (retryOnFail) {
@@ -1294,11 +1305,11 @@ Driver.prototype.getBlockchainKey = function () {
 }
 
 Driver.prototype.getCachedIdentity = function (query) {
-  return this._identityCache[tutils.stringify(query)]
+  return this._identityCache[tradleUtils.stringify(query)]
 }
 
 Driver.prototype._cacheIdentity = function (query, value) {
-  this._identityCache[tutils.stringify(query)] = value
+  this._identityCache[tradleUtils.stringify(query)] = value
 }
 
 Driver.prototype.lookupIdentity = function (query) {
@@ -1853,7 +1864,7 @@ Driver.prototype._debug = function () {
 Driver.prototype._getTxDir = function (tx) {
   var self = this
   var isOutbound = tx.ins.some(function (input) {
-    var addr = tutils.getAddressFromInput(input, self.networkName)
+    var addr = tradleUtils.getAddressFromInput(input, self.networkName)
     return addr === self.wallet.addressString
   })
 

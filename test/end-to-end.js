@@ -72,6 +72,10 @@ Driver.CATCH_UP_INTERVAL = 1000
 Driver.SEND_THROTTLE = 1000
 var utils = require('../lib/utils')
 var Messengers = require('../lib/messengers')
+var Errors = require('../lib/errors')
+Errors.MAX_RESEND = 3
+Errors.MAX_CHAIN = 3
+Errors.MAX_UNCHAIN = 3
 // var TimeMethod = require('time-method')
 // var timTimer = TimeMethod(Driver.prototype)
 // for (var p in Driver.prototype) {
@@ -107,6 +111,33 @@ test.afterEach = function (cb) {
 }
 
 rimraf.sync(STORAGE_DIR)
+
+test('give up sending after max retries', function (t) {
+  t.timeoutAfter(15000)
+  publishIdentities([driverBill, driverTed], function () {
+    var msg = toMsg({ hey: 'ho' })
+    var tries = 0
+    driverBill.messenger.send = function (rh, msg) {
+      tries++
+      t.ok(tries <= Errors.MAX_RESEND)
+      if (tries === Errors.MAX_RESEND) {
+        setTimeout(t.end, Driver.SEND_THROTTLE * 3)
+      }
+
+      return Q.reject(new Error('failed to send'))
+    }
+
+    driverBill.send({
+      msg: msg,
+      to: [{
+        fingerprint: tedPub.pubkeys[0].fingerprint
+      }],
+      deliver: true
+    })
+    .done()
+  })
+})
+
 
 test('pause/unpause', function (t) {
   t.timeoutAfter(20000)
@@ -741,7 +772,7 @@ test('message resolution - contents match on p2p and chain channels', function (
   })
 })
 
-test('recipient-specific messengers', function (t) {
+test('http messenger, recipient-specific', function (t) {
   t.timeoutAfter(20000)
 
   publishIdentities([driverBill, driverTed], function () {
