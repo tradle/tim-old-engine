@@ -102,6 +102,8 @@ function Driver (options) {
   EventEmitter.call(this)
   tradleUtils.bindPrototypeFunctions(this)
   extend(this, options)
+  this.chainThrottle = this.chainThrottle || Driver.CHAIN_WRITE_THROTTLE
+  this.syncInterval = this.syncInterval || Driver.CHAIN_READ_THROTTLE
 
   this._otrKey = toKey(
     this.getPrivateKey({
@@ -247,6 +249,10 @@ Driver.prototype.isReady = function () {
   return this._ready
 }
 
+Driver.prototype.isPaused = function () {
+  return this._paused
+}
+
 Driver.prototype.pause = function (resumeTimeout) {
   if (this._paused) return
 
@@ -317,7 +323,6 @@ Driver.prototype._readFromChain = function () {
     map(function (entry, cb) {
       // was read from chain and hasn't been processed yet
       // self._debug('unchaining tx', entry.txId)
-      var txId = entry.txId
       if (!entry.dateDetected || entry.dateUnchained) {
         return finish()
       }
@@ -334,6 +339,7 @@ Driver.prototype._readFromChain = function () {
 
       if (!shouldTryAgain) return finish()
 
+      var txId = entry.txId
       if (errs.length >= Errors.MAX_UNCHAIN) {
         // console.log(entry.errors, entry.id)
         self._debug('skipping unchain after', errs.length, 'errors for tx:', txId)
@@ -389,7 +395,7 @@ Driver.prototype._readFromChain = function () {
           cb(null, entry)
         })
     }),
-    utils.jsonifyTransform(),
+    utils.jsonify(),
     this._log,
     this._rethrow
   )
@@ -754,7 +760,7 @@ Driver.prototype._writeToChain = function () {
     tail: true
   })
 
-  var throttle = this.chainThrottle || Driver.CHAIN_WRITE_THROTTLE
+  var throttle = this.chainThrottle
   this._processQueue({
     name: 'writeToChain',
     getStream: getStream,
@@ -1050,7 +1056,7 @@ Driver.prototype._streamTxs = function (fromHeight, skipIds) {
 
   this._streams.rawTxs = this._rawTxStream = cbstreams.stream.txs({
     live: true,
-    interval: this.syncInterval || 60000,
+    interval: this.syncInterval,
     api: this.blockchain,
     height: fromHeight,
     confirmations: CONFIRMATIONS_BEFORE_CONFIRMED,
@@ -1097,12 +1103,23 @@ Driver.prototype._streamTxs = function (fromHeight, skipIds) {
       })
 
       function save (entry) {
-        var type = entry ?
-          EventType.tx.confirmation :
-          EventType.tx.new
-          // we may have chained this tx
-          // but this is the first time we're
-          // getting it FROM the chain
+        var type
+        if (entry) {
+          if (entry.dateDetected) {
+            // already got this from chain
+            // at least once
+            return cb()
+          }
+
+          // we put this tx on chain
+          // this is the first time we're getting it FROM the chain
+          type = EventType.tx.confirmation
+          if (!entry.dateChained) {
+            self._debug('uh oh, this should be a confirmation for a tx chained by us')
+          }
+        } else {
+          type = EventType.tx.new
+        }
 
         var nextEntry = new Entry(extend(entry || {}, txInfo, {
           type: type,
@@ -1118,7 +1135,7 @@ Driver.prototype._streamTxs = function (fromHeight, skipIds) {
         cb(null, nextEntry)
       }
     }),
-    utils.jsonifyTransform(),
+    utils.jsonify(),
     this._log,
     this._rethrow
   )
