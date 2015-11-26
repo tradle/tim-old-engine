@@ -72,6 +72,7 @@ var Driver = require('../')
 Driver.CATCH_UP_INTERVAL = 1000
 Driver.SEND_THROTTLE = 1000
 Driver.CHAIN_WRITE_THROTTLE = 1000
+Driver.CHAIN_READ_THROTTLE = 1000
 var utils = require('../lib/utils')
 var Messengers = require('../lib/messengers')
 var Errors = require('../lib/errors')
@@ -93,7 +94,6 @@ var driverTed
 var driverRufus
 var reinitCount = 0
 var nonce
-var chainThrottle = 1000
 var testTimerName = 'test took'
 var sharedKeeper
 test.beforeEach = function (cb) {
@@ -114,6 +114,70 @@ test.afterEach = function (cb) {
 
 rimraf.sync(STORAGE_DIR)
 
+test('export history', function (t) {
+  t.timeoutAfter(20000)
+  publishIdentities([driverBill, driverTed, driverRufus], function () {
+    var toTed = toMsg({ to: 'ted' })
+    var toBill = toMsg({ to: 'bill' })
+
+    driverBill.send({
+      msg: toTed,
+      deliver: true,
+      to: [getIdentifier(tedPub)]
+    })
+    .done()
+
+    driverRufus.send({
+      msg: toBill,
+      deliver: true,
+      to: [getIdentifier(billPub)]
+    })
+    .done()
+
+    var togo = 2
+    driverBill.on('message', oneDown)
+    driverTed.on('message', oneDown)
+
+    function oneDown (info) {
+      if (--togo) return
+
+      Q.all([
+        driverBill.history(),
+        driverTed.history()
+      ])
+      .spread(function (billHist, tedHist) {
+        t.equal(billHist.length, 5) // 3 identities + 2 msgs
+        billHist.sort(function (a, b) {
+          return a.timestamp - b.timestamp
+        })
+
+        t.deepEqual(billHist.pop().parsed.data, toBill)
+        t.deepEqual(billHist.pop().parsed.data, toTed)
+
+        t.equal(tedHist.length, 4) // 3 identities + 1 msg
+        tedHist.sort(function (a, b) {
+          return a.timestamp - b.timestamp
+        })
+
+        t.deepEqual(tedHist.pop().parsed.data, toTed)
+        return Q.all([
+          driverBill.history(getIdentifier(tedPub)),
+          driverTed.history(getIdentifier(billPub))
+        ])
+      })
+      .spread(function (billHist, tedHist) {
+        t.equal(billHist.length, 1)
+        t.deepEqual(billHist.pop().parsed.data, toTed)
+
+        t.equal(tedHist.length, 1)
+        t.deepEqual(tedHist.pop().parsed.data, toTed)
+        t.end()
+      })
+      .done()
+    }
+  })
+})
+
 test('pause/unpause', function (t) {
   t.timeoutAfter(20000)
   driverBill.pause()
@@ -121,6 +185,8 @@ test('pause/unpause', function (t) {
   driverBill.publishMyIdentity()
   driverTed.on('unchained', t.fail)
   setTimeout(function () {
+    t.ok(driverBill.isPaused())
+    t.ok(driverTed.isPaused())
     driverTed.removeListener('unchained', t.fail)
     driverBill.resume()
     driverTed.resume()
@@ -296,15 +362,9 @@ test('the reader and the writer', function (t) {
   var reader = driverBill
   reader.readOnly = true
 
-  var readerCoords = [{
-    fingerprint: reader.identityJSON.pubkeys[0].fingerprint
-  }]
-
+  var readerCoords = [getIdentifier(reader.identityJSON)]
   var writer = driverTed
-  var writerCoords = [{
-    fingerprint: writer.identityJSON.pubkeys[0].fingerprint
-  }]
-
+  var writerCoords = [getIdentifier(writer.identityJSON)]
   writer.publishMyIdentity().done()
   // publish reader's identity for them
   writer.publishIdentity(reader.identityJSON)
@@ -372,6 +432,7 @@ test('the reader and the writer', function (t) {
 
 test('wipe dbs, get publish status on reload', function (t) {
   t.plan(4)
+  t.timeoutAfter(20000)
 
   Q.nfcall(publishIdentities, [driverBill])
     .then(driverBill.destroy)
@@ -586,7 +647,7 @@ test('throttle chaining', function (t) {
       firstErrTime = utils.now()
     } else {
       blockchain.transactions.propagate = propagate
-      t.ok(utils.now() - firstErrTime > chainThrottle * 0.8) // fuzzy
+      t.ok(utils.now() - firstErrTime > driverBill.chainThrottle * 0.8) // fuzzy
     }
   }
 
@@ -607,10 +668,7 @@ test('delivery check', function (t) {
   t.plan(2)
   //t.timeoutAfter(60000)
   publishIdentities([driverBill, driverTed], function () {
-    var billCoords = {
-      fingerprint: billPub.pubkeys[0].fingerprint
-    }
-
+    var billCoords = getIdentifier(billPub)
     var msg = toMsg({ hey: 'blah' })
 
     driverTed.send({
@@ -747,10 +805,7 @@ test('message resolution - contents match on p2p and chain channels', function (
       })
     })
 
-    var billCoords = {
-      fingerprint: billPub.pubkeys[0].fingerprint
-    }
-
+    var billCoords = getIdentifier(billPub)
     var msg = { hey: 'ho' }
     msg[TYPE] = 'blahblah'
     msg = toMsg(msg)
@@ -858,8 +913,7 @@ function init (cb) {
     // keeper: keeper,
     blockchain: blockchain,
     leveldown: memdown,
-    syncInterval: 1000,
-    chainThrottle: chainThrottle
+    syncInterval: Driver.CHAIN_READ_THROTTLE
   }
 
   bootstrapDHT = new DHT({ bootstrap: false })
@@ -1044,6 +1098,16 @@ function cloneDeadDriver (driver) {
     // keeper: new Keeper({ dht: driverBill.dht, storage: STORAGE_DIR })
     keeper: sharedKeeper
   }))
+}
+
+function getIdentifier (identity) {
+  return {
+    fingerprint: identity.pubkeys[0].fingerprint
+  }
+}
+
+function getRHIdentifier (driver) {
+  return utils.toObj(ROOT_HASH, driver.myRootHash())
 }
 
 function getFunctionName(fn) {

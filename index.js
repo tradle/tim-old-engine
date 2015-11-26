@@ -101,7 +101,9 @@ function Driver (options) {
 
   EventEmitter.call(this)
   tradleUtils.bindPrototypeFunctions(this)
+  this._options = options
   extend(this, options)
+
   this.chainThrottle = this.chainThrottle || Driver.CHAIN_WRITE_THROTTLE
   this.syncInterval = this.syncInterval || Driver.CHAIN_READ_THROTTLE
 
@@ -714,7 +716,7 @@ Driver.prototype.unchainResultToEntry = function (chainedObj) {
     entry
       .set(ROOT_HASH, chainedObj.parsed.data[ROOT_HASH] || chainedObj.key)
       .set(TYPE, chainedObj.parsed.data[TYPE])
-      .set('public', chainedObj.type === TxData.types.public)
+      .set('public', chainedObj.txType === TxData.types.public)
   }
 
   if ('tx' in chainedObj) {
@@ -880,6 +882,8 @@ Driver.prototype._processQueue = function (opts) {
   }
 
   function processQueue (rid) {
+    if (self._destroyed) return
+
     var q = queues[rid] = queues[rid] || []
     if (!q.length || q.processing || q.waiting) return
 
@@ -961,8 +965,7 @@ Driver.prototype._trySend = function (entry) {
   // this._markSending(entry)
   var self = this
   var nextEntry = new Entry()
-    .set('uid', entry.uid)
-    .set(ROOT_HASH, entry[ROOT_HASH])
+    .set(utils.pick(entry, 'uid', ROOT_HASH))
 
   // return Q.ninvoke(this.msgDB, 'onLive')
   //   .then(function () {
@@ -1230,6 +1233,10 @@ Driver.prototype.lookupObjectByCurHash = function (curHash) {
 Driver.prototype.lookupObject = function (info) {
   var self = this
 
+  if (this._destroyed) {
+    return Q.reject(new Error('already destroyed'))
+  }
+
   // TODO: this unfortunately duplicates part of unchainer.js
   if (!info.txData) {
     if (info.tx) {
@@ -1325,6 +1332,8 @@ Driver.prototype.getBlockchainKey = function () {
 }
 
 Driver.prototype.getCachedIdentity = function (query) {
+  if (this._destroyed) throw new Error('already destroyed')
+
   return this._identityCache[tradleUtils.stringify(query)]
 }
 
@@ -1391,6 +1400,10 @@ Driver.prototype.receiveMsg = function (buf, senderInfo) {
 
 // Driver.prototype._receiveMsg = function (buf, senderInfo) {
   var self = this
+  if (this._destroyed) {
+    return Q.reject(new Error('already destroyed'))
+  }
+
   var msg
 
   validateRecipients(senderInfo)
@@ -1456,7 +1469,7 @@ Driver.prototype.receiveMsg = function (buf, senderInfo) {
     })
     .catch(function (err) {
       // TODO: retry
-      self._debug('failed to process inbound msg', err)
+      self._debug('failed to process inbound msg', err.message, err.stack)
       return new Entry({
         type: EventType.msg.receivedInvalid,
         msg: msg,
@@ -1490,20 +1503,14 @@ Driver.prototype.putOnChain = function (entry) {
   var type = entry.txType
   var data = entry.txData
   var nextEntry = new Entry()
-    .set(ROOT_HASH, entry[ROOT_HASH])
-    .set(CUR_HASH, entry[CUR_HASH])
+    .set(utils.pick(entry, ROOT_HASH, CUR_HASH, TYPE, 'uid', 'txType'))
     .set({
-      uid: entry.uid,
-      // from: entry.get('from'),
-      // to: entry.get('to'),
-      txType: type,
       chain: true,
       dir: Dir.outbound
     })
 
 //   return this.lookupBTCAddress(to)
 //     .then(shareWith)
-  // console.log(entry.toJSON())
   var addr = entry.addressesTo[0]
   this.emit('chaining')
   return self.chainwriter.chain()
@@ -1580,14 +1587,14 @@ Driver.prototype.share = function (options) {
   var self = this
 
   typeforce({
-    to: 'Array',
+    to: typeforce.oneOf('Array', 'Object'),
     chain: '?Boolean',
     deliver: '?Boolean'
   }, options)
 
   assert(CUR_HASH in options, 'expected current hash of object being shared')
 
-  var to = options.to
+  var to = [].concat(options.to)
   validateRecipients(to)
 
   var curHash = options[CUR_HASH]
@@ -1879,6 +1886,45 @@ Driver.prototype._getTxDir = function (tx) {
   })
 
   return isOutbound ? Dir.outbound : Dir.inbound
+}
+
+Driver.prototype.options = function () {
+  return clone(this._options)
+}
+
+Driver.prototype.history = function (identityInfo) {
+  var self = this
+  var otherPartyRootHash
+  var lookupOtherParty
+  if (identityInfo) {
+    if (ROOT_HASH in identityInfo) {
+      lookupOtherParty = Q(identityInfo)
+    } else {
+      lookupOtherParty = this.lookupIdentity(identityInfo)
+    }
+  } else {
+    lookupOtherParty = Q()
+  }
+
+  // console.log(this.myRootHash())
+  return lookupOtherParty
+    .then(function (other) {
+      var stream = self.messages().createValueStream()
+      if (other) {
+        otherPartyRootHash = other[ROOT_HASH]
+        stream = pump(stream, utils.filterStream(function (data) {
+          if (data[TYPE] === constants.TYPES.IDENTITY) return
+
+          return (data.from && data.from[ROOT_HASH] === otherPartyRootHash)
+            || (data.to && data.to[ROOT_HASH] === otherPartyRootHash)
+        }))
+      }
+
+      return Q.nfcall(collect, stream)
+    })
+    .then(function (msgs) {
+      return Q.all(msgs.map(self.lookupObject))
+    })
 }
 
 function copyDHTKeys (dest, src, curHash) {
