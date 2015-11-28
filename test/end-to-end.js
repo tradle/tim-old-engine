@@ -789,7 +789,7 @@ test('share chained content with 3rd party', function (t) {
 
 test('message resolution - contents match on p2p and chain channels', function (t) {
   t.plan(6)
-  t.timeoutAfter(60000)
+  t.timeoutAfter(20000)
 
   publishIdentities([driverBill, driverTed], function () {
     ;[driverBill, driverTed].forEach(function (driver) {
