@@ -17,6 +17,7 @@ var find = require('array-find')
 var deepEqual = require('deep-equal')
 var ChainedObj = require('@tradle/chained-obj')
 var TxData = require('@tradle/tx-data').TxData
+var TxInfo = require('@tradle/tx-data').TxInfo
 var ChainWriter = require('@tradle/bitjoe-js')
 var ChainLoader = require('@tradle/chainloader')
 var Permission = require('@tradle/permission')
@@ -325,7 +326,7 @@ Driver.prototype._readFromChain = function () {
     map(function (entry, cb) {
       // was read from chain and hasn't been processed yet
       // self._debug('unchaining tx', entry.txId)
-      if (!entry.dateDetected || entry.dateUnchained) {
+      if (!entry.dateDetected || entry.dateUnchained || !entry.txData) {
         return finish()
       }
 
@@ -1124,12 +1125,23 @@ Driver.prototype._streamTxs = function (fromHeight, skipIds) {
           type = EventType.tx.new
         }
 
-        var nextEntry = new Entry(extend(entry || {}, txInfo, {
-          type: type,
-          txId: id,
-          tx: utils.toBuffer(txInfo.tx),
-          dir: self._getTxDir(txInfo.tx)
-        }))
+        // console.log(TxInfo.parse(txInfo.tx))
+        var parsedTx = TxInfo.parse(txInfo.tx, self.networkName, PREFIX)
+        var isOutbound = parsedTx.addressesFrom.some(function (addr) {
+          return addr === self.wallet.addressString
+        })
+
+        var nextEntry = new Entry(extend(
+          entry || {},
+          txInfo,
+          parsedTx,
+          {
+            type: type,
+            txId: id,
+            tx: utils.toBuffer(txInfo.tx),
+            dir: isOutbound ? Dir.outbound : Dir.inbound
+          }
+        ))
 
         // clear errors
         nextEntry.set('errors', {})
@@ -1876,16 +1888,6 @@ Driver.prototype._debug = function () {
   var args = [].slice.call(arguments)
   args.unshift(this.name())
   return debug.apply(null, args)
-}
-
-Driver.prototype._getTxDir = function (tx) {
-  var self = this
-  var isOutbound = tx.ins.some(function (input) {
-    var addr = tradleUtils.getAddressFromInput(input, self.networkName)
-    return addr === self.wallet.addressString
-  })
-
-  return isOutbound ? Dir.outbound : Dir.inbound
 }
 
 Driver.prototype.options = function () {
