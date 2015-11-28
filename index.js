@@ -1097,7 +1097,14 @@ Driver.prototype._streamTxs = function (fromHeight, skipIds) {
           self._debug('unexpected txDB error: ' + JSON.stringify(unexpectedError))
         }
 
-        var handled = entry && entry.confirmations > CONFIRMATIONS_BEFORE_CONFIRMED
+        var handled
+        if (entry && 'confirmations' in entry) {
+          if (entry.confirmations > CONFIRMATIONS_BEFORE_CONFIRMED
+              || entry.confirmations === txInfo.confirmations) {
+            handled = true
+          }
+        }
+
         if (unexpectedErr || handled) {
           self._rmPending(id)
           return cb()
@@ -1251,9 +1258,7 @@ Driver.prototype.lookupObject = function (info) {
 
   // TODO: this unfortunately duplicates part of unchainer.js
   if (!info.txData) {
-    if (info.tx) {
-      info = bitcoin.Transaction.fromBuffer(info.tx)
-    } else {
+    if (!info.tx) {
       throw new Error('missing required info to lookup chained obj')
     }
   }

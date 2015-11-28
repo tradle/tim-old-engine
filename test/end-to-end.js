@@ -114,6 +114,28 @@ test.afterEach = function (cb) {
 
 rimraf.sync(STORAGE_DIR)
 
+test('msgDB', function (t) {
+  t.plan(6)
+
+  var people = [driverBill, driverTed, driverRufus]
+  var me = driverBill
+  publishIdentities(people, function () {
+    people.forEach(function (a) {
+      var myRootHash = me.myRootHash()
+      var myCurrentHash = me.myCurrentHash()
+      Q.ninvoke(me.messages(), 'byRootHash', myRootHash)
+        .done(function (msgs) {
+          t.equal(msgs[0][ROOT_HASH], myRootHash)
+        })
+
+      Q.ninvoke(me.messages(), 'byCurHash', myCurrentHash)
+        .done(function (msg) {
+          t.equal(msg[CUR_HASH], myCurrentHash)
+        })
+    })
+  })
+})
+
 test('export history', function (t) {
   t.timeoutAfter(20000)
   publishIdentities([driverBill, driverTed, driverRufus], function () {
