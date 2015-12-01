@@ -2,7 +2,7 @@
 var http = require('http')
 var test = require('tape')
 var Q = require('q')
-var concat = require('@tradle/concat-stream')
+var collect = require('stream-collector')
 var ROOT_HASH = require('@tradle/constants').ROOT_HASH
 var Messengers = require('../lib/messengers')
 var utils = require('./helpers/utils')
@@ -62,7 +62,10 @@ test('http', function (t) {
   var msg = new Buffer('blah')
   var received
   var server = http.createServer(function (req, res) {
-    req.pipe(concat(function (buf) {
+    collect(req, function (err, bufs) {
+      if (err) throw err
+
+      var buf = Buffer.concat(bufs)
       t.deepEqual(buf, msg)
       var resp = new Buffer(JSON.stringify({ hey: 'ho' }))
       res.writeHead(200, {
@@ -72,7 +75,7 @@ test('http', function (t) {
 
       res.write(resp)
       res.end()
-    }))
+    })
 
     received = true
   })
