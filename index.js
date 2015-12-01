@@ -5,6 +5,7 @@ var omit = require('object.omit')
 var Q = require('q')
 var typeforce = require('typeforce')
 var debug = require('debug')('tim')
+var PassThrough = require('readable-stream').PassThrough
 var reemit = require('re-emitter')
 var bitcoin = require('@tradle/bitcoinjs-lib')
 var extend = require('xtend/mutable')
@@ -22,7 +23,7 @@ var ChainWriter = require('@tradle/bitjoe-js')
 var ChainLoader = require('@tradle/chainloader')
 var Permission = require('@tradle/permission')
 var Wallet = require('@tradle/simple-wallet')
-var cbstreams = require('@tradle/cb-streams')
+// var cbstreams = require('@tradle/cb-streams')
 var Zlorp = require('zlorp')
 var Messengers = require('./lib/messengers')
 var hrtime = require('monotonic-timestamp')
@@ -268,6 +269,8 @@ Driver.prototype.pause = function (resumeTimeout) {
   if (typeof resumeTimeout === 'number') {
     setTimeout(this.resume, resumeTimeout)
   }
+
+  this.emit('pause')
 }
 
 Driver.prototype.resume = function () {
@@ -278,6 +281,8 @@ Driver.prototype.resume = function () {
   for (var name in this._streams) {
     this._streams[name].resume()
   }
+
+  this.emit('resume')
 }
 
 Driver.prototype._prepIdentity = function () {
@@ -467,28 +472,10 @@ Driver.prototype._catchUpWithBlockchain = function () {
     if (self._destroyed) return
     if (txIds) return checkDBs()
 
-    var stream = cbstreams.stream.txs({
-      api: self.blockchain,
-      confirmations: CONFIRMATIONS_BEFORE_CONFIRMED,
-      addresses: [
-        self.wallet.addressString,
-        constants.IDENTITY_PUBLISH_ADDRESS
-      ]
-    })
-
-    stream.on('error', function (err) {
-      if (/no txs/.test(err.message)) {
-        done = true
-        stream.close()
-        catchUp.resolve()
-      }
-    })
-
-    collect(stream, function (err, txInfos) {
-      if (done) return
-
+    self.blockchain.addresses.transactions(self._addresses(), null, function (err, txInfos) {
       if (err) return scheduleRetry()
 
+      txInfos = utils.parseCommonBlockchainTxs(txInfos)
       txIds = txInfos
         .filter(function (txInfo) {
           return txInfo.blockTimestamp > self.afterBlockTimestamp
@@ -1042,59 +1029,85 @@ Driver.prototype._setupTxStream = function () {
   //     // start CONFIRMATIONS_BEFORE_CONFIRMED blocks back
   //     lastBlock = lastBlock || 0
   //     lastBlock = Math.max(0, lastBlock - CONFIRMATIONS_BEFORE_CONFIRMED)
-  //     self._streamTxs(lastBlock, lastBlockTxIds)
+  //     self._runFetchTxsLoop(lastBlock, lastBlockTxIds)
   //     defer.resolve()
   //   })
   //
   // return defer.promise
 
-  this._streamTxs(0, [])
+  this._runFetchTxsLoop(0, [])
   return Q.resolve()
 }
 
-Driver.prototype._streamTxs = function (fromHeight, skipIds) {
+Driver.prototype._runFetchTxsLoop = function (fromHeight, skipIds) {
   var self = this
   if (this._destroyed) return
 
   if (!fromHeight) fromHeight = 0
 
-  this._streams.rawTxs = this._rawTxStream = cbstreams.stream.txs({
-    live: true,
-    interval: this.syncInterval,
-    api: this.blockchain,
-    height: fromHeight,
-    confirmations: CONFIRMATIONS_BEFORE_CONFIRMED,
-    addresses: [
-      this.wallet.addressString,
-      constants.IDENTITY_PUBLISH_ADDRESS
-    ]
-  })
+  // var stream = this._streams.rawTxs = new PassThrough({
+  //   objectMode: true
+  // })
 
-  if (!this._rawTxStream.destroy) {
-    this._rawTxStream.destroy = this._rawTxStream.close.bind(this._rawTxStream)
+  // stream.destroy = stream.end
+
+  this._scheduleFetch()
+  this._fetchTxs()
+}
+
+Driver.prototype._scheduleFetch = function () {
+  if (this._destroyed) return
+  if (this._paused) {
+    return this.once('resume', this._scheduleFetch)
   }
 
-  pump(
-    this._rawTxStream,
-    map(function (txInfo, cb) {
-      // TODO: make more efficient
-      // when we have a source of txs that
-      // consistently provides block height
+  this._fetchTxsTimeout = setTimeout(this._fetchTxs, this.syncInterval)
+}
+
+Driver.prototype._fetchTxs = function () {
+  var self = this
+  this.blockchain.addresses.transactions(this._addresses(), function (err, txInfos) {
+    if (!err && txInfos) {
+      self._processTxs(txInfos)
+    }
+  })
+}
+
+Driver.prototype._processTxs = function (txInfos) {
+  var self = this
+
+  this._scheduleFetch()
+
+  var lookups = []
+  var filtered = utils.parseCommonBlockchainTxs(txInfos)
+    .filter(function (txInfo) {
       if (txInfo.blockTimestamp &&
           txInfo.blockTimestamp <= self.afterBlockTimestamp) {
-        return cb()
+        return
       }
 
       var id = txInfo.tx.getId()
       if (self._pendingTxs.indexOf(id) !== -1) {
-        return cb() // already handled this one
+        return
       }
 
+      // TODO: filter shouldn't have side effects
       self._pendingTxs.push(id)
-      self.txDB.get(id, function (err, entry) {
+      txInfo.id = id
+      lookups.push(Q.ninvoke(self.txDB, 'get', id))
+      return true
+    })
+
+  return Q.allSettled(lookups)
+    .then(function (results) {
+      var logPromises = results.map(function (result, i) {
+        var txInfo = filtered[i]
+        var id = txInfo.id
+        var entry = result.value
+        var err = result.reason
         var unexpectedErr = err && !err.notFound
         if (unexpectedErr) {
-          self._debug('unexpected txDB error: ' + JSON.stringify(unexpectedError))
+          self._debug('unexpected txDB error: ' + JSON.stringify(err))
         }
 
         var handled
@@ -1106,20 +1119,15 @@ Driver.prototype._streamTxs = function (fromHeight, skipIds) {
         }
 
         if (unexpectedErr || handled) {
-          self._rmPending(id)
-          return cb()
+          return self._rmPending(id)
         }
 
-        save(entry)
-      })
-
-      function save (entry) {
         var type
         if (entry) {
           if (entry.dateDetected) {
             // already got this from chain
             // at least once
-            return cb()
+            return
           }
 
           // we put this tx on chain
@@ -1152,17 +1160,12 @@ Driver.prototype._streamTxs = function (fromHeight, skipIds) {
 
         // clear errors
         nextEntry.set('errors', {})
+        return self.log(utils.jsonifyErrors(nextEntry))
+      })
 
-        // if (entry) nextEntry.prev(new Entry(entry))
-        cb(null, nextEntry)
-      }
-    }),
-    utils.jsonify(),
-    this._log,
-    this._rethrow
-  )
-
-  this._pauseStreamIfPaused(this._rawTxStream)
+    return Q.all(logPromises)
+  })
+  .done()
 }
 
 Driver.prototype._setupDBs = function () {
@@ -1851,6 +1854,7 @@ Driver.prototype.destroy = function () {
 
   // sync
   this.chainwriter.destroy()
+  clearTimeout(this._fetchTxsTimeout)
   // if (this._rawTxStream) {
   //   this._rawTxStream.close() // custom close method
   // }
@@ -1932,6 +1936,13 @@ Driver.prototype.history = function (identityInfo) {
     .then(function (msgs) {
       return Q.all(msgs.map(self.lookupObject))
     })
+}
+
+Driver.prototype._addresses = function () {
+  return [
+    this.wallet.addressString,
+    constants.IDENTITY_PUBLISH_ADDRESS
+  ]
 }
 
 function copyDHTKeys (dest, src, curHash) {
