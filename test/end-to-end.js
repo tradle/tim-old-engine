@@ -97,27 +97,27 @@ var reinitCount = 0
 var nonce
 var testTimerName = 'test took'
 var sharedKeeper
-var currentTest
-var profiler = require('v8-profiler')
+// var currentTest
+// var profiler = require('v8-profiler')
 test.beforeEach = function (cb) {
   nonce = 1
   sharedKeeper = FakeKeeper.empty()
   init(function () {
-    currentTest = 'test ' + reinitCount
-    profiler.startProfiling(currentTest, true)
+    // currentTest = 'test ' + reinitCount
+    // profiler.startProfiling(currentTest, true)
     console.time(testTimerName)
     cb()
   })
 }
 
 test.afterEach = function (cb) {
-  var profile = profiler.stopProfiling(currentTest)
-  var profilePath = path.join(process.cwd(), currentTest + '.cpuprofile')
-  profile.export(function(err, res) {
-    if (err) throw err
+  // var profile = profiler.stopProfiling(currentTest)
+  // var profilePath = path.join(process.cwd(), currentTest + '.cpuprofile')
+  // profile.export(function(err, res) {
+  //   if (err) throw err
 
-    fs.writeFile(profilePath, res)
-  })
+  //   fs.writeFile(profilePath, res)
+  // })
 
   teardown(function () {
     console.timeEnd(testTimerName)
@@ -160,14 +160,14 @@ test('export history', function (t) {
       deliver: true,
       to: [getIdentifier(tedPub)]
     })
-    .done()
+    .catch(t.fail)
 
     driverRufus.send({
       msg: toBill,
       deliver: true,
       to: [getIdentifier(billPub)]
     })
-    .done()
+    .catch(t.fail)
 
     var togo = 2
     driverBill.on('message', oneDown)
@@ -353,7 +353,7 @@ test('give up sending after max retries', function (t) {
       }],
       deliver: true
     })
-    .done()
+    .catch(t.fail)
   })
 })
 
@@ -386,7 +386,7 @@ test('give up chaining after max retries', function (t) {
       }],
       chain: true
     })
-    .done()
+    .catch(t.fail)
   })
 })
 
@@ -482,15 +482,15 @@ test('wipe dbs, get publish status on reload', function (t) {
 test('no chaining in readOnly mode', function (t) {
   driverTed.readOnly = true
   var msg = toMsg({ blah: 'yo' })
-  t.throws(function () {
-    driverTed.send({
-      msg: msg,
-      to: [{
-        fingerprint: billPub.pubkeys[0].fingerprint
-      }],
-      chain: true
-    })
+  driverTed.send({
+    msg: msg,
+    to: [{
+      fingerprint: billPub.pubkeys[0].fingerprint
+    }],
+    chain: true
   })
+  .then(t.fail)
+  .catch(t.pass)
 
   // for now
   // TODO: close dbs safely when they're closed before being fully open
@@ -679,7 +679,7 @@ test('throttle chaining', function (t) {
       msg: msg,
       to: [{ fingerprint: driverTed.wallet.addressString }]
     })
-    .done()
+    .catch(t.fail)
 
   driverBill.on('error', function (err) {
     t.ok(/test error/.test(err.message))
@@ -802,7 +802,7 @@ test('share chained content with 3rd party', function (t) {
 
           shareOpts[CUR_HASH] = obj[CUR_HASH]
           driverTed.share(shareOpts)
-            .done()
+            .catch(t.fail)
         })
       })
     }
@@ -844,7 +844,7 @@ test('message resolution - contents match on p2p and chain channels', function (
           to: [billCoords],
           chain: true,
           deliver: true
-        }).done()
+        }).catch(t.fail)
       })
 
     function onUnchained (info) {
@@ -920,7 +920,7 @@ test('http messenger, recipient-specific', function (t) {
         }],
         deliver: true
       })
-      .done()
+      .catch(t.fail)
     })
   })
 })

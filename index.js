@@ -457,9 +457,8 @@ Driver.prototype._catchUpWithBlockchain = async function () {
     if (this._destroyed) return
 
     if (!txIds) {
-      var txInfos
       try {
-        txInfos = await this._doFetchTxs()
+        var txInfos = await this._doFetchTxs()
       } catch (err) {
         this._debug('failed to fetch txs', err.stack)
         await utils.delay(Driver.CATCH_UP_INTERVAL)
@@ -498,11 +497,9 @@ Driver.prototype._catchUpWithBlockchain = async function () {
 }
 
 Driver.prototype.identityPublishStatus = async function () {
-  var self = this
   // check if we've already chained it
-  if (!this._ready) {
-    return this._readyPromise.then(this.identityPublishStatus)
-  }
+
+  await this._readyPromise
 
   var rh = this.myRootHash()
   var me = this.identityJSON
@@ -513,7 +510,7 @@ Driver.prototype.identityPublishStatus = async function () {
   }
 
   await this._catchUpWithBlockchain()
-  var entriesPromise = Q.ninvoke(self.msgDB, 'byRootHash', rh)
+  var entriesPromise = Q.ninvoke(this.msgDB, 'byRootHash', rh)
   var curHashPromise = Q.ninvoke(tradleUtils, 'getStorageKeyFor', utils.toBuffer(me))
   var promises = [
     entriesPromise,
@@ -1564,7 +1561,7 @@ Driver.prototype.publish = function (options) {
   }, options))
 }
 
-Driver.prototype.share = function (options) {
+Driver.prototype.share = async function (options) {
   var self = this
 
   typeforce({
@@ -1588,42 +1585,35 @@ Driver.prototype.share = function (options) {
     from: utils.toObj(ROOT_HASH, this.myRootHash())
   })
 
-  var recipients
-  return Q.all(to.map(this.lookupIdentity, this))
-    .then(function (_recipients) {
-      recipients = _recipients
-      return Q.ninvoke(self.msgDB, 'byCurHash', curHash)
-    })
-    .then(self.lookupObject)
-    .then(function (obj) {
-      entry.set(CUR_HASH, curHash)
-        .set(ROOT_HASH, obj[ROOT_HASH])
-        .set(TYPE, obj[TYPE])
+  var recipients = await* to.map(this.lookupIdentity, this)
+  var objInfo = await Q.ninvoke(this.msgDB, 'byCurHash', curHash)
+  var obj = await this.lookupObject(objInfo)
+  entry.set(CUR_HASH, curHash)
+    .set(ROOT_HASH, obj[ROOT_HASH])
+    .set(TYPE, obj[TYPE])
 
-      var symmetricKey = obj.permission.body().decryptionKey
-      return Q.all(recipients.map(function (r) {
-        var pubkey = self._getBTCKey(r.identity)
-        return self.chainwriter.share()
-          .shareAccessTo(curHash, symmetricKey)
-          .shareAccessWith(pubkey.value)
-          .execute()
-      }))
-    })
-    .then(function (shares) {
-      // TODO: rethink this repeated code from send()
-      var entries = shares.map(function (share, i) {
-        return entry.clone().set({
-          to: utils.toObj(ROOT_HASH, recipients[i][ROOT_HASH]),
-          addressesTo: [share.address],
-          addressesFrom: [self.wallet.addressString],
-          txType: TxData.types.permission,
-          txData: utils.toBuffer(share.encryptedKey, 'hex')
-        })
-      })
+  var symmetricKey = obj.permission.body().decryptionKey
+  var shares = await* recipients.map(function (r) {
+    var pubkey = self._getBTCKey(r.identity)
+    return self.chainwriter.share()
+      .shareAccessTo(curHash, symmetricKey)
+      .shareAccessWith(pubkey.value)
+      .execute()
+  })
 
-      entries.forEach(utils.setUID)
-      return Q.all(entries.map(self.log, self))
+  // TODO: rethink this repeated code from send()
+  var entries = shares.map(function (share, i) {
+    return entry.clone().set({
+      to: utils.toObj(ROOT_HASH, recipients[i][ROOT_HASH]),
+      addressesTo: [share.address],
+      addressesFrom: [self.wallet.addressString],
+      txType: TxData.types.permission,
+      txData: utils.toBuffer(share.encryptedKey, 'hex')
     })
+  })
+
+  entries.forEach(utils.setUID)
+  await* entries.map(this.log, this)
 }
 
 // Driver.prototype.chain = function (info) {
@@ -1657,7 +1647,7 @@ Driver.prototype.share = function (options) {
  * @param {Boolean} options.chain (optional) - whether to put this message on chain
  * @param {Boolean} options.deliver (optional) - whether to deliver this message p2p
  */
-Driver.prototype.send = function (options) {
+Driver.prototype.send = async function (options) {
   var self = this
 
   typeforce({
@@ -1703,66 +1693,56 @@ Driver.prototype.send = function (options) {
 
   var recipients
   var btcKeys
-  return this._readyPromise
-    // validate
-    .then(function () {
-      return Q.ninvoke(Parser, 'parse', data)
-    })
-    .then(function (parsed) {
-      entry.set(TYPE, parsed.data[TYPE])
-      return isPublic
-        ? Q.resolve(to)
-        : Q.all(to.map(self.lookupIdentity, self))
-    })
-    .then(function (_recipients) {
-      recipients = _recipients
-      if (isPublic) {
-        btcKeys = to
-      } else {
-        btcKeys = utils.pluck(recipients, 'identity')
-          .map(self._getBTCKey, self)
-          .map(function (k) {
-            return k.value
-          })
-      }
+  await this._readyPromise
+  // validate
+  var parsed = await Q.ninvoke(Parser, 'parse', data)
+  entry.set(TYPE, parsed.data[TYPE])
+  if (isPublic) {
+    recipients = btcKeys = to
+  } else {
+    recipients = await* to.map(this.lookupIdentity, this)
+    btcKeys = utils.pluck(recipients, 'identity')
+      .map(this._getBTCKey, this)
+      .map(function (k) {
+        return k.value
+      })
+  }
 
-      return self.chainwriter.create()
-        .data(data)
-        .setPublic(isPublic)
-        .recipients(btcKeys)
-        .execute()
-    })
-    .then(function (resp) {
-      copyDHTKeys(entry, resp.key)
-      self._debug('stored (write)', entry.get(ROOT_HASH))
+  var resp = await this.chainwriter.create()
+    .data(data)
+    .setPublic(isPublic)
+    .recipients(btcKeys)
+    .execute()
 
-      var entries
-      if (isPublic) {
-        self._push(resp)
-        entries = to.map(function (contact, i) {
-          return entry.clone().set({
-            to: contact,
-            addressesFrom: [self.wallet.addressString],
-            addressesTo: [btcKeys[i].fingerprint],
-            txType: TxData.types.public,
-            txData: utils.toBuffer(resp.key, 'hex')
-          })
-        })
-      } else {
-        entries = resp.shares.map(function (share, i) {
-          return entry.clone().set({
-            to: utils.toObj(ROOT_HASH, recipients[i][ROOT_HASH]),
-            addressesTo: [share.address],
-            addressesFrom: [self.wallet.addressString],
-            txType: TxData.types.permission,
-            txData: utils.toBuffer(share.encryptedKey, 'hex')
-          })
-        })
-      }
+  copyDHTKeys(entry, resp.key)
+  this._debug('stored (write)', entry.get(ROOT_HASH))
 
-      entries.forEach(utils.setUID)
-      return Q.all(entries.map(self.log, self))
+  var entries
+  if (isPublic) {
+    this._push(resp)
+    entries = to.map(function (contact, i) {
+      return entry.clone().set({
+        to: contact,
+        addressesFrom: [self.wallet.addressString],
+        addressesTo: [btcKeys[i].fingerprint],
+        txType: TxData.types.public,
+        txData: utils.toBuffer(resp.key, 'hex')
+      })
     })
+  } else {
+    entries = resp.shares.map(function (share, i) {
+      return entry.clone().set({
+        to: utils.toObj(ROOT_HASH, recipients[i][ROOT_HASH]),
+        addressesTo: [share.address],
+        addressesFrom: [self.wallet.addressString],
+        txType: TxData.types.permission,
+        txData: utils.toBuffer(share.encryptedKey, 'hex')
+      })
+    })
+  }
+
+  entries.forEach(utils.setUID)
+  await* entries.map(this.log, this)
 }
 
 Driver.prototype._push = function () {
