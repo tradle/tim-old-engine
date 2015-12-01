@@ -1031,7 +1031,7 @@ Driver.prototype._fetchTxs = function () {
   })
 }
 
-Driver.prototype._processTxs = function (txInfos) {
+Driver.prototype._processTxs = async function (txInfos) {
   var self = this
 
   this._scheduleFetch()
@@ -1052,78 +1052,81 @@ Driver.prototype._processTxs = function (txInfos) {
       // TODO: filter shouldn't have side effects
       self._pendingTxs.push(id)
       txInfo.id = id
+
+      // run in parallel
       lookups.push(Q.ninvoke(self.txDB, 'get', id))
       return true
     })
 
-  return Q.allSettled(lookups)
-    .then(function (results) {
-      var logPromises = results.map(function (result, i) {
-        var txInfo = filtered[i]
-        var id = txInfo.id
-        var entry = result.value
-        var err = result.reason
-        var unexpectedErr = err && !err.notFound
-        if (unexpectedErr) {
-          self._debug('unexpected txDB error: ' + JSON.stringify(err))
-        }
+  var logPromises = await* lookups.map(async function (lookup, i) {
+    var err
+    try {
+      var entry = await lookup
+    } catch (e) {
+      err = e
+    }
 
-        var handled
-        if (entry && 'confirmations' in entry) {
-          if (entry.confirmations > CONFIRMATIONS_BEFORE_CONFIRMED
-              || entry.confirmations === txInfo.confirmations) {
-            handled = true
-          }
-        }
+    var txInfo = filtered[i]
+    var id = txInfo.id
+    var unexpectedErr = err && !err.notFound
+    if (unexpectedErr) {
+      self._debug('unexpected txDB error: ' + JSON.stringify(err))
+    }
 
-        if (unexpectedErr || handled) {
-          return self._rmPending(id)
-        }
+    var handled
+    if (entry && 'confirmations' in entry) {
+      if (entry.confirmations > CONFIRMATIONS_BEFORE_CONFIRMED
+          || entry.confirmations === txInfo.confirmations) {
+        handled = true
+      }
+    }
 
-        var type
-        if (entry) {
-          if (entry.dateDetected) {
-            // already got this from chain
-            // at least once
-            return
-          }
+    if (unexpectedErr || handled) {
+      return self._rmPending(id)
+    }
 
-          // we put this tx on chain
-          // this is the first time we're getting it FROM the chain
-          type = EventType.tx.confirmation
-          if (!entry.dateChained) {
-            self._debug('uh oh, this should be a confirmation for a tx chained by us')
-          }
-        } else {
-          type = EventType.tx.new
-        }
+    var type
+    if (entry) {
+      if (entry.dateDetected) {
+        // already got this from chain
+        // at least once
+        return
+      }
 
-        // console.log(TxInfo.parse(txInfo.tx))
-        var parsedTx = TxInfo.parse(txInfo.tx, self.networkName, PREFIX)
-        var isOutbound = parsedTx.addressesFrom.some(function (addr) {
-          return addr === self.wallet.addressString
-        })
+      // we put this tx on chain
+      // this is the first time we're getting it FROM the chain
+      type = EventType.tx.confirmation
+      if (!entry.dateChained) {
+        self._debug('uh oh, this should be a confirmation for a tx chained by us')
+      }
+    } else {
+      type = EventType.tx.new
+    }
 
-        var nextEntry = new Entry(extend(
-          entry || {},
-          txInfo,
-          parsedTx,
-          {
-            type: type,
-            txId: id,
-            tx: utils.toBuffer(txInfo.tx),
-            dir: isOutbound ? Dir.outbound : Dir.inbound
-          }
-        ))
+    // console.log(TxInfo.parse(txInfo.tx))
+    var parsedTx = TxInfo.parse(txInfo.tx, self.networkName, PREFIX)
+    var isOutbound = parsedTx.addressesFrom.some(function (addr) {
+      return addr === self.wallet.addressString
+    })
 
-        // clear errors
-        nextEntry.set('errors', {})
-        return self.log(utils.jsonifyErrors(nextEntry))
-      })
+    var nextEntry = new Entry(extend(
+      entry || {},
+      txInfo,
+      parsedTx,
+      {
+        type: type,
+        txId: id,
+        tx: utils.toBuffer(txInfo.tx),
+        dir: isOutbound ? Dir.outbound : Dir.inbound
+      }
+    ))
 
-    return Q.all(logPromises)
+    // clear errors
+    nextEntry.set('errors', {})
+    return self.log(utils.jsonifyErrors(nextEntry))
   })
-  .done()
+
+  await* logPromises
 }
 
 Driver.prototype._setupDBs = function () {
