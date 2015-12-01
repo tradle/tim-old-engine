@@ -34,7 +34,6 @@
     "@tradle/cb-streams": "^1.3.0",
     "@tradle/chained-obj": "^1.3.2",
     "@tradle/chainloader": "^1.1.2",
-    "@tradle/concat-stream": "^1.5.1",
     "@tradle/constants": "^1.1.3",
     "@tradle/identity": "^1.0.7",
     "@tradle/kiki": "^1.1.9",
