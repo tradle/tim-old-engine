@@ -11,7 +11,7 @@ var billPriv = require('./fixtures/bill-priv')
 var tedPub = require('./fixtures/ted-pub')
 var tedPriv = require('./fixtures/ted-priv')
 
-test('p2p', function (t) {
+test('p2p', async function (t) {
   var received
   var identityInfos = [
     {
@@ -23,36 +23,38 @@ test('p2p', function (t) {
       priv: tedPriv
     }
   ]
-  utils.makeConnectedZlorps(identityInfos, function (zlorps) {
-    var messengers = zlorps.map(function (z) {
-      return new Messengers.P2P({
-        zlorp: z
-      })
-    })
 
-    var msg = new Buffer('blah')
-    messengers[0].send('123', msg, { identity: identityInfos[1].pub })
-      .catch(t.fail)
-      .finally(function () {
-        t.ok(received)
-        return Q.all(messengers.map(function (m) {
-          m.destroy()
-        }))
-      })
-      .then(function () {
-        return Q.all(zlorps.map(function (z) {
-          return Q.ninvoke(z._dht, 'destroy')
-        }))
-      })
-      .then(function () {
-        t.end()
-      })
-      .done()
+  var zlorps = await Q.Promise(function (resolve) {
+    utils.makeConnectedZlorps(identityInfos, resolve)
+  })
 
-    messengers[1].on('message', function () {
-      received = true
+  var messengers = zlorps.map(function (z) {
+    return new Messengers.P2P({
+      zlorp: z
     })
   })
+
+  messengers[1].on('message', function () {
+    received = true
+  })
+
+  var msg = new Buffer('blah')
+  try {
+    await messengers[0].send('123', msg, { identity: identityInfos[1].pub })
+
+    t.ok(received)
+    await* messengers.map(async function (m) {
+      m.destroy()
+    })
+
+    await* zlorps.map(async function (z) {
+      return Q.ninvoke(z._dht, 'destroy')
+    })
+  } catch (err) {
+    t.error(err)
+  }
+
+  t.end()
 })
 
 test('http', function (t) {
@@ -81,26 +83,21 @@ test('http', function (t) {
     received = true
   })
 
-  server.listen(function () {
+  server.listen(async function () {
     var recipientRootHash = '123'
     var recipientInfo = {}
     recipientInfo[ROOT_HASH] = recipientRootHash
 
     messenger.addEndpoint(recipientRootHash, 'http://127.0.0.1:' + server.address().port)
-    messenger.send('123', msg, recipientInfo)
-      .catch(function (err) {
-        console.log(err)
-        throw err
-      })
-      .finally(function () {
-        t.ok(received)
-      })
-      .then(function () {
-        server.close()
-        return messenger.destroy()
-      })
-      .done(function () {
-        t.end()
-      })
+    try {
+      await messenger.send('123', msg, recipientInfo)
+      t.ok(received)
+      server.close()
+      await messenger.destroy()
+    } catch (err) {
+      t.error(err)
+    }
+
+    t.end()
   })
 })

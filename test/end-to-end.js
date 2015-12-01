@@ -5,6 +5,7 @@ if (process.env.MULTIPLEX) {
 }
 
 var path = require('path')
+var fs = require('fs')
 var test = require('tape-extra')
 var rimraf = require('rimraf')
 var find = require('array-find')
@@ -96,16 +97,28 @@ var reinitCount = 0
 var nonce
 var testTimerName = 'test took'
 var sharedKeeper
+var currentTest
+var profiler = require('v8-profiler')
 test.beforeEach = function (cb) {
   nonce = 1
   sharedKeeper = FakeKeeper.empty()
   init(function () {
+    currentTest = 'test ' + reinitCount
+    profiler.startProfiling(currentTest, true)
     console.time(testTimerName)
     cb()
   })
 }
 
 test.afterEach = function (cb) {
+  var profile = profiler.stopProfiling(currentTest)
+  var profilePath = path.join(process.cwd(), currentTest + '.cpuprofile')
+  profile.export(function(err, res) {
+    if (err) throw err
+
+    fs.writeFile(profilePath, res)
+  })
+
   teardown(function () {
     console.timeEnd(testTimerName)
     cb()
@@ -377,7 +390,7 @@ test('give up chaining after max retries', function (t) {
   })
 })
 
-test('the reader and the writer', function (t) {
+test('the reader and the writer', async function (t) {
   t.timeoutAfter(20000)
 
   var togo = 4
@@ -387,68 +400,55 @@ test('the reader and the writer', function (t) {
   var readerCoords = [getIdentifier(reader.identityJSON)]
   var writer = driverTed
   var writerCoords = [getIdentifier(writer.identityJSON)]
-  writer.publishMyIdentity().done()
+  writer.publishMyIdentity()
+    .catch(t.fail)
+
   // publish reader's identity for them
   writer.publishIdentity(reader.identityJSON)
+    .catch(t.fail)
+
   reader.on('unchained', onUnchainedIdentity)
   writer.on('unchained', onUnchainedIdentity)
   var msg = toMsg({
     hey: 'ho'
   })
 
-  writer.once('message', function (info) {
-    writer.lookupObject(info)
-      .then(function (obj) {
-        return writer.send({
-          chain: true,
-          deliver: false,
-          public: info.public,
-          msg: obj.parsed.data,
-          to: readerCoords
-        })
-      })
-      .done()
+  writer.once('message', async function (info) {
+    reader.once('unchained', async function (info) {
+      var obj = await reader.lookupObject(info)
+      t.deepEqual(obj.parsed.data, msg)
+      t.end()
+    })
 
-    reader.once('unchained', function (info) {
-      reader.lookupObject(info)
-        .done(function (obj) {
-          t.deepEqual(obj.parsed.data, msg)
-          t.end()
-        })
+    var obj = await writer.lookupObject(info)
+    await writer.send({
+      chain: true,
+      deliver: false,
+      public: info.public,
+      msg: obj.parsed.data,
+      to: readerCoords
     })
   })
 
-  function onUnchainedIdentity () {
+  async function onUnchainedIdentity () {
     if (--togo) return
 
     reader.removeListener('unchained', onUnchainedIdentity)
     writer.removeListener('unchained', onUnchainedIdentity)
 
-    reader.identityPublishStatus()
-      .then(function (status) {
-        t.ok(status.ever)
-        t.ok(status.current)
+    try {
+      var status = await reader.identityPublishStatus()
+      t.ok(status.ever)
+      t.ok(status.current)
+      await reader.send({
+        chain: false,
+        deliver: true,
+        msg: msg,
+        to: writerCoords
       })
-      .then(function () {
-        return reader.send({
-          chain: false,
-          deliver: true,
-          msg: msg,
-          to: writerCoords
-        })
-      })
-      .done()
-
-    // reader.send({
-    //   chain: false,
-    //   deliver: true,
-    //   public: true,
-    //   msg: extend(reader.identityJSON),
-    //   to: writerCoords
-    // })
-    // .then(function () {
-
-    // })
+    } catch (err) {
+      t.fail(err)
+    }
   }
 })
 
@@ -497,7 +497,7 @@ test('no chaining in readOnly mode', function (t) {
   setTimeout(t.end, 300)
 })
 
-test('no chaining attempted if low balance', function (t) {
+test('no chaining attempted if low balance', async function (t) {
   t.plan(2)
   driverBill.wallet.balance = function (cb) {
     process.nextTick(function () {
@@ -505,15 +505,14 @@ test('no chaining attempted if low balance', function (t) {
     })
   }
 
-  driverBill._updateBalance()
-    .done(function () {
-      driverBill.publishMyIdentity().done()
-      driverBill.on('chaining', t.fail)
-      driverBill.once('lowbalance', function () {
-        t.pass()
-        setTimeout(t.pass, 1000)
-      })
-    })
+  driverBill.on('chaining', t.fail)
+  driverBill.once('lowbalance', function () {
+    t.pass()
+    setTimeout(t.pass, 1000)
+  })
+
+  await driverBill._updateBalance()
+  await driverBill.publishMyIdentity()
 })
 
 test('delivered/chained/both', function (t) {
@@ -585,7 +584,7 @@ test('self publish, edit, republish', function (t) {
 
   function publish (next) {
     var togo = 2
-    driverBill.publishMyIdentity().done()
+    driverBill.publishMyIdentity().catch(t.fail)
     ;[driverBill, driverTed].forEach(function (driver) {
       driver.once('unchained', function (info) {
         driver.lookupObject(info)
@@ -602,15 +601,16 @@ test('self publish, edit, republish', function (t) {
     driverBill.publishMyIdentity()
       .then(t.fail)
       .catch(t.pass)
-      .done(function () {
+      .then(function () {
         driverTed.removeListener('unchained', t.fail)
         next()
       })
 
-    t.throws(function () {
-      // can't publish twice simultaneously
-      driverBill.publishMyIdentity()
-    })
+    // can't publish twice simultaneously
+    driverBill.publishMyIdentity()
+      .catch((err) => {
+        t.ok(/wait/.test(err.message), 'refuse to publish twice simultaneously')
+      })
   }
 
   function republish (next) {
@@ -618,7 +618,7 @@ test('self publish, edit, republish', function (t) {
     newBill.name = { firstName: 'Bill 2' }
     newBill[NONCE] = '232'
     driverBill.setIdentity(newBill)
-    driverBill.publishMyIdentity()
+    driverBill.publishMyIdentity().catch(t.fail)
     driverTed.once('unchained', function (info) {
       driverTed.lookupObject(info)
         .done(function (chainedObj) {
@@ -1037,7 +1037,9 @@ function publishIdentities (drivers, cb) {
   drivers.forEach(function (d) {
     global.d = d
     d.on('unchained', onUnchained)
-    d.publishMyIdentity().done()
+    d.publishMyIdentity().catch(function (err) {
+      console.error(err.stack)
+    })
   })
 
   return defer.promise.nodeify(cb || noop)

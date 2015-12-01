@@ -450,30 +450,21 @@ Driver.prototype._rethrow = function (err) {
   }
 }
 
-Driver.prototype._catchUpWithBlockchain = function () {
+Driver.prototype._catchUpWithBlockchain = async function () {
   var self = this
-  if (this._caughtUpPromise) return this._caughtUpPromise
-
-  var done
   var txIds
-  var catchUp = Q.defer()
-  this._caughtUpPromise = catchUp.promise
-    .then(function () {
-      self._debug('caught up with blockchain')
-    })
-    .finally(function () {
-      done = true
-    })
+  while (true) {
+    if (this._destroyed) return
 
-  tryAgain()
-  return this._caughtUpPromise
-
-  function tryAgain () {
-    if (self._destroyed) return
-    if (txIds) return checkDBs()
-
-    self.blockchain.addresses.transactions(self._addresses(), null, function (err, txInfos) {
-      if (err) return scheduleRetry()
+    if (!txIds) {
+      var txInfos
+      try {
+        txInfos = await this._doFetchTxs()
+      } catch (err) {
+        this._debug('failed to fetch txs', err.stack)
+        await utils.delay(Driver.CATCH_UP_INTERVAL)
+        continue
+      }
 
       txInfos = utils.parseCommonBlockchainTxs(txInfos)
       txIds = txInfos
@@ -483,42 +474,30 @@ Driver.prototype._catchUpWithBlockchain = function () {
         .map(function (txInfo) {
           return txInfo.tx.getId()
         })
+    }
 
-      checkDBs()
-    })
+    try {
+      await checkDBs()
+    } catch (err) {
+      this._debug('waiting to for txs to get processed...', err)
+      await utils.delay(Driver.CATCH_UP_INTERVAL)
+      continue
+    }
+
+    break
   }
 
-  function checkDBs () {
-    var tasks = txIds.map(function (txId) {
-      return Q.ninvoke(self.txDB, 'get', txId)
-        .then(function (entry) {
-          // var erroredOut
-          // if (entry.errors && entry.errors.length) {
-          //   var maxRetries = entry.dir === Dir.outbound
-          //     ? MAX_CHAIN_RETRIES
-          //     : MAX_UNCHAIN_RETRIES
-
-          //   erroredOut = entry.errors.length >= maxRetries
-          // }
-
-          var hasErrors = !!utils.countErrors(entry)
-          var processed = entry.dateUnchained || entry.dateChained || hasErrors
-          if (!processed) throw new Error('not ready')
-        })
+  async function checkDBs () {
+    await* txIds.map(async function (txId) {
+      var entry = await Q.ninvoke(self.txDB, 'get', txId)
+      var hasErrors = !!utils.countErrors(entry)
+      var processed = entry.dateUnchained || entry.dateChained || hasErrors
+      if (!processed) throw new Error('not ready')
     })
-
-    Q.all(tasks)
-      .then(catchUp.resolve)
-      .catch(scheduleRetry)
-  }
-
-  function scheduleRetry () {
-    self._debug('not caught up yet with blockchain...')
-    setTimeout(tryAgain, Driver.CATCH_UP_INTERVAL)
   }
 }
 
-Driver.prototype.identityPublishStatus = function () {
+Driver.prototype.identityPublishStatus = async function () {
   var self = this
   // check if we've already chained it
   if (!this._ready) {
@@ -533,55 +512,39 @@ Driver.prototype.identityPublishStatus = function () {
     queued: false
   }
 
-  return this._catchUpWithBlockchain()
-    .then(function () {
-      return Q.all([
-        Q.ninvoke(self.msgDB, 'byRootHash', rh),
-        Q.ninvoke(tradleUtils, 'getStorageKeyFor', utils.toBuffer(me))
-      ])
-    })
-    .spread(function (entries, curHash) {
-      curHash = curHash.toString('hex')
+  await this._catchUpWithBlockchain()
+  var entriesPromise = Q.ninvoke(self.msgDB, 'byRootHash', rh)
+  var curHashPromise = Q.ninvoke(tradleUtils, 'getStorageKeyFor', utils.toBuffer(me))
+  var promises = [
+    entriesPromise,
+    curHashPromise
+  ]
 
-      var unchained = entries.filter(function (e) {
-        return e.dateUnchained
-      })
+  try {
+    var results = await* promises
+  } catch (err) {
+    if (!err.notFound) throw err
 
-      status.ever = !!unchained.length
-      status.current = unchained.some(function (e) {
-        return e[CUR_HASH] === curHash
-      })
+    return status
+  }
 
-      status.queued = !status.current && entries.some(function (e) {
-        return e[CUR_HASH] === curHash
-      })
+  var entries = results[0]
+  var curHash = results[1].toString('hex')
 
-      // curHash = curHash.toString('hex')
-      // status.ever = true
+  var unchained = entries.filter(function (e) {
+    return e.dateUnchained
+  })
 
-      // var timestamp = 0
-      // var last
-      // entries.forEach(function (e) {
-      //   if (e.timestamp > timestamp) {
-      //     last = e
-      //     timestamp = e.timestamp
-      //   }
-      // })
+  status.ever = !!unchained.length
+  status.current = unchained.some(function (e) {
+    return e[CUR_HASH] === curHash
+  })
 
-      // if (last[CUR_HASH] === curHash) {
-      //   status.queued = true
-      //   if (last.tx) {
-      //     status.current = true
-      //   }
-      // }
+  status.queued = !status.current && entries.some(function (e) {
+    return e[CUR_HASH] === curHash
+  })
 
-      return status
-    })
-    .catch(function (err) {
-      if (!err.notFound) throw err
-
-      return status
-    })
+  return status
 }
 
 Driver.prototype.publishIdentity = function (identity) {
@@ -599,57 +562,48 @@ Driver.prototype.setIdentity = function (identityJSON) {
   this.identityJSON = this.identity.toJSON()
 }
 
-Driver.prototype.publishMyIdentity = function () {
+Driver.prototype.publishMyIdentity = async function () {
   var self = this
 
   if (this._publishingIdentity) {
     throw new Error('wait till current publishing process ends')
   }
 
-  if (!this._ready) {
-    return this._readyPromise.then(this.publishMyIdentity)
-  }
-
   this._publishingIdentity = true
-  return this.identityPublishStatus()
-    .then(function (status) {
-      if (!status.ever) return self.publishIdentity()
-      if (status.queued) {
-        return Q.reject(new Error('already publishing this version'))
-      }
 
-      if (status.current) {
-        return Q.reject(new Error('already published this version'))
-      }
+  try {
+    await this._readyPromise
+    var status = await this.identityPublishStatus()
+    if (!status.ever) return this.publishIdentity()
+    if (status.queued) {
+      throw new Error('already publishing this version')
+    }
 
-      return publish()
-    })
-    .finally(function () {
-      delete self._publishingIdentity
-    })
+    if (status.current) {
+      throw new Error('already published this version')
+    }
 
-  function publish () {
-    var priv = self.getPrivateKey({ purpose: 'update' })
-    var update = extend({}, self.identityJSON)
-    var prevHash = self.myCurrentHash() || self.myRootHash()
+    var priv = this.getPrivateKey({ purpose: 'update' })
+    var update = extend({}, this.identityJSON)
+    var prevHash = this.myCurrentHash() || this.myRootHash()
     utils.updateChainedObj(update, prevHash)
 
-    return Q.ninvoke(Builder, 'addNonce', update)
-      .then(function (nonce) {
-        var builder = Builder()
-          .data(update)
-          .signWith(toKey(priv))
+    var nonce = await Q.ninvoke(Builder, 'addNonce', update)
+    var builder = Builder()
+      .data(update)
+      .signWith(toKey(priv))
 
-        return Q.ninvoke(builder, 'build')
-      })
-      .then(function (result) {
-        self.setIdentity(update)
-        extend(self.identityMeta, utils.pick(update, PREV_HASH, ROOT_HASH))
-        return Q.all([
-          self._prepIdentity(),
-          self.publishIdentity(result.form)
-        ])
-      })
+    var build = await Q.ninvoke(builder, 'build')
+    this.setIdentity(update)
+    extend(this.identityMeta, utils.pick(update, PREV_HASH, ROOT_HASH))
+    await* [
+      this._prepIdentity(),
+      this.publishIdentity(build.form)
+    ]
+
+    delete this._publishingIdentity
+  } finally {
+    this._publishingIdentity = false
   }
 }
 
@@ -1062,6 +1016,10 @@ Driver.prototype._scheduleFetch = function () {
   }
 
   this._fetchTxsTimeout = setTimeout(this._fetchTxs, this.syncInterval)
+}
+
+Driver.prototype._doFetchTxs = function () {
+  return Q.ninvoke(this.blockchain.addresses, 'transactions', this._addresses(), null)
 }
 
 Driver.prototype._fetchTxs = function () {
