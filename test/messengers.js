@@ -12,6 +12,7 @@ var tedPub = require('./fixtures/ted-pub')
 var tedPriv = require('./fixtures/ted-priv')
 
 test('p2p', function (t) {
+  var received
   var identityInfos = [
     {
       pub: billPub,
