@@ -1772,16 +1772,13 @@ Driver.prototype.lookupBTCKey = function (recipient) {
 }
 
 Driver.prototype.lookupBTCPubKey = function (recipient) {
-  return this.lookupBTCKey(recipient).then(function (k) {
-    return k.value
-  })
+  return this.lookupBTCKey(recipient)
+    .then((k) => k.value)
 }
 
 Driver.prototype.lookupBTCAddress = function (recipient) {
   return this.lookupBTCKey(recipient)
-    .then(function (k) {
-      return k.fingerprint
-    })
+    .then((k) => k.fingerprint)
 }
 
 Driver.prototype.destroy = function () {

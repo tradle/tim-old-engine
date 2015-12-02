@@ -1,5 +1,5 @@
 before_script:
-  - npm install -g babel
+  - npm install -g babel-cli
 language: node_js
 node_js:
   - "0.12"
