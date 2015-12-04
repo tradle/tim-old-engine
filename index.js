@@ -487,12 +487,12 @@ Driver.prototype._catchUpWithBlockchain = async function () {
   }
 
   async function checkDBs () {
-    await* txIds.map(async function (txId) {
+    await Q.all(txIds.map(async function (txId) {
       var entry = await Q.ninvoke(self.txDB, 'get', txId)
       var hasErrors = !!utils.countErrors(entry)
       var processed = entry.dateUnchained || entry.dateChained || hasErrors
       if (!processed) throw new Error('not ready')
-    })
+    }))
   }
 }
 
@@ -518,7 +518,7 @@ Driver.prototype.identityPublishStatus = async function () {
   ]
 
   try {
-    var results = await* promises
+    var results = await Q.all(promises)
   } catch (err) {
     if (!err.notFound) throw err
 
@@ -593,10 +593,10 @@ Driver.prototype.publishMyIdentity = async function () {
     var build = await Q.ninvoke(builder, 'build')
     this.setIdentity(update)
     extend(this.identityMeta, utils.pick(update, PREV_HASH, ROOT_HASH))
-    await* [
+    await Q.all([
       this._prepIdentity(),
       this.publishIdentity(build.form)
-    ]
+    ])
 
     delete this._publishingIdentity
   } finally {
@@ -1055,7 +1055,7 @@ Driver.prototype._processTxs = async function (txInfos) {
       return true
     })
 
-  var logPromises = await* lookups.map(async function (lookup, i) {
+  return await Q.all(lookups.map(async function (lookup, i) {
     var err
     try {
       var entry = await lookup
@@ -1121,9 +1121,7 @@ Driver.prototype._processTxs = async function (txInfos) {
     // clear errors
     nextEntry.set('errors', {})
     return self.log(utils.jsonifyErrors(nextEntry))
-  })
-
-  await* logPromises
+  }))
 }
 
 Driver.prototype._setupDBs = function () {
@@ -1585,7 +1583,7 @@ Driver.prototype.share = async function (options) {
     from: utils.toObj(ROOT_HASH, this.myRootHash())
   })
 
-  var recipients = await* to.map(this.lookupIdentity, this)
+  var recipients = await Q.all(to.map(this.lookupIdentity, this))
   var objInfo = await Q.ninvoke(this.msgDB, 'byCurHash', curHash)
   var obj = await this.lookupObject(objInfo)
   entry.set(CUR_HASH, curHash)
@@ -1593,13 +1591,13 @@ Driver.prototype.share = async function (options) {
     .set(TYPE, obj[TYPE])
 
   var symmetricKey = obj.permission.body().decryptionKey
-  var shares = await* recipients.map(function (r) {
+  var shares = await Q.all(recipients.map(function (r) {
     var pubkey = self._getBTCKey(r.identity)
     return self.chainwriter.share()
       .shareAccessTo(curHash, symmetricKey)
       .shareAccessWith(pubkey.value)
       .execute()
-  })
+  }))
 
   // TODO: rethink this repeated code from send()
   var entries = shares.map(function (share, i) {
@@ -1613,7 +1611,7 @@ Driver.prototype.share = async function (options) {
   })
 
   entries.forEach(utils.setUID)
-  await* entries.map(this.log, this)
+  await Q.all(entries.map(this.log, this))
 }
 
 // Driver.prototype.chain = function (info) {
@@ -1700,7 +1698,7 @@ Driver.prototype.send = async function (options) {
   if (isPublic) {
     recipients = btcKeys = to
   } else {
-    recipients = await* to.map(this.lookupIdentity, this)
+    recipients = await Q.all(to.map(this.lookupIdentity, this))
     btcKeys = utils.pluck(recipients, 'identity')
       .map(this._getBTCKey, this)
       .map(function (k) {
@@ -1742,7 +1740,7 @@ Driver.prototype.send = async function (options) {
   }
 
   entries.forEach(utils.setUID)
-  await* entries.map(this.log, this)
+  await Q.all(entries.map(this.log, this))
 }
 
 Driver.prototype._push = function () {
