@@ -2,10 +2,16 @@
   "name": "tim",
   "version": "2.0.0",
   "description": "Tradle's P2P OTR-based chat with plaintext and structured messages, and the ability to externalize messages onto a blockchain (currently bitcoin's)",
-  "main": "index.js",
+  "main": "lib/index.js",
   "scripts": {
     "test": "babel-node test && MULTIPLEX=1 babel-node test",
-    "style": "standard $(git ls-files '**.js')"
+    "style": "standard $(git ls-files '**.js')",
+    "clean": "rm -rf lib/",
+    "prebuild": "npm run clean -s",
+    "build": "babel src -d lib",
+    "postbuild": "npm run test -s",
+    "prepublish": "npm run build -s",
+    "postpublish": "git push origin HEAD"
   },
   "pre-commit": [
     "test"
