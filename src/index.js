@@ -478,7 +478,7 @@ Driver.prototype._catchUpWithBlockchain = async function () {
     try {
       await checkDBs()
     } catch (err) {
-      this._debug('waiting to for txs to get processed...', err)
+      this._debug('waiting for txs to get processed...', err)
       await utils.delay(Driver.CATCH_UP_INTERVAL)
       continue
     }
@@ -1369,7 +1369,7 @@ Driver.prototype._prefix = function (path) {
   return this.pathPrefix + '-' + path
 }
 
-Driver.prototype.receiveMsg = function (buf, senderInfo) {
+Driver.prototype.receiveMsg = async function (buf, senderInfo) {
 //   return (this._receiving || Q())
 //     .finally(this._receiveMsg.bind(this, buf, senderInfo))
 // }
@@ -1398,69 +1398,59 @@ Driver.prototype.receiveMsg = function (buf, senderInfo) {
   var txInfo
   var promiseValid
   var valid = utils.validateMsg(msg)
-  if (valid) promiseValid = Q.resolve()
-  else promiseValid = Q.reject(new Error('received invalid msg'))
+  var entry
+  try {
+    if (!valid) throw new Error('received invalid msg')
 
-  var from
-  return this._receiving = promiseValid
-    .then(this.lookupIdentity.bind(this, senderInfo))
-    .then(function (result) {
-      from = result
-      var fromKey = utils.firstKey(result.identity.pubkeys, {
-        type: 'bitcoin',
-        networkName: self.networkName,
-        purpose: 'messaging'
-      })
+    var from = await this.lookupIdentity(senderInfo)
+    var fromKey = utils.firstKey(from.identity.pubkeys, {
+      type: 'bitcoin',
+      networkName: this.networkName,
+      purpose: 'messaging'
+    })
 
-      txInfo = {
-        addressesFrom: [fromKey.fingerprint],
-        addressesTo: [self.wallet.addressString],
-        txData: msg.txData,
-        txType: msg.txType
-      }
+    txInfo = {
+      addressesFrom: [fromKey.fingerprint],
+      addressesTo: [this.wallet.addressString],
+      txData: msg.txData,
+      txType: msg.txType
+    }
 
-      // TODO: rethink how chainloader should work
-      // this doesn't look right
-      return self.chainloader._processTxInfo(txInfo)
+    // TODO: rethink how chainloader should work
+    // this doesn't look right
+    var parsed = await this.chainloader._processTxInfo(txInfo)
+    var permission = Permission.recover(msg.encryptedPermission, parsed.sharedKey)
+    await Q.all([
+      this.keeper.put(parsed.permissionKey.toString('hex'), msg.encryptedPermission),
+      this.keeper.put(permission.fileKeyString(), msg.encryptedData)
+    ])
+
+        // yes, it repeats work
+        // but it makes the code simpler
+        // TODO optimize
+    var obj = await this.lookupObject(txInfo)
+    entry = await this.unchainResultToEntry(obj)
+    entry.set({
+      type: EventType.msg.receivedValid,
+      dir: Dir.inbound
     })
-    .then(function (parsed) {
-      var permission = Permission.recover(msg.encryptedPermission, parsed.sharedKey)
-      return Q.all([
-        self.keeper.put(parsed.permissionKey.toString('hex'), msg.encryptedPermission),
-        self.keeper.put(permission.fileKeyString(), msg.encryptedData)
-      ])
-    })
-    .then(function () {
-      // yes, it repeats work
-      // but it makes the code simpler
-      // TODO optimize
-      return self.lookupObject(txInfo)
-    })
-    .then(self.unchainResultToEntry)
-    .then(function (entry) {
-      return entry.set({
-        type: EventType.msg.receivedValid,
-        dir: Dir.inbound
-      })
-    })
-    .catch(function (err) {
+  } catch (err) {
       // TODO: retry
-      self._debug('failed to process inbound msg', err.message, err.stack)
-      return new Entry({
-        type: EventType.msg.receivedInvalid,
-        msg: msg,
-        from: utils.toObj(ROOT_HASH, from && from[ROOT_HASH]),
-        to: utils.toObj(ROOT_HASH, self.myRootHash()),
-        dir: Dir.inbound,
-        errors: {
-          receive: err
-        }
-      })
+    this._debug('failed to process inbound msg', err.message, err.stack)
+    entry = new Entry({
+      type: EventType.msg.receivedInvalid,
+      msg: msg,
+      from: utils.toObj(ROOT_HASH, from && from[ROOT_HASH]),
+      to: utils.toObj(ROOT_HASH, this.myRootHash()),
+      dir: Dir.inbound,
+      errors: {
+        receive: err
+      }
     })
-    .then(function (entry) {
-      entry.set('timestamp', timestamp)
-      return self.log(entry)
-    })
+  }
+
+  entry.set('timestamp', timestamp)
+  return await this.log(entry)
 }
 
 Driver.prototype.myRootHash = function () {
@@ -1740,7 +1730,7 @@ Driver.prototype.send = async function (options) {
   }
 
   entries.forEach(utils.setUID)
-  await Q.all(entries.map(this.log, this))
+  return await Q.all(entries.map(this.log, this))
 }
 
 Driver.prototype._push = function () {

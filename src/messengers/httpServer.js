@@ -66,29 +66,28 @@ HttpMessengerServer.prototype._onmessage = function (req, res, next) {
   if (!this.receive) throw new Error('please set "receive" function')
 
   debug('received msg from', fromRootHash)
-  collect(req, function (err, bufs) {
+  collect(req, async function (err, bufs) {
     if (err) return sendErr(res, 501, 'Something went wrong')
 
     var buf = Buffer.concat(bufs)
     debug('processing msg from', fromRootHash)
-    self.receive(buf, from)
-      .then(function () {
-        debug('processed msg from', fromRootHash)
-        queued = self._recipients[fromRootHash] || []
-        res.json(queued)
-        queued.length = 0
-      })
-      .catch(function (err) {
-        debug('failed to process message', buf.toString(), err)
-        if ('code' in err) {
-          sendErr(res, err)
-        } else {
-          // for security purposes
-          // don't propagate internal errs
-          sendErr(res, 501, 'Something went wrong')
-        }
-      })
-      .done()
+
+    try {
+      await self.receive(buf, from)
+      debug('processed msg from', fromRootHash)
+      var queued = self._recipients[fromRootHash] || []
+      res.json(queued)
+      queued.length = 0
+    } catch (err) {
+      debug('failed to process message', buf.toString(), err)
+      if ('code' in err) {
+        sendErr(res, err)
+      } else {
+        // for security purposes
+        // don't propagate internal errs
+        sendErr(res, 501, 'Something went wrong')
+      }
+    }
   })
 }
 

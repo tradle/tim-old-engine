@@ -8,7 +8,8 @@
     "style": "standard $(git ls-files '**.js')",
     "clean": "rm -rf lib/",
     "prebuild": "npm run clean -s",
-    "build": "babel src -d lib",
+    "compile": "babel src -d lib",
+    "build": "npm run compile -s",
     "postbuild": "npm run test -s",
     "prepublish": "npm run build -s",
     "postpublish": "git push origin HEAD"

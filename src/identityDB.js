@@ -151,7 +151,6 @@ module.exports = function mkIdentityDB (path, options) {
           cb(null, ret)
         })
         .catch(cb)
-        .done()
     })
   }
 
@@ -207,13 +206,13 @@ module.exports = function mkIdentityDB (path, options) {
         .catch(function (err) {
           if (err instanceof TypeError ||
             err instanceof ReferenceError) {
+            debug('rethrowing ReferenceError', err, err.stack)
             throw err
           }
 
           debug('unable to get identity from keeper', err)
           cb()
         })
-        .done()
     }
   }
 }
