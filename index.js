@@ -330,8 +330,7 @@ Driver.prototype._readFromChain = function () {
     toObjectStream(),
     map(function (entry, cb) {
       // was read from chain and hasn't been processed yet
-      // self._debug('unchaining tx', entry.txId)
-      if (!entry.dateDetected || entry.dateUnchained || !entry.txData) {
+      if (!entry.dateDetected || entry.dateUnchained || entry.ignore) {
         return finish()
       }
 
@@ -356,6 +355,7 @@ Driver.prototype._readFromChain = function () {
       }
 
       if (self._queuedUnchains[txId]) {
+        finish()
         return self._debug('already schedulded unchaining!')
       }
 
@@ -369,6 +369,10 @@ Driver.prototype._readFromChain = function () {
         if (err || !ret) self._rmPending(txId)
 
         delete self._queuedUnchains[txId]
+        if (!ret) {
+          self._debug('skipping unchain of tx', entry.txId)
+        }
+
         cb(err, ret)
       }
     }),
@@ -502,8 +506,11 @@ Driver.prototype._catchUpWithBlockchain = function () {
           // }
 
           var hasErrors = !!utils.countErrors(entry)
-          var processed = entry.dateUnchained || entry.dateChained || hasErrors
-          if (!processed) throw new Error('not ready')
+          var processed = entry.dateUnchained || entry.dateChained || entry.ignore || hasErrors
+          if (!processed) {
+            self._debug('still waiting for tx', txId)
+            throw new Error('not ready')
+          }
         })
     })
 
@@ -1052,32 +1059,38 @@ Driver.prototype._runFetchTxsLoop = function (fromHeight, skipIds) {
   // stream.destroy = stream.end
 
   this._scheduleFetch()
-  this._fetchTxs()
+  this._fetchAndReschedule()
 }
 
 Driver.prototype._scheduleFetch = function () {
+  var self = this
   if (this._destroyed) return
   if (this._paused) {
     return this.once('resume', this._scheduleFetch)
   }
 
-  this._fetchTxsTimeout = setTimeout(this._fetchTxs, this.syncInterval)
+  this._fetchTxsTimeout = setTimeout(this._fetchAndReschedule, this.syncInterval)
+}
+
+Driver.prototype._fetchAndReschedule = function () {
+  var self = this
+  return this._fetchTxs()
+    .then(this._processTxs)
+    .catch(function (err) {
+      debug('failed to fetch/process txs', err)
+    })
+    .finally(function () {
+      self._scheduleFetch()
+    })
+    .done()
 }
 
 Driver.prototype._fetchTxs = function () {
-  var self = this
-  this.blockchain.addresses.transactions(this._addresses(), function (err, txInfos) {
-    if (!err && txInfos) {
-      self._processTxs(txInfos)
-    }
-  })
+  return Q.ninvoke(this.blockchain.addresses, 'transactions', this._addresses())
 }
 
 Driver.prototype._processTxs = function (txInfos) {
   var self = this
-
-  this._scheduleFetch()
-
   var lookups = []
   var filtered = utils.parseCommonBlockchainTxs(txInfos)
     .filter(function (txInfo) {
@@ -1123,8 +1136,11 @@ Driver.prototype._processTxs = function (txInfos) {
         }
 
         var type
+
+        // console.log(TxInfo.parse(txInfo.tx))
+        var parsedTx = TxInfo.parse(txInfo.tx, self.networkName, PREFIX)
         if (entry) {
-          if (entry.dateDetected) {
+          if (entry.dateDetected || entry.ignore) {
             // already got this from chain
             // at least once
             return
@@ -1133,15 +1149,16 @@ Driver.prototype._processTxs = function (txInfos) {
           // we put this tx on chain
           // this is the first time we're getting it FROM the chain
           type = EventType.tx.confirmation
+
           if (!entry.dateChained) {
             self._debug('uh oh, this should be a confirmation for a tx chained by us')
           }
+        } else if (!parsedTx.txData) {
+          type = EventType.tx.ignore
         } else {
           type = EventType.tx.new
         }
 
-        // console.log(TxInfo.parse(txInfo.tx))
-        var parsedTx = TxInfo.parse(txInfo.tx, self.networkName, PREFIX)
         var isOutbound = parsedTx.addressesFrom.some(function (addr) {
           return addr === self.wallet.addressString
         })
@@ -1165,7 +1182,6 @@ Driver.prototype._processTxs = function (txInfos) {
 
     return Q.all(logPromises)
   })
-  .done()
 }
 
 Driver.prototype._setupDBs = function () {
