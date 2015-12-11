@@ -1497,7 +1497,7 @@ Driver.prototype.receiveMsg = function (buf, senderInfo) {
         to: utils.toObj(ROOT_HASH, self.myRootHash()),
         dir: Dir.inbound,
         errors: {
-          receive: err
+          receive: [err]
         }
       })
     })
