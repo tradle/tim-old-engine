@@ -7,6 +7,18 @@ if (process.env.MULTIPLEX) {
 var path = require('path')
 var fs = require('fs')
 var test = require('tape-extra')
+var testAsync = function (name, fn) {
+  test(name, async function (t) {
+    try {
+      await fn(t)
+    } catch (err) {
+      console.error(err)
+      t.error(err)
+      throw err
+    }
+  })
+}
+
 var rimraf = require('rimraf')
 var find = require('array-find')
 var pick = require('object.pick')
@@ -18,6 +30,8 @@ var collect = require('stream-collector')
 var map = require('map-stream')
 var safe = require('safecb')
 var Q = require('q')
+Q.longStackSupport = true
+var Promise = Q.Promise
 var DHT = require('@tradle/bittorrent-dht')
 // var Keeper = require('bitkeeper-js')
 var Zlorp = require('zlorp')
@@ -213,6 +227,44 @@ test('export history', function (t) {
   })
 })
 
+testAsync('forget contact', async function (t) {
+  // t.timeoutAfter(20000)
+  await Q.nfcall(publishIdentities, [driverBill, driverTed])
+  var receivePromise = new Promise((resolve) => {
+    driverTed.once('message', resolve)
+  })
+
+  try {
+    await driverBill.send({
+      msg: toMsg({ yo: 'ted' }),
+      deliver: true,
+      to: [getIdentifier(tedPub)]
+    })
+  } catch (err) {
+    t.fail(err)
+    return t.end()
+  }
+
+  var tedRootHash = driverTed.myRootHash()
+  var billRootHash = driverBill.myRootHash()
+
+  await receivePromise
+  var msgs = await driverBill.getConversation(tedRootHash)
+  t.equal(msgs.length, 1)
+
+  msgs = await driverTed.getConversation(billRootHash)
+  t.equal(msgs.length, 1)
+
+  await driverBill.forget(tedRootHash)
+  msgs = await driverBill.getConversation(tedRootHash)
+  t.equal(msgs.length, 0)
+
+  await driverTed.forget(billRootHash)
+  msgs = await driverTed.getConversation(billRootHash)
+  t.equal(msgs.length, 0)
+  t.end()
+})
+
 test('pause/unpause', function (t) {
   t.timeoutAfter(20000)
   driverBill.pause()
@@ -390,7 +442,7 @@ test('give up chaining after max retries', function (t) {
   })
 })
 
-test('the reader and the writer', async function (t) {
+testAsync('the reader and the writer', async function (t) {
   t.timeoutAfter(20000)
 
   var togo = 4
@@ -497,7 +549,7 @@ test('no chaining in readOnly mode', function (t) {
   setTimeout(t.end, 300)
 })
 
-test('no chaining attempted if low balance', async function (t) {
+testAsync('no chaining attempted if low balance', async function (t) {
   t.plan(2)
   driverBill.wallet.balance = function (cb) {
     process.nextTick(function () {

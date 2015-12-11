@@ -3,6 +3,7 @@ var assert = require('assert')
 var util = require('util')
 var omit = require('object.omit')
 var Q = require('q')
+// var Promise = Q.Promise
 var typeforce = require('typeforce')
 var debug = require('debug')('tim')
 var PassThrough = require('readable-stream').PassThrough
@@ -1156,7 +1157,8 @@ Driver.prototype._setupDBs = function () {
     'chained',
     'unchained',
     'message',
-    'sent'
+    'sent',
+    'forgot'
   ]
 
   reemit(this.msgDB, this, msgDBEvents)
@@ -1218,6 +1220,7 @@ Driver.prototype.lookupObject = function (info) {
   // TODO: this unfortunately duplicates part of unchainer.js
   if (!info.txData) {
     if (!info.tx) {
+      console.log(info)
       throw new Error('missing required info to lookup chained obj')
     }
   }
@@ -1733,6 +1736,22 @@ Driver.prototype.send = async function (options) {
   return await Q.all(entries.map(this.log, this))
 }
 
+/**
+ * Forget all conversations with a contact
+ * @param  {String} rootHash of contact
+ * @return {Promise}
+ */
+Driver.prototype.forget = async function (rootHash) {
+  typeforce('String', rootHash)
+  var msgs = await this.getConversation(rootHash)
+  var keys = msgs.map(msg => msg[ROOT_HASH])
+  await this.keeper.removeMany(keys)
+  await this.log(new Entry({
+    type: EventType.misc.forget,
+    who: rootHash
+  }))
+}
+
 Driver.prototype._push = function () {
   if (this.keeper.push) {
     this.keeper.push.apply(this.keeper, arguments)
@@ -1829,39 +1848,26 @@ Driver.prototype.options = function () {
   return clone(this._options)
 }
 
-Driver.prototype.history = function (identityInfo) {
-  var self = this
+Driver.prototype.history = async function (identityInfo) {
   var otherPartyRootHash
   var lookupOtherParty
   if (identityInfo) {
-    if (ROOT_HASH in identityInfo) {
-      lookupOtherParty = Q(identityInfo)
-    } else {
-      lookupOtherParty = this.lookupIdentity(identityInfo)
+    otherPartyRootHash = identityInfo[ROOT_HASH]
+    if (!otherPartyRootHash) {
+      identityInfo = await this.lookupIdentity(identityInfo)
+      otherPartyRootHash = identityInfo[ROOT_HASH]
     }
-  } else {
-    lookupOtherParty = Q()
   }
 
-  // console.log(this.myRootHash())
-  return lookupOtherParty
-    .then(function (other) {
-      var stream = self.messages().createValueStream()
-      if (other) {
-        otherPartyRootHash = other[ROOT_HASH]
-        stream = pump(stream, utils.filterStream(function (data) {
-          if (data[TYPE] === constants.TYPES.IDENTITY) return
+  var msgs = otherPartyRootHash
+    ? await this.getConversation(otherPartyRootHash)
+    : await Q.nfcall(collect, this.msgDB.createValueStream())
 
-          return (data.from && data.from[ROOT_HASH] === otherPartyRootHash)
-            || (data.to && data.to[ROOT_HASH] === otherPartyRootHash)
-        }))
-      }
+  return await Q.all(msgs.map(this.lookupObject))
+}
 
-      return Q.nfcall(collect, stream)
-    })
-    .then(function (msgs) {
-      return Q.all(msgs.map(self.lookupObject))
-    })
+Driver.prototype.getConversation = async function (rootHash) {
+  return await Q.ninvoke(this.msgDB, 'getConversation', rootHash)
 }
 
 Driver.prototype._addresses = function () {

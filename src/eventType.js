@@ -30,6 +30,12 @@ var reverse = exports.reverse = {}
       writeSuccess: 2,
       writeError: 3
     }
+  },
+  {
+    group: 'misc',
+    events: {
+      forget: 0
+    }
   }
 ].forEach(function (group, i) {
   var offset = 1000 * (i + 1)
