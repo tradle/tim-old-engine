@@ -114,6 +114,7 @@ test.afterEach = function (cb) {
 
 rimraf.sync(STORAGE_DIR)
 
+
 test('msgDB', function (t) {
   t.plan(6)
 
@@ -183,8 +184,8 @@ test('export history', function (t) {
 
         t.deepEqual(tedHist.pop().parsed.data, toTed)
         return Q.all([
-          driverBill.history(getIdentifier(tedPub)),
-          driverTed.history(getIdentifier(billPub))
+          driverBill.history(driverTed.myRootHash()),
+          driverTed.history(driverBill.myRootHash())
         ])
       })
       .spread(function (billHist, tedHist) {
@@ -922,6 +923,51 @@ test('http messenger, recipient-specific', function (t) {
       })
       .done()
     })
+  })
+})
+
+test('forget contact', function (t) {  // t.timeoutAfter(20000)
+  publishIdentities([driverBill, driverTed], function () {
+    var receivePromise = Q.Promise(function (resolve) {
+      driverTed.once('message', resolve)
+    })
+
+    var tedRootHash = driverTed.myRootHash()
+    var billRootHash = driverBill.myRootHash()
+    driverBill.send({
+        msg: toMsg({ yo: 'ted' }),
+        deliver: true,
+        to: [getIdentifier(tedPub)]
+      })
+      .then(function () {
+        return receivePromise
+      })
+      .then(function () {
+        return driverBill.getConversation(tedRootHash)
+      })
+      .then(function (msgs) {
+        t.equal(msgs.length, 1)
+        return driverTed.getConversation(billRootHash)
+      })
+      .then(function (msgs) {
+        t.equal(msgs.length, 1)
+        return driverBill.forget(tedRootHash)
+      })
+      .then(function () {
+        return driverBill.getConversation(tedRootHash)
+      })
+      .then(function (msgs) {
+        t.equal(msgs.length, 0)
+        return driverTed.forget(billRootHash)
+      })
+      .then(function () {
+        return driverTed.getConversation(billRootHash)
+      })
+      .then(function (msgs) {
+        t.equal(msgs.length, 0)
+        t.end()
+      })
+      .done()
   })
 })
 

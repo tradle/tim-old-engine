@@ -1200,7 +1200,8 @@ Driver.prototype._setupDBs = function () {
     'chained',
     'unchained',
     'message',
-    'sent'
+    'sent',
+    'forgot'
   ]
 
   reemit(this.msgDB, this, msgDBEvents)
@@ -1804,6 +1805,25 @@ Driver.prototype.send = function (options) {
     })
 }
 
+Driver.prototype.forget = function (rootHash) {
+  var self = this
+  typeforce('String', rootHash)
+  return this.getConversation(rootHash)
+    .then(function (msgs) {
+      var keys = msgs.map(function (msg) {
+        return msg[ROOT_HASH]
+      })
+
+      return self.keeper.removeMany(keys)
+    })
+    .then(function () {
+      return self.log(new Entry({
+        type: EventType.misc.forget,
+        who: rootHash
+      }))
+    })
+}
+
 Driver.prototype._push = function () {
   if (this.keeper.push) {
     this.keeper.push.apply(this.keeper, arguments)
@@ -1903,39 +1923,19 @@ Driver.prototype.options = function () {
   return clone(this._options)
 }
 
-Driver.prototype.history = function (identityInfo) {
+Driver.prototype.history = function (otherPartyRootHash) {
   var self = this
-  var otherPartyRootHash
-  var lookupOtherParty
-  if (identityInfo) {
-    if (ROOT_HASH in identityInfo) {
-      lookupOtherParty = Q(identityInfo)
-    } else {
-      lookupOtherParty = this.lookupIdentity(identityInfo)
-    }
-  } else {
-    lookupOtherParty = Q()
-  }
+  var getMsgs = otherPartyRootHash
+    ? this.getConversation(otherPartyRootHash)
+    : Q.nfcall(collect, this.msgDB.createValueStream())
 
-  // console.log(this.myRootHash())
-  return lookupOtherParty
-    .then(function (other) {
-      var stream = self.messages().createValueStream()
-      if (other) {
-        otherPartyRootHash = other[ROOT_HASH]
-        stream = pump(stream, utils.filterStream(function (data) {
-          if (data[TYPE] === constants.TYPES.IDENTITY) return
+  return getMsgs.then(function (msgs) {
+    return Q.all(msgs.map(self.lookupObject))
+  })
+}
 
-          return (data.from && data.from[ROOT_HASH] === otherPartyRootHash)
-            || (data.to && data.to[ROOT_HASH] === otherPartyRootHash)
-        }))
-      }
-
-      return Q.nfcall(collect, stream)
-    })
-    .then(function (msgs) {
-      return Q.all(msgs.map(self.lookupObject))
-    })
+Driver.prototype.getConversation = function (rootHash) {
+  return Q.ninvoke(this.msgDB, 'getConversation', rootHash)
 }
 
 Driver.prototype._addresses = function () {
