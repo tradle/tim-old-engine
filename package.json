@@ -39,6 +39,7 @@
     "@tradle/multiplex-utp": "^1.0.1",
     "@tradle/permission": "0.0.1",
     "@tradle/simple-wallet": "0.0.1",
+    "@tradle/test-helpers": "0.0.4",
     "@tradle/tx-data": "0.0.1",
     "@tradle/utils": "^0.2.4",
     "@tradle/verifier": "^1.0.0",
