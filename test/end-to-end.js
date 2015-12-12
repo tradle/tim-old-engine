@@ -1,4 +1,3 @@
-
 if (process.env.MULTIPLEX) {
   console.log('multiplex over UTP')
   require('@tradle/multiplex-utp')
@@ -17,6 +16,11 @@ var collect = require('stream-collector')
 var map = require('map-stream')
 var safe = require('safecb')
 var Q = require('q')
+Q.onerror = function (e) {
+  console.error(e)
+  throw e
+}
+
 var DHT = require('@tradle/bittorrent-dht')
 // var Keeper = require('bitkeeper-js')
 var Zlorp = require('zlorp')
@@ -113,7 +117,6 @@ test.afterEach = function (cb) {
 }
 
 rimraf.sync(STORAGE_DIR)
-
 
 test('msgDB', function (t) {
   t.plan(6)
@@ -837,16 +840,16 @@ test('message resolution - contents match on p2p and chain channels', function (
     Builder()
       .data(msg)
       .signWith(getSigningKey(tedPriv))
-      .build(function (err, result) {
-        if (err) throw err
-
-        driverTed.send({
-          msg: result.form,
+      .build()
+      .then(function (buf) {
+        return driverTed.send({
+          msg: buf,
           to: [billCoords],
           chain: true,
           deliver: true
-        }).done()
+        })
       })
+      .done()
 
     function onUnchained (info) {
       this.lookupObject(info)

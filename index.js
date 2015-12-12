@@ -640,21 +640,19 @@ Driver.prototype.publishMyIdentity = function () {
     var update = extend({}, self.identityJSON)
     var prevHash = self.myCurrentHash() || self.myRootHash()
     utils.updateChainedObj(update, prevHash)
-
-    return Q.ninvoke(Builder, 'addNonce', update)
-      .then(function (nonce) {
-        var builder = Builder()
+    return Builder.addNonce(update)
+      .then(function () {
+        return Builder()
           .data(update)
           .signWith(toKey(priv))
-
-        return Q.ninvoke(builder, 'build')
+          .build()
       })
-      .then(function (result) {
+      .then(function (buf) {
         self.setIdentity(update)
         extend(self.identityMeta, utils.pick(update, PREV_HASH, ROOT_HASH))
         return Q.all([
           self._prepIdentity(),
-          self.publishIdentity(result.form)
+          self.publishIdentity(buf)
         ])
       })
   }
@@ -1287,7 +1285,7 @@ Driver.prototype.lookupObject = function (info) {
   return this.chainloader.load(clone(info))
     .then(function (obj) {
       chainedObj = obj
-      return Q.ninvoke(Parser, 'parse', obj.data)
+      return Parser.parse(obj.data)
     })
     .then(function (parsed) {
       chainedObj.parsed = parsed
@@ -1589,20 +1587,17 @@ Driver.prototype.putOnChain = function (entry) {
     })
 }
 
+Driver.prototype._signee = function () {
+  return this.myRootHash() + ':' + this.myCurrentHash()
+}
+
 Driver.prototype.sign = function (msg) {
   typeforce('Object', msg, true) // strict
-  if (!msg[SIGNEE]) {
-    msg[SIGNEE] = this.myRootHash() + ':' + this.myCurrentHash()
-  }
-
-  var b = Builder()
+  var signee = msg[SIGNEE] || this._signee()
+  return new Builder()
     .data(msg)
-    .signWith(this._signingKey)
-
-  return Q.ninvoke(b, 'build')
-    .then(function (result) {
-      return result.form
-    })
+    .signWith(this._signingKey, signee)
+    .build()
 }
 
 Driver.prototype.chain = function (options) {
@@ -1762,7 +1757,7 @@ Driver.prototype.send = function (options) {
   return this._readyPromise
     // validate
     .then(function () {
-      return Q.ninvoke(Parser, 'parse', data)
+      return Parser.parse(data)
     })
     .then(function (parsed) {
       entry.set(TYPE, parsed.data[TYPE])
