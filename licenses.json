@@ -1,0 +1,2485 @@
+{
+  "@tradle/bitcoinjs-lib@1.5.7": {
+    "licenses": "MIT*",
+    "repository": "https://github.com/bitcoinjs/bitcoinjs-lib",
+    "licenseFile": "/Users/tenaciousmv/Code/tradling/node_modules/@tradle/bitcoinjs-lib/LICENSE"
+  },
+  "@tradle/bitjoe-js@0.1.1": {
+    "licenses": "MIT",
+    "repository": "https://github.com/tradle/bitjoe-js",
+    "licenseFile": "/Users/tenaciousmv/Code/tradling/node_modules/@tradle/bitjoe-js/LICENSE"
+  },
+  "@tradle/bittorrent-dht@3.2.1": {
+    "licenses": "MIT",
+    "repository": "https://github.com/feross/bittorrent-dht",
+    "licenseFile": "/Users/tenaciousmv/Code/tradling/node_modules/@tradle/bittorrent-dht/LICENSE"
+  },
+  "@tradle/cb-blockr@3.1.1": {
+    "licenses": "ISC",
+    "repository": "https://github.com/weilu/cb-blockr"
+  },
+  "@tradle/chained-obj@2.0.1": {
+    "licenses": "MIT",
+    "repository": "https://github.com/tradle/chained-obj",
+    "licenseFile": "/Users/tenaciousmv/Code/tradling/node_modules/@tradle/chained-obj/LICENSE"
+  },
+  "@tradle/chainloader@1.1.2": {
+    "licenses": "MIT",
+    "repository": "git+https://github.com/tradle/chainloader",
+    "licenseFile": "/Users/tenaciousmv/Code/tradling/node_modules/@tradle/chainloader/LICENSE"
+  },
+  "@tradle/constants@1.1.3": {
+    "licenses": "MIT",
+    "repository": "https://github.com/mvayngrib/tradle-constants"
+  },
+  "@tradle/dht-relay@1.0.0": {
+    "licenses": "ISC",
+    "licenseFile": "/Users/tenaciousmv/Code/tradling/node_modules/zlorp/node_modules/@tradle/dht-relay/LICENSE"
+  },
+  "@tradle/identity@1.0.7": {
+    "licenses": "MIT",
+    "licenseFile": "/Users/tenaciousmv/Code/tradling/node_modules/@tradle/identity/LICENSE"
+  },
+  "@tradle/kiki@1.1.10": {
+    "licenses": "MIT",
+    "licenseFile": "/Users/tenaciousmv/Code/tradling/node_modules/@tradle/kiki/LICENSE"
+  },
+  "@tradle/multiplex-utp@1.0.1": {
+    "licenses": "ISC",
+    "repository": "https://github.com/mvayngrib/multiplex-utp"
+  },
+  "@tradle/otr@0.2.15": {
+    "licenses": "MPL v2.0",
+    "repository": "https://github.com/arlolra/otr",
+    "licenseFile": "/Users/tenaciousmv/Code/tradling/node_modules/@tradle/kiki/node_modules/@tradle/otr/license"
+  },
+  "@tradle/permission@0.0.1": {
+    "licenses": "MIT",
+    "repository": "git+https://github.com/tradle/permission",
+    "licenseFile": "/Users/tenaciousmv/Code/tradling/node_modules/@tradle/permission/LICENSE"
+  },
+  "@tradle/simple-wallet@0.0.1": {
+    "licenses": "MIT",
+    "repository": "https://github.com/mvayngrib/simple-wallet",
+    "licenseFile": "/Users/tenaciousmv/Code/tradling/node_modules/@tradle/simple-wallet/LICENSE"
+  },
+  "@tradle/spender@1.0.2": {
+    "licenses": "MIT",
+    "repository": "https://github.com/mvayngrib/spender"
+  },
+  "@tradle/talko@1.0.1": {
+    "licenses": "ISC",
+    "licenseFile": "/Users/tenaciousmv/Code/tradling/node_modules/zlorp/node_modules/@tradle/talko/LICENSE"
+  },
+  "@tradle/test-helpers@0.0.4": {
+    "licenses": "MIT",
+    "repository": "git+https://github.com/tradle/test-helpers",
+    "licenseFile": "/Users/tenaciousmv/Code/tradling/node_modules/@tradle/test-helpers/LICENSE"
+  },
+  "@tradle/tx-data@0.0.1": {
+    "licenses": "MIT",
+    "repository": "git+https://github.com/tradle/tx-data",
+    "licenseFile": "/Users/tenaciousmv/Code/tradling/node_modules/@tradle/tx-data/LICENSE"
+  },
+  "@tradle/utils@0.2.4": {
+    "licenses": "MIT"
+  },
+  "@tradle/utp@0.0.8": {
+    "licenses": "MIT*",
+    "repository": "https://github.com/mafintosh/utp"
+  },
+  "@tradle/verifier@1.0.1": {
+    "licenses": "ISC",
+    "repository": "https://github.com/mvayngrib/tradle-verifier"
+  },
+  "abbrev@1.0.7": {
+    "licenses": "ISC",
+    "repository": "http://github.com/isaacs/abbrev-js",
+    "licenseFile": "/Users/tenaciousmv/Code/tradling/node_modules/standard/node_modules/standard-format/node_modules/esformatter-jsx/node_modules/js-beautify/node_modules/nopt/node_modules/abbrev/LICENSE"
+  },
+  "abstract-leveldown@0.12.4": {
+    "licenses": "MIT",
+    "repository": "https://github.com/rvagg/node-abstract-leveldown",
+    "licenseFile": "/Users/tenaciousmv/Code/tradling/node_modules/level-live-stream/node_modules/level-sublevel/node_modules/levelup/node_modules/deferred-leveldown/node_modules/abstract-leveldown/LICENSE.md"
+  },
+  "abstract-leveldown@2.4.1": {
+    "licenses": "MIT",
+    "repository": "https://github.com/level/abstract-leveldown",
+    "licenseFile": "/Users/tenaciousmv/Code/tradling/node_modules/memdown/node_modules/abstract-leveldown/LICENSE.md"
+  },
+  "accepts@1.2.13": {
+    "licenses": "MIT",
+    "repository": "https://github.com/jshttp/accepts",
+    "licenseFile": "/Users/tenaciousmv/Code/tradling/node_modules/express/node_modules/accepts/LICENSE"
+  },
+  "acorn@1.2.2": {
+    "licenses": "MIT",
+    "repository": "https://github.com/marijnh/acorn",
+    "licenseFile": "/Users/tenaciousmv/Code/tradling/node_modules/standard/node_modules/standard-format/node_modules/esformatter-jsx/node_modules/babel-core/node_modules/regenerator/node_modules/commoner/node_modules/detective/node_modules/acorn/LICENSE"
+  },
+  "add-stream@1.0.0": {
+    "licenses": "MIT",
+    "repository": "https://github.com/wilsonjackson/add-stream"
+  },
+  "addr-to-ip-port@1.4.2": {
+    "licenses": "MIT",
+    "repository": "https://github.com/feross/addr-to-ip-port",
+    "licenseFile": "/Users/tenaciousmv/Code/tradling/node_modules/@tradle/bittorrent-dht/node_modules/addr-to-ip-port/LICENSE"
+  },
+  "align-text@0.1.3": {
+    "licenses": "MIT",
+    "repository": "https://github.com/jonschlinkert/align-text",
+    "licenseFile": "/Users/tenaciousmv/Code/tradling/node_modules/standard/node_modules/standard-format/node_modules/esformatter-jsx/node_modules/babel-core/node_modules/regenerator/node_modules/defs/node_modules/yargs/node_modules/cliui/node_modules/center-align/node_modules/align-text/LICENSE"
+  },
+  "alter@0.2.0": {
+    "licenses": "MIT",
+    "repository": "https://github.com/olov/alter",
+    "licenseFile": "/Users/tenaciousmv/Code/tradling/node_modules/standard/node_modules/standard-format/node_modules/esformatter-jsx/node_modules/babel-core/node_modules/regenerator/node_modules/defs/node_modules/alter/LICENSE"
+  },
+  "amdefine@1.0.0": {
+    "licenses": "BSD-3-Clause AND MIT",
+    "repository": "https://github.com/jrburke/amdefine",
+    "licenseFile": "/Users/tenaciousmv/Code/tradling/node_modules/standard/node_modules/standard-format/node_modules/esformatter-jsx/node_modules/babel-core/node_modules/source-map-support/node_modules/source-map/node_modules/amdefine/LICENSE"
+  },
+  "ansi-regex@1.1.1": {
+    "licenses": "MIT",
+    "repository": "https://github.com/sindresorhus/ansi-regex",
+    "licenseFile": "/Users/tenaciousmv/Code/tradling/node_modules/standard/node_modules/eslint/node_modules/inquirer/node_modules/ansi-regex/license"
+  },
+  "ansi-regex@2.0.0": {
+    "licenses": "MIT",
+    "repository": "https://github.com/sindresorhus/ansi-regex",
+    "licenseFile": "/Users/tenaciousmv/Code/tradling/node_modules/nets/node_modules/request/node_modules/har-validator/node_modules/chalk/node_modules/has-ansi/node_modules/ansi-regex/license"
+  },
+  "ansi-styles@2.1.0": {
+    "licenses": "MIT",
+    "repository": "https://github.com/chalk/ansi-styles",
+    "licenseFile": "/Users/tenaciousmv/Code/tradling/node_modules/nets/node_modules/request/node_modules/har-validator/node_modules/chalk/node_modules/ansi-styles/license"
+  },
+  "argparse@1.0.3": {
+    "licenses": "MIT",
+    "repository": "git+https://github.com/nodeca/argparse",
+    "licenseFile": "/Users/tenaciousmv/Code/tradling/node_modules/standard/node_modules/eslint/node_modules/js-yaml/node_modules/argparse/LICENSE"
+  },
+  "array-find@0.1.1": {
+    "licenses": "ISC",
+    "repository": "https://github.com/stefanduberg/array-find"
+  },
+  "array-find@1.0.0": {
+    "licenses": "MIT",
+    "repository": "https://github.com/stefanduberg/array-find",
+    "licenseFile": "/Users/tenaciousmv/Code/tradling/node_modules/array-find/LICENSE"
+  },
+  "array-flatten@1.1.1": {
+    "licenses": "MIT",
+    "repository": "https://github.com/blakeembrey/array-flatten",
+    "licenseFile": "/Users/tenaciousmv/Code/tradling/node_modules/express/node_modules/array-flatten/LICENSE"
+  },
+  "asap@2.0.3": {
+    "licenses": "MIT",
+    "repository": "https://github.com/kriskowal/asap",
+    "licenseFile": "/Users/tenaciousmv/Code/tradling/node_modules/@tradle/utils/node_modules/create-torrent/node_modules/dezalgo/node_modules/asap/LICENSE.md"
+  },
+  "asn1@0.2.3": {
+    "licenses": "MIT",
+    "repository": "https://github.com/mcavage/node-asn1",
+    "licenseFile": "/Users/tenaciousmv/Code/tradling/node_modules/nets/node_modules/request/node_modules/http-signature/node_modules/sshpk/node_modules/asn1/LICENSE"
+  },
+  "assert-plus@0.1.5": {
+    "licenses": "MIT*",
+    "repository": "https://github.com/mcavage/node-assert-plus"
+  },
+  "assert-plus@0.2.0": {
+    "licenses": "MIT",
+    "repository": "https://github.com/mcavage/node-assert-plus"
+  },
+  "ast-traverse@0.1.1": {
+    "licenses": "MIT",
+    "repository": "https://github.com/olov/ast-traverse",
+    "licenseFile": "/Users/tenaciousmv/Code/tradling/node_modules/standard/node_modules/standard-format/node_modules/esformatter-jsx/node_modules/babel-core/node_modules/regenerator/node_modules/defs/node_modules/ast-traverse/LICENSE"
+  },
+  "ast-types@0.8.12": {
+    "licenses": "MIT",
+    "repository": "https://github.com/benjamn/ast-types",
+    "licenseFile": "/Users/tenaciousmv/Code/tradling/node_modules/standard/node_modules/standard-format/node_modules/esformatter-jsx/node_modules/babel-core/node_modules/regenerator/node_modules/recast/node_modules/ast-types/LICENSE"
+  },
+  "async@0.9.2": {
+    "licenses": "MIT",
+    "repository": "https://github.com/caolan/async",
+    "licenseFile": "/Users/tenaciousmv/Code/tradling/node_modules/@tradle/cb-blockr/node_modules/async/LICENSE"
+  },
+  "async@1.5.0": {
+    "licenses": "MIT",
+    "repository": "https://github.com/caolan/async",
+    "licenseFile": "/Users/tenaciousmv/Code/tradling/node_modules/nets/node_modules/request/node_modules/form-data/node_modules/async/LICENSE"
+  },
+  "aws-sign2@0.6.0": {
+    "licenses": "Apache-2.0",
+    "repository": "https://github.com/mikeal/aws-sign",
+    "licenseFile": "/Users/tenaciousmv/Code/tradling/node_modules/nets/node_modules/request/node_modules/aws-sign2/LICENSE"
+  },
+  "babel-core@5.8.34": {
+    "licenses": "MIT",
+    "repository": "https://github.com/babel/babel"
+  },
+  "babel-plugin-constant-folding@1.0.1": {
+    "licenses": "MIT",
+    "repository": "https://github.com/babel-plugins/babel-plugin-constant-folding"
+  },
+  "babel-plugin-dead-code-elimination@1.0.2": {
+    "licenses": "MIT",
+    "repository": "https://github.com/babel-plugins/babel-plugin-dead-code-elimination"
+  },
+  "babel-plugin-eval@1.0.1": {
+    "licenses": "MIT",
+    "repository": "https://github.com/babel-plugins/babel-plugin-eval"
+  },
+  "babel-plugin-inline-environment-variables@1.0.1": {
+    "licenses": "MIT",
+    "repository": "https://github.com/babel-plugins/babel-plugin-inline-environment-variables"
+  },
+  "babel-plugin-jscript@1.0.4": {
+    "licenses": "MIT",
+    "repository": "https://github.com/babel-plugins/babel-plugin-jscript"
+  },
+  "babel-plugin-member-expression-literals@1.0.1": {
+    "licenses": "MIT",
+    "repository": "https://github.com/babel-plugins/babel-plugin-member-expression-literals"
+  },
+  "babel-plugin-property-literals@1.0.1": {
+    "licenses": "MIT",
+    "repository": "https://github.com/babel-plugins/babel-plugin-property-literals"
+  },
+  "babel-plugin-proto-to-assign@1.0.4": {
+    "licenses": "MIT",
+    "repository": "https://github.com/babel-plugins/babel-plugin-proto-to-assign"
+  },
+  "babel-plugin-react-constant-elements@1.0.3": {
+    "licenses": "MIT",
+    "repository": "https://github.com/babel-plugins/babel-plugin-react-constant-elements"
+  },
+  "babel-plugin-react-display-name@1.0.3": {
+    "licenses": "MIT",
+    "repository": "https://github.com/babel-plugins/babel-plugin-react-display-name"
+  },
+  "babel-plugin-remove-console@1.0.1": {
+    "licenses": "MIT",
+    "repository": "https://github.com/babel-plugins/babel-plugin-remove-console"
+  },
+  "babel-plugin-remove-debugger@1.0.1": {
+    "licenses": "MIT",
+    "repository": "https://github.com/babel-plugins/babel-plugin-remove-debugger"
+  },
+  "babel-plugin-runtime@1.0.7": {
+    "licenses": "MIT",
+    "repository": "https://github.com/babel-plugins/babel-plugin-runtime"
+  },
+  "babel-plugin-undeclared-variables-check@1.0.2": {
+    "licenses": "MIT",
+    "repository": "https://github.com/babel-plugins/babel-plugin-undeclared-variables-check"
+  },
+  "babel-plugin-undefined-to-void@1.1.6": {
+    "licenses": "MIT",
+    "repository": "https://github.com/babel-plugins/babel-plugin-undefined-to-void"
+  },
+  "babylon@5.8.34": {
+    "licenses": "MIT",
+    "repository": "https://github.com/babel/babel",
+    "licenseFile": "/Users/tenaciousmv/Code/tradling/node_modules/standard/node_modules/standard-format/node_modules/esformatter-jsx/node_modules/babel-core/node_modules/babylon/LICENSE"
+  },
+  "balanced-match@0.3.0": {
+    "licenses": "MIT",
+    "repository": "https://github.com/juliangruber/balanced-match",
+    "licenseFile": "/Users/tenaciousmv/Code/tradling/node_modules/rimraf/node_modules/glob/node_modules/minimatch/node_modules/brace-expansion/node_modules/balanced-match/LICENSE.md"
+  },
+  "base64-js@0.0.2": {
+    "licenses": "MIT",
+    "repository": "https://github.com/beatgammit/deflate-js"
+  },
+  "bencode@0.7.0": {
+    "licenses": "MIT",
+    "repository": "https://github.com/themasch/node-bencode",
+    "licenseFile": "/Users/tenaciousmv/Code/tradling/node_modules/@tradle/utils/node_modules/create-torrent/node_modules/bencode/LICENSE.md"
+  },
+  "bigi@1.4.1": {
+    "licenses": "MIT*",
+    "repository": "https://github.com/cryptocoinjs/bigi",
+    "licenseFile": "/Users/tenaciousmv/Code/tradling/node_modules/@tradle/bitcoinjs-lib/node_modules/bigi/LICENSE.md"
+  },
+  "bl@0.8.2": {
+    "licenses": "MIT",
+    "repository": "https://github.com/rvagg/bl",
+    "licenseFile": "/Users/tenaciousmv/Code/tradling/node_modules/level-live-stream/node_modules/level-sublevel/node_modules/levelup/node_modules/bl/LICENSE"
+  },
+  "bl@1.0.0": {
+    "licenses": "MIT",
+    "repository": "https://github.com/rvagg/bl",
+    "licenseFile": "/Users/tenaciousmv/Code/tradling/node_modules/nets/node_modules/request/node_modules/bl/LICENSE.md"
+  },
+  "block-stream2@1.0.0": {
+    "licenses": "MIT",
+    "repository": "https://github.com/substack/block-stream2",
+    "licenseFile": "/Users/tenaciousmv/Code/tradling/node_modules/@tradle/utils/node_modules/create-torrent/node_modules/block-stream2/LICENSE"
+  },
+  "bluebird@2.10.2": {
+    "licenses": "MIT",
+    "repository": "https://github.com/petkaantonov/bluebird",
+    "licenseFile": "/Users/tenaciousmv/Code/tradling/node_modules/standard/node_modules/standard-format/node_modules/esformatter-jsx/node_modules/babel-core/node_modules/bluebird/LICENSE"
+  },
+  "bn.js@2.2.0": {
+    "licenses": "MIT",
+    "repository": "https://github.com/indutny/bn.js"
+  },
+  "bn.js@4.5.1": {
+    "licenses": "MIT",
+    "repository": "https://github.com/indutny/bn.js"
+  },
+  "boom@2.10.1": {
+    "licenses": "BSD-3-Clause",
+    "repository": "https://github.com/hapijs/boom",
+    "licenseFile": "/Users/tenaciousmv/Code/tradling/node_modules/nets/node_modules/request/node_modules/hawk/node_modules/boom/LICENSE"
+  },
+  "bops@0.1.1": {
+    "licenses": "MIT",
+    "repository": "https://github.com/chrisdickinson/bops"
+  },
+  "brace-expansion@1.1.2": {
+    "licenses": "MIT",
+    "repository": "https://github.com/juliangruber/brace-expansion"
+  },
+  "breakable@1.0.0": {
+    "licenses": "MIT",
+    "repository": "https://github.com/olov/breakable",
+    "licenseFile": "/Users/tenaciousmv/Code/tradling/node_modules/standard/node_modules/standard-format/node_modules/esformatter-jsx/node_modules/babel-core/node_modules/regenerator/node_modules/defs/node_modules/breakable/LICENSE"
+  },
+  "brorand@1.0.5": {
+    "licenses": "MIT",
+    "repository": "https://github.com/indutny/brorand"
+  },
+  "browser-process-hrtime@0.1.2": {
+    "licenses": "BSD-2-Clause",
+    "repository": "https://github.com/kumavis/browser-process-hrtime"
+  },
+  "bs58@2.0.1": {
+    "licenses": "MIT",
+    "repository": "http://github.com/cryptocoinjs/bs58"
+  },
+  "bs58check@1.0.6": {
+    "licenses": "MIT",
+    "repository": "https://github.com/dcousens/bs58check",
+    "licenseFile": "/Users/tenaciousmv/Code/tradling/node_modules/@tradle/bitcoinjs-lib/node_modules/bs58check/LICENSE"
+  },
+  "buffer-equal@0.0.1": {
+    "licenses": "MIT",
+    "repository": "https://github.com/substack/node-buffer-equal"
+  },
+  "bytewise@0.7.1": {
+    "licenses": "MIT",
+    "repository": "https://github.com/deanlandolt/bytewise"
+  },
+  "camelcase@1.2.1": {
+    "licenses": "MIT",
+    "repository": "https://github.com/sindresorhus/camelcase",
+    "licenseFile": "/Users/tenaciousmv/Code/tradling/node_modules/standard/node_modules/standard-format/node_modules/esformatter-jsx/node_modules/babel-core/node_modules/regenerator/node_modules/defs/node_modules/yargs/node_modules/camelcase/license"
+  },
+  "caseless@0.11.0": {
+    "licenses": "Apache-2.0",
+    "repository": "https://github.com/mikeal/caseless",
+    "licenseFile": "/Users/tenaciousmv/Code/tradling/node_modules/nets/node_modules/request/node_modules/caseless/LICENSE"
+  },
+  "center-align@0.1.2": {
+    "licenses": "MIT",
+    "repository": "https://github.com/jonschlinkert/center-align",
+    "licenseFile": "/Users/tenaciousmv/Code/tradling/node_modules/standard/node_modules/standard-format/node_modules/esformatter-jsx/node_modules/babel-core/node_modules/regenerator/node_modules/defs/node_modules/yargs/node_modules/cliui/node_modules/center-align/LICENSE"
+  },
+  "chalk@1.1.1": {
+    "licenses": "MIT",
+    "repository": "https://github.com/chalk/chalk",
+    "licenseFile": "/Users/tenaciousmv/Code/tradling/node_modules/nets/node_modules/request/node_modules/har-validator/node_modules/chalk/license"
+  },
+  "changes-feed@1.1.0": {
+    "licenses": "MIT",
+    "repository": "https://github.com/mafintosh/changes-feed",
+    "licenseFile": "/Users/tenaciousmv/Code/tradling/node_modules/logbase/node_modules/changes-feed/LICENSE"
+  },
+  "cipher-base@1.0.2": {
+    "licenses": "MIT",
+    "repository": "git+https://github.com/crypto-browserify/cipher-base"
+  },
+  "cli-width@1.1.0": {
+    "licenses": "ISC",
+    "repository": "https://github.com/knownasilya/cli-width",
+    "licenseFile": "/Users/tenaciousmv/Code/tradling/node_modules/standard/node_modules/eslint/node_modules/inquirer/node_modules/cli-width/LICENSE"
+  },
+  "cliui@2.1.0": {
+    "licenses": "ISC",
+    "repository": "http://github.com/bcoe/cliui",
+    "licenseFile": "/Users/tenaciousmv/Code/tradling/node_modules/standard/node_modules/standard-format/node_modules/esformatter-jsx/node_modules/babel-core/node_modules/regenerator/node_modules/defs/node_modules/yargs/node_modules/cliui/LICENSE.txt"
+  },
+  "clone@1.0.2": {
+    "licenses": "MIT",
+    "repository": "https://github.com/pvorb/node-clone",
+    "licenseFile": "/Users/tenaciousmv/Code/tradling/node_modules/@tradle/utils/node_modules/defaults/node_modules/clone/LICENSE"
+  },
+  "closest-to@0.0.2": {
+    "licenses": "MIT",
+    "repository": "https://github.com/michaelrhodes/closest-to"
+  },
+  "combined-stream@0.0.7": {
+    "licenses": "MIT*",
+    "repository": "https://github.com/felixge/node-combined-stream",
+    "licenseFile": "/Users/tenaciousmv/Code/tradling/node_modules/@tradle/cb-blockr/node_modules/superagent/node_modules/form-data/node_modules/combined-stream/License"
+  },
+  "combined-stream@1.0.5": {
+    "licenses": "MIT",
+    "repository": "https://github.com/felixge/node-combined-stream",
+    "licenseFile": "/Users/tenaciousmv/Code/tradling/node_modules/nets/node_modules/request/node_modules/combined-stream/License"
+  },
+  "commander@2.9.0": {
+    "licenses": "MIT",
+    "repository": "https://github.com/tj/commander.js",
+    "licenseFile": "/Users/tenaciousmv/Code/tradling/node_modules/nets/node_modules/request/node_modules/har-validator/node_modules/commander/LICENSE"
+  },
+  "commoner@0.10.4": {
+    "licenses": "MIT",
+    "repository": "https://github.com/reactjs/commoner",
+    "licenseFile": "/Users/tenaciousmv/Code/tradling/node_modules/standard/node_modules/standard-format/node_modules/esformatter-jsx/node_modules/babel-core/node_modules/regenerator/node_modules/commoner/LICENSE"
+  },
+  "compact2string@1.4.0": {
+    "licenses": "BSD",
+    "repository": "https://github.com/bencevans/node-compact2string"
+  },
+  "component-emitter@1.1.2": {
+    "licenses": "MIT*",
+    "repository": "https://github.com/component/emitter"
+  },
+  "concat-map@0.0.1": {
+    "licenses": "MIT",
+    "repository": "https://github.com/substack/node-concat-map",
+    "licenseFile": "/Users/tenaciousmv/Code/tradling/node_modules/rimraf/node_modules/glob/node_modules/minimatch/node_modules/brace-expansion/node_modules/concat-map/LICENSE"
+  },
+  "concat-stream@1.5.1": {
+    "licenses": "MIT",
+    "repository": "https://github.com/maxogden/concat-stream",
+    "licenseFile": "/Users/tenaciousmv/Code/tradling/node_modules/pre-commit/node_modules/cross-spawn/node_modules/spawn-sync/node_modules/concat-stream/LICENSE"
+  },
+  "config-chain@1.1.9": {
+    "licenses": "MIT",
+    "repository": "https://github.com/dominictarr/config-chain",
+    "licenseFile": "/Users/tenaciousmv/Code/tradling/node_modules/standard/node_modules/standard-format/node_modules/esformatter-jsx/node_modules/js-beautify/node_modules/config-chain/LICENCE"
+  },
+  "content-disposition@0.5.0": {
+    "licenses": "MIT",
+    "repository": "https://github.com/jshttp/content-disposition",
+    "licenseFile": "/Users/tenaciousmv/Code/tradling/node_modules/express/node_modules/content-disposition/LICENSE"
+  },
+  "content-type@1.0.1": {
+    "licenses": "MIT",
+    "repository": "https://github.com/jshttp/content-type",
+    "licenseFile": "/Users/tenaciousmv/Code/tradling/node_modules/express/node_modules/content-type/LICENSE"
+  },
+  "convert-source-map@1.1.2": {
+    "licenses": "MIT",
+    "repository": "https://github.com/thlorenz/convert-source-map",
+    "licenseFile": "/Users/tenaciousmv/Code/tradling/node_modules/standard/node_modules/standard-format/node_modules/esformatter-jsx/node_modules/babel-core/node_modules/convert-source-map/LICENSE"
+  },
+  "cookie-signature@1.0.6": {
+    "licenses": "MIT",
+    "repository": "https://github.com/visionmedia/node-cookie-signature"
+  },
+  "cookie@0.1.3": {
+    "licenses": "MIT",
+    "repository": "https://github.com/jshttp/cookie",
+    "licenseFile": "/Users/tenaciousmv/Code/tradling/node_modules/express/node_modules/cookie/LICENSE"
+  },
+  "cookiejar@2.0.1": {
+    "licenses": "MIT",
+    "repository": "https://github.com/bmeck/node-cookiejar",
+    "licenseFile": "/Users/tenaciousmv/Code/tradling/node_modules/@tradle/cb-blockr/node_modules/superagent/node_modules/cookiejar/LICENSE"
+  },
+  "core-js@1.2.6": {
+    "licenses": "MIT",
+    "repository": "https://github.com/zloirock/core-js",
+    "licenseFile": "/Users/tenaciousmv/Code/tradling/node_modules/standard/node_modules/standard-format/node_modules/esformatter-jsx/node_modules/babel-core/node_modules/core-js/LICENSE"
+  },
+  "core-util-is@1.0.2": {
+    "licenses": "MIT",
+    "repository": "https://github.com/isaacs/core-util-is",
+    "licenseFile": "/Users/tenaciousmv/Code/tradling/node_modules/readable-stream/node_modules/core-util-is/LICENSE"
+  },
+  "create-hash@1.1.2": {
+    "licenses": "MIT",
+    "repository": "https://github.com/crypto-browserify/createHash"
+  },
+  "create-hmac@1.1.4": {
+    "licenses": "MIT",
+    "repository": "https://github.com/crypto-browserify/createHmac"
+  },
+  "create-torrent@3.18.1": {
+    "licenses": "MIT",
+    "repository": "https://github.com/feross/create-torrent",
+    "licenseFile": "/Users/tenaciousmv/Code/tradling/node_modules/@tradle/utils/node_modules/create-torrent/LICENSE"
+  },
+  "cross-spawn-async@2.1.1": {
+    "licenses": "MIT",
+    "repository": "https://github.com/IndigoUnited/node-cross-spawn-async",
+    "licenseFile": "/Users/tenaciousmv/Code/tradling/node_modules/pre-commit/node_modules/cross-spawn/node_modules/cross-spawn-async/LICENSE"
+  },
+  "cross-spawn@2.0.1": {
+    "licenses": "MIT",
+    "repository": "https://github.com/IndigoUnited/node-cross-spawn",
+    "licenseFile": "/Users/tenaciousmv/Code/tradling/node_modules/pre-commit/node_modules/cross-spawn/LICENSE"
+  },
+  "cryptiles@2.0.5": {
+    "licenses": "BSD-3-Clause",
+    "repository": "https://github.com/hapijs/cryptiles",
+    "licenseFile": "/Users/tenaciousmv/Code/tradling/node_modules/nets/node_modules/request/node_modules/hawk/node_modules/cryptiles/LICENSE"
+  },
+  "cyclist@0.1.1": {
+    "licenses": "MIT*",
+    "repository": "https://github.com/mafintosh/cyclist"
+  },
+  "d@0.1.1": {
+    "licenses": "MIT",
+    "repository": "https://github.com/medikoo/d",
+    "licenseFile": "/Users/tenaciousmv/Code/tradling/node_modules/standard/node_modules/eslint/node_modules/escope/node_modules/es6-map/node_modules/d/LICENCE"
+  },
+  "dashdash@1.10.1": {
+    "licenses": "MIT",
+    "repository": "https://github.com/trentm/node-dashdash"
+  },
+  "debug-log@1.0.0": {
+    "licenses": "MIT",
+    "repository": "https://github.com/sindresorhus/debug-log"
+  },
+  "debug@0.7.4": {
+    "licenses": "MIT",
+    "repository": "https://github.com/visionmedia/debug"
+  },
+  "debug@2.2.0": {
+    "licenses": "MIT",
+    "repository": "https://github.com/visionmedia/debug"
+  },
+  "decamelize@1.1.1": {
+    "licenses": "MIT",
+    "repository": "https://github.com/sindresorhus/decamelize",
+    "licenseFile": "/Users/tenaciousmv/Code/tradling/node_modules/standard/node_modules/standard-format/node_modules/esformatter-jsx/node_modules/babel-core/node_modules/regenerator/node_modules/defs/node_modules/yargs/node_modules/decamelize/license"
+  },
+  "deep-equal@1.0.1": {
+    "licenses": "MIT",
+    "repository": "http://github.com/substack/node-deep-equal",
+    "licenseFile": "/Users/tenaciousmv/Code/tradling/node_modules/deep-equal/LICENSE"
+  },
+  "deep-is@0.1.3": {
+    "licenses": "MIT",
+    "repository": "http://github.com/thlorenz/deep-is",
+    "licenseFile": "/Users/tenaciousmv/Code/tradling/node_modules/standard/node_modules/eslint/node_modules/optionator/node_modules/deep-is/LICENSE"
+  },
+  "defaults@1.0.3": {
+    "licenses": "MIT",
+    "repository": "https://github.com/tmpvar/defaults",
+    "licenseFile": "/Users/tenaciousmv/Code/tradling/node_modules/@tradle/utils/node_modules/defaults/LICENSE"
+  },
+  "deferred-leveldown@0.2.0": {
+    "licenses": "MIT",
+    "repository": "https://github.com/Level/deferred-leveldown"
+  },
+  "define-properties@1.1.2": {
+    "licenses": "MIT",
+    "repository": "https://github.com/ljharb/define-properties",
+    "licenseFile": "/Users/tenaciousmv/Code/tradling/node_modules/tape/node_modules/string.prototype.trim/node_modules/define-properties/LICENSE"
+  },
+  "defined@0.0.0": {
+    "licenses": "MIT",
+    "repository": "https://github.com/substack/defined",
+    "licenseFile": "/Users/tenaciousmv/Code/tradling/node_modules/@tradle/utils/node_modules/create-torrent/node_modules/block-stream2/node_modules/defined/LICENSE"
+  },
+  "defined@1.0.0": {
+    "licenses": "MIT",
+    "repository": "https://github.com/substack/defined",
+    "licenseFile": "/Users/tenaciousmv/Code/tradling/node_modules/tape/node_modules/defined/LICENSE"
+  },
+  "defs@1.1.1": {
+    "licenses": "MIT",
+    "repository": "https://github.com/olov/defs",
+    "licenseFile": "/Users/tenaciousmv/Code/tradling/node_modules/standard/node_modules/standard-format/node_modules/esformatter-jsx/node_modules/babel-core/node_modules/regenerator/node_modules/defs/LICENSE"
+  },
+  "deglob@1.0.2": {
+    "licenses": "ISC",
+    "repository": "git+https://github.com/flet/deglob",
+    "licenseFile": "/Users/tenaciousmv/Code/tradling/node_modules/standard/node_modules/deglob/LICENSE.md"
+  },
+  "delayed-stream@0.0.5": {
+    "licenses": "MIT*",
+    "repository": "https://github.com/felixge/node-delayed-stream",
+    "licenseFile": "/Users/tenaciousmv/Code/tradling/node_modules/@tradle/cb-blockr/node_modules/superagent/node_modules/form-data/node_modules/combined-stream/node_modules/delayed-stream/License"
+  },
+  "delayed-stream@1.0.0": {
+    "licenses": "MIT",
+    "repository": "https://github.com/felixge/node-delayed-stream",
+    "licenseFile": "/Users/tenaciousmv/Code/tradling/node_modules/nets/node_modules/request/node_modules/combined-stream/node_modules/delayed-stream/License"
+  },
+  "depd@1.0.1": {
+    "licenses": "MIT",
+    "repository": "https://github.com/dougwilson/nodejs-depd",
+    "licenseFile": "/Users/tenaciousmv/Code/tradling/node_modules/express/node_modules/depd/LICENSE"
+  },
+  "destroy@1.0.3": {
+    "licenses": "MIT",
+    "repository": "https://github.com/stream-utils/destroy"
+  },
+  "detect-indent@3.0.1": {
+    "licenses": "MIT",
+    "repository": "https://github.com/sindresorhus/detect-indent",
+    "licenseFile": "/Users/tenaciousmv/Code/tradling/node_modules/standard/node_modules/standard-format/node_modules/esformatter-jsx/node_modules/babel-core/node_modules/detect-indent/license"
+  },
+  "detective@4.3.1": {
+    "licenses": "MIT",
+    "repository": "https://github.com/substack/node-detective",
+    "licenseFile": "/Users/tenaciousmv/Code/tradling/node_modules/standard/node_modules/standard-format/node_modules/esformatter-jsx/node_modules/babel-core/node_modules/regenerator/node_modules/commoner/node_modules/detective/LICENSE"
+  },
+  "dezalgo@1.0.3": {
+    "licenses": "ISC",
+    "repository": "https://github.com/npm/dezalgo",
+    "licenseFile": "/Users/tenaciousmv/Code/tradling/node_modules/@tradle/utils/node_modules/create-torrent/node_modules/dezalgo/LICENSE"
+  },
+  "diff@1.4.0": {
+    "licenses": "BSD",
+    "repository": "https://github.com/kpdecker/jsdiff"
+  },
+  "disparity@2.0.0": {
+    "licenses": "MIT",
+    "repository": "https://github.com/millermedeiros/disparity",
+    "licenseFile": "/Users/tenaciousmv/Code/tradling/node_modules/standard/node_modules/standard-format/node_modules/esformatter/node_modules/disparity/LICENSE.md"
+  },
+  "dns.js@1.0.1": {
+    "licenses": "MIT",
+    "repository": "https://github.com/indutny/dns.js"
+  },
+  "doctrine@0.6.4": {
+    "licenses": "BSD",
+    "repository": "http://github.com/Constellation/doctrine",
+    "licenseFile": "/Users/tenaciousmv/Code/tradling/node_modules/standard/node_modules/eslint/node_modules/doctrine/LICENSE.esprima"
+  },
+  "dom-walk@0.1.1": {
+    "licenses": "MIT",
+    "repository": "https://github.com/Raynos/dom-walk",
+    "licenseFile": "/Users/tenaciousmv/Code/tradling/node_modules/nets/node_modules/xhr/node_modules/global/node_modules/min-document/node_modules/dom-walk/LICENCE"
+  },
+  "duplexer2@0.0.2": {
+    "licenses": "BSD",
+    "repository": "https://github.com/deoxxa/duplexer2",
+    "licenseFile": "/Users/tenaciousmv/Code/tradling/node_modules/stream-combiner2/node_modules/duplexer2/LICENSE.md"
+  },
+  "duplexify@3.4.2": {
+    "licenses": "MIT",
+    "repository": "https://github.com/mafintosh/duplexify",
+    "licenseFile": "/Users/tenaciousmv/Code/tradling/node_modules/zlorp/node_modules/@tradle/talko/node_modules/duplexify/LICENSE"
+  },
+  "ecc-jsbn@0.1.1": {
+    "licenses": "MIT",
+    "repository": "https://github.com/quartzjer/ecc-jsbn",
+    "licenseFile": "/Users/tenaciousmv/Code/tradling/node_modules/nets/node_modules/request/node_modules/http-signature/node_modules/sshpk/node_modules/ecc-jsbn/LICENSE"
+  },
+  "ecurve@1.0.2": {
+    "licenses": "MIT",
+    "repository": "https://github.com/cryptocoinjs/ecurve"
+  },
+  "ee-first@1.1.1": {
+    "licenses": "MIT",
+    "repository": "https://github.com/jonathanong/ee-first",
+    "licenseFile": "/Users/tenaciousmv/Code/tradling/node_modules/express/node_modules/on-finished/node_modules/ee-first/LICENSE"
+  },
+  "elistener@1.0.2": {
+    "licenses": "ISC",
+    "licenseFile": "/Users/tenaciousmv/Code/tradling/node_modules/zlorp/node_modules/elistener/LICENSE"
+  },
+  "elliptic@3.1.0": {
+    "licenses": "MIT",
+    "repository": "https://github.com/indutny/elliptic"
+  },
+  "elliptic@6.0.2": {
+    "licenses": "MIT",
+    "repository": "https://github.com/indutny/elliptic"
+  },
+  "end-of-stream@1.0.0": {
+    "licenses": "MIT",
+    "repository": "https://github.com/mafintosh/end-of-stream"
+  },
+  "end-of-stream@1.1.0": {
+    "licenses": "MIT",
+    "repository": "https://github.com/mafintosh/end-of-stream",
+    "licenseFile": "/Users/tenaciousmv/Code/tradling/node_modules/pump/node_modules/end-of-stream/LICENSE"
+  },
+  "errno@0.1.4": {
+    "licenses": "MIT",
+    "repository": "https://github.com/rvagg/node-errno"
+  },
+  "error@7.0.2": {
+    "licenses": "MIT",
+    "repository": "https://github.com/Raynos/error"
+  },
+  "es-abstract@1.4.3": {
+    "licenses": "MIT",
+    "repository": "https://github.com/ljharb/es-abstract",
+    "licenseFile": "/Users/tenaciousmv/Code/tradling/node_modules/tape/node_modules/string.prototype.trim/node_modules/es-abstract/LICENSE"
+  },
+  "es-to-primitive@1.0.0": {
+    "licenses": "MIT",
+    "repository": "https://github.com/ljharb/es-to-primitive",
+    "licenseFile": "/Users/tenaciousmv/Code/tradling/node_modules/tape/node_modules/string.prototype.trim/node_modules/es-abstract/node_modules/es-to-primitive/LICENSE"
+  },
+  "es5-ext@0.10.10": {
+    "licenses": "MIT",
+    "repository": "https://github.com/medikoo/es5-ext",
+    "licenseFile": "/Users/tenaciousmv/Code/tradling/node_modules/standard/node_modules/eslint/node_modules/escope/node_modules/es6-map/node_modules/es5-ext/LICENSE"
+  },
+  "es6-iterator@2.0.0": {
+    "licenses": "MIT",
+    "repository": "https://github.com/medikoo/es6-iterator",
+    "licenseFile": "/Users/tenaciousmv/Code/tradling/node_modules/standard/node_modules/eslint/node_modules/escope/node_modules/es6-map/node_modules/es6-iterator/LICENSE"
+  },
+  "es6-map@0.1.3": {
+    "licenses": "MIT",
+    "repository": "https://github.com/medikoo/es6-map",
+    "licenseFile": "/Users/tenaciousmv/Code/tradling/node_modules/standard/node_modules/eslint/node_modules/escope/node_modules/es6-map/LICENSE"
+  },
+  "es6-set@0.1.3": {
+    "licenses": "MIT",
+    "repository": "https://github.com/medikoo/es6-set",
+    "licenseFile": "/Users/tenaciousmv/Code/tradling/node_modules/standard/node_modules/eslint/node_modules/escope/node_modules/es6-map/node_modules/es6-set/LICENSE"
+  },
+  "es6-symbol@3.0.2": {
+    "licenses": "MIT",
+    "repository": "https://github.com/medikoo/es6-symbol",
+    "licenseFile": "/Users/tenaciousmv/Code/tradling/node_modules/standard/node_modules/eslint/node_modules/escope/node_modules/es6-map/node_modules/es6-symbol/LICENSE"
+  },
+  "es6-weak-map@2.0.1": {
+    "licenses": "MIT",
+    "repository": "https://github.com/medikoo/es6-weak-map",
+    "licenseFile": "/Users/tenaciousmv/Code/tradling/node_modules/standard/node_modules/eslint/node_modules/escope/node_modules/es6-weak-map/LICENSE"
+  },
+  "escape-html@1.0.2": {
+    "licenses": "MIT",
+    "repository": "https://github.com/component/escape-html",
+    "licenseFile": "/Users/tenaciousmv/Code/tradling/node_modules/express/node_modules/escape-html/LICENSE"
+  },
+  "escape-string-regexp@1.0.3": {
+    "licenses": "MIT",
+    "repository": "https://github.com/sindresorhus/escape-string-regexp",
+    "licenseFile": "/Users/tenaciousmv/Code/tradling/node_modules/nets/node_modules/request/node_modules/har-validator/node_modules/chalk/node_modules/escape-string-regexp/license"
+  },
+  "escope@3.3.0": {
+    "licenses": "BSD-2-Clause",
+    "repository": "git+https://github.com/estools/escope",
+    "licenseFile": "/Users/tenaciousmv/Code/tradling/node_modules/standard/node_modules/eslint/node_modules/escope/LICENSE.BSD"
+  },
+  "esformatter-eol-last@1.0.0": {
+    "licenses": "ISC",
+    "repository": "https://github.com/briandipalma/esformatter-eol-last"
+  },
+  "esformatter-ignore@0.1.3": {
+    "licenses": "MIT",
+    "repository": "git+https://github.com/royriojas/esformatter-ignore",
+    "licenseFile": "/Users/tenaciousmv/Code/tradling/node_modules/standard/node_modules/standard-format/node_modules/esformatter-jsx/node_modules/esformatter-ignore/LICENSE"
+  },
+  "esformatter-jsx@2.3.11": {
+    "licenses": "MIT",
+    "repository": "git+https://github.com/royriojas/esformatter-jsx",
+    "licenseFile": "/Users/tenaciousmv/Code/tradling/node_modules/standard/node_modules/standard-format/node_modules/esformatter-jsx/LICENSE"
+  },
+  "esformatter-literal-notation@1.0.1": {
+    "licenses": "MIT",
+    "repository": "git+https://github.com/kewah/esformatter-literal-notation",
+    "licenseFile": "/Users/tenaciousmv/Code/tradling/node_modules/standard/node_modules/standard-format/node_modules/esformatter-literal-notation/LICENSE"
+  },
+  "esformatter-quotes@1.0.3": {
+    "licenses": "MIT",
+    "repository": "https://github.com/millermedeiros/esformatter-quotes"
+  },
+  "esformatter-semicolon-first@1.1.0": {
+    "licenses": "MIT",
+    "repository": "https://github.com/millermedeiros/esformatter-semicolon-first"
+  },
+  "esformatter-spaced-lined-comment@2.0.1": {
+    "licenses": "ISC",
+    "repository": "https://github.com/briandipalma/esformatter-spaced-lined-comment"
+  },
+  "esformatter@0.8.1": {
+    "licenses": "MIT",
+    "repository": "git+https://github.com/millermedeiros/esformatter",
+    "licenseFile": "/Users/tenaciousmv/Code/tradling/node_modules/standard/node_modules/standard-format/node_modules/esformatter/LICENSE.md"
+  },
+  "eslint-config-standard-react@1.0.1": {
+    "licenses": "MIT",
+    "repository": "https://github.com/feross/eslint-config-standard-react",
+    "licenseFile": "/Users/tenaciousmv/Code/tradling/node_modules/standard/node_modules/eslint-config-standard-react/LICENSE"
+  },
+  "eslint-config-standard@3.4.1": {
+    "licenses": "MIT",
+    "repository": "https://github.com/feross/eslint-config-standard",
+    "licenseFile": "/Users/tenaciousmv/Code/tradling/node_modules/standard/node_modules/eslint-config-standard/LICENSE"
+  },
+  "eslint-plugin-react@2.7.1": {
+    "licenses": "MIT",
+    "repository": "git+https://github.com/yannickcr/eslint-plugin-react",
+    "licenseFile": "/Users/tenaciousmv/Code/tradling/node_modules/standard/node_modules/eslint-plugin-react/LICENSE"
+  },
+  "eslint@0.24.1": {
+    "licenses": "MIT",
+    "repository": "https://github.com/eslint/eslint",
+    "licenseFile": "/Users/tenaciousmv/Code/tradling/node_modules/standard/node_modules/eslint/LICENSE"
+  },
+  "espree@2.2.5": {
+    "licenses": "BSD",
+    "repository": "http://github.com/eslint/espree"
+  },
+  "esprima-fb@15001.1001.0-dev-harmony-fb": {
+    "licenses": "BSD",
+    "repository": "http://github.com/facebook/esprima"
+  },
+  "esprima@1.0.4": {
+    "licenses": "BSD",
+    "repository": "http://github.com/ariya/esprima"
+  },
+  "esprima@2.7.1": {
+    "licenses": "BSD-2-Clause",
+    "repository": "git+https://github.com/jquery/esprima",
+    "licenseFile": "/Users/tenaciousmv/Code/tradling/node_modules/standard/node_modules/eslint/node_modules/js-yaml/node_modules/esprima/LICENSE.BSD"
+  },
+  "esrecurse@3.1.1": {
+    "licenses": "BSD",
+    "repository": "http://github.com/estools/esrecurse"
+  },
+  "estraverse-fb@1.3.1": {
+    "licenses": "MIT",
+    "repository": "https://github.com/RReverser/estraverse-fb",
+    "licenseFile": "/Users/tenaciousmv/Code/tradling/node_modules/standard/node_modules/eslint/node_modules/estraverse-fb/LICENSE"
+  },
+  "estraverse@3.1.0": {
+    "licenses": "BSD",
+    "repository": "http://github.com/estools/estraverse",
+    "licenseFile": "/Users/tenaciousmv/Code/tradling/node_modules/standard/node_modules/eslint/node_modules/escope/node_modules/esrecurse/node_modules/estraverse/LICENSE.BSD"
+  },
+  "estraverse@4.1.1": {
+    "licenses": "BSD-2-Clause",
+    "repository": "https://github.com/estools/estraverse",
+    "licenseFile": "/Users/tenaciousmv/Code/tradling/node_modules/standard/node_modules/eslint/node_modules/estraverse/LICENSE.BSD"
+  },
+  "esutils@1.1.6": {
+    "licenses": "BSD",
+    "repository": "http://github.com/Constellation/esutils",
+    "licenseFile": "/Users/tenaciousmv/Code/tradling/node_modules/standard/node_modules/eslint/node_modules/doctrine/node_modules/esutils/LICENSE.BSD"
+  },
+  "esutils@2.0.2": {
+    "licenses": "BSD",
+    "repository": "http://github.com/estools/esutils",
+    "licenseFile": "/Users/tenaciousmv/Code/tradling/node_modules/standard/node_modules/standard-format/node_modules/esformatter-jsx/node_modules/babel-core/node_modules/esutils/LICENSE.BSD"
+  },
+  "etag@1.7.0": {
+    "licenses": "MIT",
+    "repository": "https://github.com/jshttp/etag",
+    "licenseFile": "/Users/tenaciousmv/Code/tradling/node_modules/express/node_modules/etag/LICENSE"
+  },
+  "event-emitter@0.3.4": {
+    "licenses": "MIT",
+    "repository": "https://github.com/medikoo/event-emitter",
+    "licenseFile": "/Users/tenaciousmv/Code/tradling/node_modules/standard/node_modules/eslint/node_modules/escope/node_modules/es6-map/node_modules/event-emitter/LICENSE"
+  },
+  "exit-hook@1.1.1": {
+    "licenses": "MIT",
+    "repository": "https://github.com/sindresorhus/exit-hook",
+    "licenseFile": "/Users/tenaciousmv/Code/tradling/node_modules/zlorp/node_modules/exit-hook/license"
+  },
+  "express@4.13.3": {
+    "licenses": "MIT",
+    "repository": "https://github.com/strongloop/express",
+    "licenseFile": "/Users/tenaciousmv/Code/tradling/node_modules/express/LICENSE"
+  },
+  "extend.js@0.0.2": {
+    "licenses": "MIT*"
+  },
+  "extend@1.2.1": {
+    "licenses": "MIT*",
+    "repository": "https://github.com/justmoon/node-extend"
+  },
+  "extend@2.0.1": {
+    "licenses": "MIT",
+    "repository": "https://github.com/justmoon/node-extend",
+    "licenseFile": "/Users/tenaciousmv/Code/tradling/node_modules/@tradle/bitjoe-js/node_modules/extend/LICENSE"
+  },
+  "extend@3.0.0": {
+    "licenses": "MIT",
+    "repository": "https://github.com/justmoon/node-extend",
+    "licenseFile": "/Users/tenaciousmv/Code/tradling/node_modules/@tradle/kiki/node_modules/extend/LICENSE"
+  },
+  "externr@1.0.0": {
+    "licenses": "MIT",
+    "repository": "https://github.com/rvagg/externr",
+    "licenseFile": "/Users/tenaciousmv/Code/tradling/node_modules/@tradle/verifier/node_modules/externr/LICENSE.md"
+  },
+  "extsprintf@1.0.2": {
+    "licenses": "MIT*",
+    "repository": "https://github.com/davepacheco/node-extsprintf",
+    "licenseFile": "/Users/tenaciousmv/Code/tradling/node_modules/nets/node_modules/request/node_modules/http-signature/node_modules/jsprim/node_modules/extsprintf/LICENSE"
+  },
+  "fast-levenshtein@1.0.7": {
+    "licenses": "MIT",
+    "repository": "https://github.com/hiddentao/fast-levenshtein",
+    "licenseFile": "/Users/tenaciousmv/Code/tradling/node_modules/standard/node_modules/eslint/node_modules/optionator/node_modules/fast-levenshtein/LICENSE.md"
+  },
+  "figures@1.4.0": {
+    "licenses": "MIT",
+    "repository": "https://github.com/sindresorhus/figures",
+    "licenseFile": "/Users/tenaciousmv/Code/tradling/node_modules/standard/node_modules/eslint/node_modules/inquirer/node_modules/figures/license"
+  },
+  "filestream@4.1.1": {
+    "licenses": "MIT",
+    "repository": "https://github.com/DamonOehlman/filestream"
+  },
+  "finalhandler@0.4.0": {
+    "licenses": "MIT",
+    "repository": "https://github.com/pillarjs/finalhandler",
+    "licenseFile": "/Users/tenaciousmv/Code/tradling/node_modules/express/node_modules/finalhandler/LICENSE"
+  },
+  "find-root@0.1.1": {
+    "licenses": "MIT",
+    "repository": "https://github.com/agilemd/find-root",
+    "licenseFile": "/Users/tenaciousmv/Code/tradling/node_modules/standard/node_modules/find-root/LICENSE.md"
+  },
+  "flatten@0.0.1": {
+    "licenses": "MIT*",
+    "repository": "https://github.com/jesusabdullah/node-flatten"
+  },
+  "for-each@0.3.2": {
+    "licenses": "MIT",
+    "repository": "https://github.com/Raynos/for-each",
+    "licenseFile": "/Users/tenaciousmv/Code/tradling/node_modules/nets/node_modules/xhr/node_modules/parse-headers/node_modules/for-each/LICENCE"
+  },
+  "for-in@0.1.4": {
+    "licenses": "MIT",
+    "repository": "https://github.com/jonschlinkert/for-in",
+    "licenseFile": "/Users/tenaciousmv/Code/tradling/node_modules/object.omit/node_modules/for-own/node_modules/for-in/LICENSE"
+  },
+  "for-own@0.1.3": {
+    "licenses": "MIT",
+    "repository": "https://github.com/jonschlinkert/for-own",
+    "licenseFile": "/Users/tenaciousmv/Code/tradling/node_modules/object.omit/node_modules/for-own/LICENSE"
+  },
+  "foreach@2.0.5": {
+    "licenses": "MIT",
+    "repository": "https://github.com/manuelstofer/foreach",
+    "licenseFile": "/Users/tenaciousmv/Code/tradling/node_modules/tape/node_modules/string.prototype.trim/node_modules/define-properties/node_modules/foreach/LICENSE"
+  },
+  "forever-agent@0.6.1": {
+    "licenses": "Apache-2.0",
+    "repository": "https://github.com/mikeal/forever-agent",
+    "licenseFile": "/Users/tenaciousmv/Code/tradling/node_modules/nets/node_modules/request/node_modules/forever-agent/LICENSE"
+  },
+  "form-data@0.2.0": {
+    "licenses": "MIT",
+    "repository": "https://github.com/felixge/node-form-data",
+    "licenseFile": "/Users/tenaciousmv/Code/tradling/node_modules/@tradle/cb-blockr/node_modules/superagent/node_modules/form-data/License"
+  },
+  "form-data@1.0.0-rc3": {
+    "licenses": "MIT",
+    "repository": "https://github.com/form-data/form-data",
+    "licenseFile": "/Users/tenaciousmv/Code/tradling/node_modules/nets/node_modules/request/node_modules/form-data/License"
+  },
+  "formidable@1.0.14": {
+    "licenses": "MIT*",
+    "repository": "https://github.com/felixge/node-formidable",
+    "licenseFile": "/Users/tenaciousmv/Code/tradling/node_modules/@tradle/cb-blockr/node_modules/superagent/node_modules/formidable/LICENSE"
+  },
+  "forwarded@0.1.0": {
+    "licenses": "MIT",
+    "repository": "https://github.com/jshttp/forwarded",
+    "licenseFile": "/Users/tenaciousmv/Code/tradling/node_modules/express/node_modules/proxy-addr/node_modules/forwarded/LICENSE"
+  },
+  "fresh-falafel@1.2.0": {
+    "licenses": "MIT",
+    "repository": "https://github.com/substack/node-falafel"
+  },
+  "fresh@0.3.0": {
+    "licenses": "MIT",
+    "repository": "https://github.com/jshttp/fresh",
+    "licenseFile": "/Users/tenaciousmv/Code/tradling/node_modules/express/node_modules/fresh/LICENSE"
+  },
+  "from2@1.3.0": {
+    "licenses": "MIT",
+    "repository": "https://github.com/hughsk/from2",
+    "licenseFile": "/Users/tenaciousmv/Code/tradling/node_modules/logbase/node_modules/changes-feed/node_modules/from2/LICENSE.md"
+  },
+  "fs-readdir-recursive@0.1.2": {
+    "licenses": "MIT",
+    "repository": "https://github.com/fs-utils/fs-readdir-recursive",
+    "licenseFile": "/Users/tenaciousmv/Code/tradling/node_modules/standard/node_modules/standard-format/node_modules/esformatter-jsx/node_modules/babel-core/node_modules/fs-readdir-recursive/LICENSE"
+  },
+  "function-bind@1.0.2": {
+    "licenses": "MIT",
+    "repository": "https://github.com/Raynos/function-bind",
+    "licenseFile": "/Users/tenaciousmv/Code/tradling/node_modules/tape/node_modules/function-bind/LICENSE"
+  },
+  "functional-red-black-tree@1.0.1": {
+    "licenses": "MIT",
+    "repository": "https://github.com/mikolalysenko/functional-red-black-tree",
+    "licenseFile": "/Users/tenaciousmv/Code/tradling/node_modules/memdown/node_modules/functional-red-black-tree/LICENSE"
+  },
+  "generate-function@2.0.0": {
+    "licenses": "MIT",
+    "repository": "https://github.com/mafintosh/generate-function"
+  },
+  "generate-object-property@1.2.0": {
+    "licenses": "MIT",
+    "repository": "https://github.com/mafintosh/generate-object-property",
+    "licenseFile": "/Users/tenaciousmv/Code/tradling/node_modules/nets/node_modules/request/node_modules/har-validator/node_modules/is-my-json-valid/node_modules/generate-object-property/LICENSE"
+  },
+  "get-stdin@4.0.1": {
+    "licenses": "MIT",
+    "repository": "https://github.com/sindresorhus/get-stdin"
+  },
+  "glob@5.0.15": {
+    "licenses": "ISC",
+    "repository": "https://github.com/isaacs/node-glob",
+    "licenseFile": "/Users/tenaciousmv/Code/tradling/node_modules/rimraf/node_modules/glob/LICENSE"
+  },
+  "global@4.3.0": {
+    "licenses": "MIT",
+    "repository": "https://github.com/Raynos/global",
+    "licenseFile": "/Users/tenaciousmv/Code/tradling/node_modules/nets/node_modules/xhr/node_modules/global/LICENCE"
+  },
+  "globals@6.4.1": {
+    "licenses": "MIT",
+    "repository": "https://github.com/sindresorhus/globals",
+    "licenseFile": "/Users/tenaciousmv/Code/tradling/node_modules/standard/node_modules/standard-format/node_modules/esformatter-jsx/node_modules/babel-core/node_modules/globals/license"
+  },
+  "globals@8.14.0": {
+    "licenses": "MIT",
+    "repository": "https://github.com/sindresorhus/globals",
+    "licenseFile": "/Users/tenaciousmv/Code/tradling/node_modules/standard/node_modules/eslint/node_modules/globals/license"
+  },
+  "graceful-fs@4.1.2": {
+    "licenses": "ISC",
+    "repository": "https://github.com/isaacs/node-graceful-fs",
+    "licenseFile": "/Users/tenaciousmv/Code/tradling/node_modules/standard/node_modules/standard-format/node_modules/esformatter-jsx/node_modules/babel-core/node_modules/regenerator/node_modules/commoner/node_modules/graceful-fs/LICENSE"
+  },
+  "graceful-readlink@1.0.1": {
+    "licenses": "MIT",
+    "repository": "https://github.com/zhiyelee/graceful-readlink",
+    "licenseFile": "/Users/tenaciousmv/Code/tradling/node_modules/nets/node_modules/request/node_modules/har-validator/node_modules/commander/node_modules/graceful-readlink/LICENSE"
+  },
+  "har-validator@2.0.3": {
+    "licenses": "ISC",
+    "repository": "https://github.com/ahmadnassri/har-validator",
+    "licenseFile": "/Users/tenaciousmv/Code/tradling/node_modules/nets/node_modules/request/node_modules/har-validator/LICENSE"
+  },
+  "has-ansi@2.0.0": {
+    "licenses": "MIT",
+    "repository": "https://github.com/sindresorhus/has-ansi",
+    "licenseFile": "/Users/tenaciousmv/Code/tradling/node_modules/nets/node_modules/request/node_modules/har-validator/node_modules/chalk/node_modules/has-ansi/license"
+  },
+  "has@1.0.1": {
+    "licenses": "MIT",
+    "repository": "https://github.com/tarruda/has",
+    "licenseFile": "/Users/tenaciousmv/Code/tradling/node_modules/tape/node_modules/has/LICENSE-MIT"
+  },
+  "hash.js@1.0.3": {
+    "licenses": "MIT",
+    "repository": "https://github.com/indutny/hash.js"
+  },
+  "hashmap@2.0.4": {
+    "licenses": "MIT",
+    "repository": "https://github.com/flesler/hashmap",
+    "licenseFile": "/Users/tenaciousmv/Code/tradling/node_modules/@tradle/identity/node_modules/hashmap/LICENSE"
+  },
+  "hat@0.0.3": {
+    "licenses": "MIT/X11",
+    "repository": "http://github.com/substack/node-hat"
+  },
+  "hawk@3.1.2": {
+    "licenses": "BSD-3-Clause",
+    "repository": "https://github.com/hueniverse/hawk",
+    "licenseFile": "/Users/tenaciousmv/Code/tradling/node_modules/nets/node_modules/request/node_modules/hawk/LICENSE"
+  },
+  "hoek@2.16.3": {
+    "licenses": "BSD-3-Clause",
+    "repository": "https://github.com/hapijs/hoek",
+    "licenseFile": "/Users/tenaciousmv/Code/tradling/node_modules/nets/node_modules/request/node_modules/hawk/node_modules/hoek/LICENSE"
+  },
+  "home-or-tmp@1.0.0": {
+    "licenses": "MIT",
+    "repository": "https://github.com/sindresorhus/home-or-tmp",
+    "licenseFile": "/Users/tenaciousmv/Code/tradling/node_modules/standard/node_modules/standard-format/node_modules/esformatter-jsx/node_modules/babel-core/node_modules/home-or-tmp/license"
+  },
+  "http-errors@1.3.1": {
+    "licenses": "MIT",
+    "repository": "https://github.com/jshttp/http-errors",
+    "licenseFile": "/Users/tenaciousmv/Code/tradling/node_modules/express/node_modules/send/node_modules/http-errors/LICENSE"
+  },
+  "http-signature@1.1.0": {
+    "licenses": "MIT",
+    "repository": "https://github.com/joyent/node-http-signature",
+    "licenseFile": "/Users/tenaciousmv/Code/tradling/node_modules/nets/node_modules/request/node_modules/http-signature/LICENSE"
+  },
+  "iconv-lite@0.4.13": {
+    "licenses": "MIT",
+    "repository": "https://github.com/ashtuchkin/iconv-lite",
+    "licenseFile": "/Users/tenaciousmv/Code/tradling/node_modules/standard/node_modules/standard-format/node_modules/esformatter-jsx/node_modules/babel-core/node_modules/regenerator/node_modules/commoner/node_modules/iconv-lite/LICENSE"
+  },
+  "ignore@2.2.19": {
+    "licenses": "MIT",
+    "repository": "https://github.com/kaelzhang/node-ignore",
+    "licenseFile": "/Users/tenaciousmv/Code/tradling/node_modules/standard/node_modules/deglob/node_modules/ignore/LICENSE-MIT"
+  },
+  "inflight@1.0.4": {
+    "licenses": "ISC",
+    "repository": "https://github.com/isaacs/inflight",
+    "licenseFile": "/Users/tenaciousmv/Code/tradling/node_modules/rimraf/node_modules/glob/node_modules/inflight/LICENSE"
+  },
+  "inherit@2.2.2": {
+    "licenses": "MIT",
+    "repository": "http://github.com/dfilatov/node-inherit"
+  },
+  "inherits@2.0.1": {
+    "licenses": "ISC",
+    "repository": "https://github.com/isaacs/inherits",
+    "licenseFile": "/Users/tenaciousmv/Code/tradling/node_modules/@tradle/bitcoinjs-lib/node_modules/create-hash/node_modules/inherits/LICENSE"
+  },
+  "ini@1.3.4": {
+    "licenses": "ISC",
+    "repository": "https://github.com/isaacs/ini",
+    "licenseFile": "/Users/tenaciousmv/Code/tradling/node_modules/standard/node_modules/standard-format/node_modules/esformatter-jsx/node_modules/js-beautify/node_modules/config-chain/node_modules/ini/LICENSE"
+  },
+  "inquirer@0.8.5": {
+    "licenses": "MIT",
+    "repository": "https://github.com/SBoudrias/Inquirer.js"
+  },
+  "invert-kv@1.0.0": {
+    "licenses": "MIT",
+    "repository": "https://github.com/sindresorhus/invert-kv"
+  },
+  "ip-regex@1.0.3": {
+    "licenses": "MIT",
+    "repository": "https://github.com/sindresorhus/ip-regex",
+    "licenseFile": "/Users/tenaciousmv/Code/tradling/node_modules/@tradle/bittorrent-dht/node_modules/is-ip/node_modules/ip-regex/license"
+  },
+  "ipaddr.js@1.0.5": {
+    "licenses": "MIT",
+    "repository": "https://github.com/whitequark/ipaddr.js",
+    "licenseFile": "/Users/tenaciousmv/Code/tradling/node_modules/@tradle/bittorrent-dht/node_modules/compact2string/node_modules/ipaddr.js/LICENSE"
+  },
+  "is-absolute@0.1.7": {
+    "licenses": "MIT",
+    "repository": "https://github.com/jonschlinkert/is-absolute",
+    "licenseFile": "/Users/tenaciousmv/Code/tradling/node_modules/pre-commit/node_modules/cross-spawn/node_modules/cross-spawn-async/node_modules/which/node_modules/is-absolute/LICENSE"
+  },
+  "is-buffer@1.1.0": {
+    "licenses": "MIT",
+    "repository": "https://github.com/feross/is-buffer",
+    "licenseFile": "/Users/tenaciousmv/Code/tradling/node_modules/standard/node_modules/standard-format/node_modules/esformatter-jsx/node_modules/babel-core/node_modules/regenerator/node_modules/defs/node_modules/yargs/node_modules/cliui/node_modules/center-align/node_modules/align-text/node_modules/kind-of/node_modules/is-buffer/LICENSE"
+  },
+  "is-callable@1.1.1": {
+    "licenses": "MIT",
+    "repository": "https://github.com/ljharb/is-callable",
+    "licenseFile": "/Users/tenaciousmv/Code/tradling/node_modules/tape/node_modules/string.prototype.trim/node_modules/es-abstract/node_modules/is-callable/LICENSE"
+  },
+  "is-date-object@1.0.1": {
+    "licenses": "MIT",
+    "repository": "https://github.com/ljharb/is-date-object",
+    "licenseFile": "/Users/tenaciousmv/Code/tradling/node_modules/tape/node_modules/string.prototype.trim/node_modules/es-abstract/node_modules/es-to-primitive/node_modules/is-date-object/LICENSE"
+  },
+  "is-file@1.0.0": {
+    "licenses": "MIT",
+    "repository": "https://github.com/jsdevel/node-is-file",
+    "licenseFile": "/Users/tenaciousmv/Code/tradling/node_modules/@tradle/utils/node_modules/create-torrent/node_modules/is-file/LICENSE"
+  },
+  "is-finite@1.0.1": {
+    "licenses": "MIT",
+    "repository": "https://github.com/sindresorhus/is-finite",
+    "licenseFile": "/Users/tenaciousmv/Code/tradling/node_modules/standard/node_modules/standard-format/node_modules/esformatter-jsx/node_modules/babel-core/node_modules/repeating/node_modules/is-finite/license"
+  },
+  "is-function@1.0.1": {
+    "licenses": "MIT",
+    "repository": "https://github.com/grncdr/js-is-function",
+    "licenseFile": "/Users/tenaciousmv/Code/tradling/node_modules/nets/node_modules/xhr/node_modules/is-function/LICENSE"
+  },
+  "is-integer@1.0.6": {
+    "note": "public license",
+    "licenses": "WTFPL",
+    "repository": "https://github.com/parshap/js-is-integer",
+    "licenseFile": "/Users/tenaciousmv/Code/tradling/node_modules/standard/node_modules/standard-format/node_modules/esformatter-jsx/node_modules/babel-core/node_modules/is-integer/LICENSE"
+  },
+  "is-ip@1.0.0": {
+    "licenses": "MIT",
+    "repository": "https://github.com/sindresorhus/is-ip"
+  },
+  "is-my-json-valid@2.12.3": {
+    "licenses": "MIT",
+    "repository": "https://github.com/mafintosh/is-my-json-valid",
+    "licenseFile": "/Users/tenaciousmv/Code/tradling/node_modules/nets/node_modules/request/node_modules/har-validator/node_modules/is-my-json-valid/LICENSE"
+  },
+  "is-property@1.0.2": {
+    "licenses": "MIT",
+    "repository": "https://github.com/mikolalysenko/is-property",
+    "licenseFile": "/Users/tenaciousmv/Code/tradling/node_modules/nets/node_modules/request/node_modules/har-validator/node_modules/is-my-json-valid/node_modules/generate-object-property/node_modules/is-property/LICENSE"
+  },
+  "is-regex@1.0.3": {
+    "licenses": "MIT",
+    "repository": "https://github.com/ljharb/is-regex",
+    "licenseFile": "/Users/tenaciousmv/Code/tradling/node_modules/tape/node_modules/string.prototype.trim/node_modules/es-abstract/node_modules/is-regex/LICENSE"
+  },
+  "is-relative@0.1.3": {
+    "licenses": "MIT",
+    "repository": "https://github.com/jonschlinkert/is-relative",
+    "licenseFile": "/Users/tenaciousmv/Code/tradling/node_modules/pre-commit/node_modules/cross-spawn/node_modules/cross-spawn-async/node_modules/which/node_modules/is-absolute/node_modules/is-relative/LICENSE-MIT"
+  },
+  "is-symbol@1.0.1": {
+    "licenses": "MIT",
+    "repository": "https://github.com/ljharb/is-symbol",
+    "licenseFile": "/Users/tenaciousmv/Code/tradling/node_modules/tape/node_modules/string.prototype.trim/node_modules/es-abstract/node_modules/es-to-primitive/node_modules/is-symbol/LICENSE"
+  },
+  "is-typedarray@1.0.0": {
+    "licenses": "MIT",
+    "repository": "https://github.com/hughsk/is-typedarray",
+    "licenseFile": "/Users/tenaciousmv/Code/tradling/node_modules/@tradle/utils/node_modules/create-torrent/node_modules/filestream/node_modules/typedarray-to-buffer/node_modules/is-typedarray/LICENSE.md"
+  },
+  "isarray@0.0.1": {
+    "licenses": "MIT",
+    "repository": "https://github.com/juliangruber/isarray"
+  },
+  "isobject@1.0.2": {
+    "licenses": "MIT",
+    "repository": "https://github.com/jonschlinkert/isobject",
+    "licenseFile": "/Users/tenaciousmv/Code/tradling/node_modules/object.omit/node_modules/isobject/LICENSE"
+  },
+  "isstream@0.1.2": {
+    "licenses": "MIT",
+    "repository": "https://github.com/rvagg/isstream",
+    "licenseFile": "/Users/tenaciousmv/Code/tradling/node_modules/nets/node_modules/request/node_modules/isstream/LICENSE.md"
+  },
+  "jodid25519@1.0.2": {
+    "licenses": "MIT",
+    "repository": "https://github.com/meganz/jodid25519",
+    "licenseFile": "/Users/tenaciousmv/Code/tradling/node_modules/nets/node_modules/request/node_modules/http-signature/node_modules/sshpk/node_modules/jodid25519/LICENSE"
+  },
+  "js-beautify@1.5.10": {
+    "licenses": "MIT",
+    "repository": "https://github.com/beautify-web/js-beautify",
+    "licenseFile": "/Users/tenaciousmv/Code/tradling/node_modules/standard/node_modules/standard-format/node_modules/esformatter-jsx/node_modules/js-beautify/LICENSE"
+  },
+  "js-tokens@1.0.1": {
+    "licenses": "MIT",
+    "repository": "https://github.com/lydell/js-tokens",
+    "licenseFile": "/Users/tenaciousmv/Code/tradling/node_modules/standard/node_modules/standard-format/node_modules/esformatter-jsx/node_modules/babel-core/node_modules/js-tokens/LICENSE"
+  },
+  "js-yaml@3.4.6": {
+    "licenses": "MIT",
+    "repository": "git+https://github.com/nodeca/js-yaml",
+    "licenseFile": "/Users/tenaciousmv/Code/tradling/node_modules/standard/node_modules/eslint/node_modules/js-yaml/LICENSE"
+  },
+  "jsbn@0.1.0": {
+    "licenses": "BSD",
+    "repository": "https://github.com/andyperlitch/jsbn",
+    "licenseFile": "/Users/tenaciousmv/Code/tradling/node_modules/nets/node_modules/request/node_modules/http-signature/node_modules/sshpk/node_modules/jsbn/LICENSE"
+  },
+  "jsesc@0.5.0": {
+    "licenses": "MIT",
+    "repository": "https://github.com/mathiasbynens/jsesc",
+    "licenseFile": "/Users/tenaciousmv/Code/tradling/node_modules/standard/node_modules/standard-format/node_modules/esformatter-jsx/node_modules/babel-core/node_modules/regexpu/node_modules/regjsparser/node_modules/jsesc/LICENSE-MIT.txt"
+  },
+  "json-schema@0.2.2": {
+    "licenses": [
+      "AFLv2.1",
+      "BSD"
+    ],
+    "repository": "http://github.com/kriszyp/json-schema"
+  },
+  "json-stable-stringify@1.0.0": {
+    "licenses": "MIT",
+    "repository": "https://github.com/substack/json-stable-stringify",
+    "licenseFile": "/Users/tenaciousmv/Code/tradling/node_modules/@tradle/utils/node_modules/json-stable-stringify/LICENSE"
+  },
+  "json-stringify-safe@5.0.1": {
+    "licenses": "ISC",
+    "repository": "https://github.com/isaacs/json-stringify-safe",
+    "licenseFile": "/Users/tenaciousmv/Code/tradling/node_modules/nets/node_modules/request/node_modules/json-stringify-safe/LICENSE"
+  },
+  "json5@0.4.0": {
+    "licenses": "MIT",
+    "repository": "https://github.com/aseemk/json5"
+  },
+  "jsonify@0.0.0": {
+    "licenses": "Public Domain",
+    "repository": "http://github.com/substack/jsonify"
+  },
+  "jsonpointer@2.0.0": {
+    "licenses": "MIT",
+    "repository": "http://github.com/janl/node-jsonpointer"
+  },
+  "jsprim@1.2.2": {
+    "licenses": "MIT",
+    "repository": "https://github.com/davepacheco/node-jsprim",
+    "licenseFile": "/Users/tenaciousmv/Code/tradling/node_modules/nets/node_modules/request/node_modules/http-signature/node_modules/jsprim/LICENSE"
+  },
+  "junk@1.0.2": {
+    "licenses": "MIT",
+    "repository": "https://github.com/sindresorhus/junk",
+    "licenseFile": "/Users/tenaciousmv/Code/tradling/node_modules/@tradle/utils/node_modules/create-torrent/node_modules/junk/license"
+  },
+  "k-bucket@0.4.4": {
+    "licenses": "MIT",
+    "repository": "https://github.com/tristanls/k-bucket",
+    "licenseFile": "/Users/tenaciousmv/Code/tradling/node_modules/@tradle/bittorrent-dht/node_modules/k-bucket/LICENSE"
+  },
+  "kind-of@2.0.1": {
+    "licenses": "MIT",
+    "repository": "https://github.com/jonschlinkert/kind-of",
+    "licenseFile": "/Users/tenaciousmv/Code/tradling/node_modules/standard/node_modules/standard-format/node_modules/esformatter-jsx/node_modules/babel-core/node_modules/regenerator/node_modules/defs/node_modules/yargs/node_modules/cliui/node_modules/center-align/node_modules/align-text/node_modules/kind-of/LICENSE"
+  },
+  "lazy-cache@0.2.7": {
+    "licenses": "MIT",
+    "repository": "git+https://github.com/jonschlinkert/lazy-cache",
+    "licenseFile": "/Users/tenaciousmv/Code/tradling/node_modules/standard/node_modules/standard-format/node_modules/esformatter-jsx/node_modules/babel-core/node_modules/regenerator/node_modules/defs/node_modules/yargs/node_modules/cliui/node_modules/center-align/node_modules/lazy-cache/LICENSE"
+  },
+  "lcid@1.0.0": {
+    "licenses": "MIT",
+    "repository": "https://github.com/sindresorhus/lcid",
+    "licenseFile": "/Users/tenaciousmv/Code/tradling/node_modules/standard/node_modules/standard-format/node_modules/esformatter-jsx/node_modules/babel-core/node_modules/regenerator/node_modules/defs/node_modules/yargs/node_modules/os-locale/node_modules/lcid/license"
+  },
+  "left-pad@0.0.3": {
+    "licenses": "BSD",
+    "repository": "https://github.com/azer/left-pad"
+  },
+  "length-prefixed-stream@1.4.0": {
+    "licenses": "MIT",
+    "repository": "https://github.com/mafintosh/length-prefixed-stream",
+    "licenseFile": "/Users/tenaciousmv/Code/tradling/node_modules/zlorp/node_modules/@tradle/talko/node_modules/length-prefixed-stream/LICENSE"
+  },
+  "level-errors@1.0.4": {
+    "licenses": "MIT",
+    "repository": "https://github.com/level/errors",
+    "licenseFile": "/Users/tenaciousmv/Code/tradling/node_modules/level-errors/LICENSE.md"
+  },
+  "level-live-stream@1.4.11": {
+    "licenses": "MIT",
+    "repository": "https://github.com/dominictarr/level-live-stream",
+    "licenseFile": "/Users/tenaciousmv/Code/tradling/node_modules/level-live-stream/LICENSE"
+  },
+  "level-post@1.0.4": {
+    "licenses": "MIT",
+    "repository": "https://github.com/dominictarr/level-post",
+    "licenseFile": "/Users/tenaciousmv/Code/tradling/node_modules/level-live-stream/node_modules/pull-level/node_modules/level-post/LICENSE"
+  },
+  "level-sublevel@6.3.17": {
+    "licenses": "MIT",
+    "repository": "https://github.com/dominictarr/level-sublevel",
+    "licenseFile": "/Users/tenaciousmv/Code/tradling/node_modules/level-live-stream/node_modules/level-sublevel/LICENSE"
+  },
+  "levelup@0.18.6": {
+    "licenses": "MIT",
+    "repository": "https://github.com/rvagg/node-levelup",
+    "licenseFile": "/Users/tenaciousmv/Code/tradling/node_modules/levelup/LICENSE.md"
+  },
+  "levelup@0.19.0": {
+    "licenses": "MIT",
+    "repository": "https://github.com/rvagg/node-levelup",
+    "licenseFile": "/Users/tenaciousmv/Code/tradling/node_modules/level-live-stream/node_modules/level-sublevel/node_modules/levelup/LICENSE.md"
+  },
+  "leven@1.0.2": {
+    "licenses": "MIT",
+    "repository": "https://github.com/sindresorhus/leven",
+    "licenseFile": "/Users/tenaciousmv/Code/tradling/node_modules/standard/node_modules/standard-format/node_modules/esformatter-jsx/node_modules/babel-core/node_modules/babel-plugin-undeclared-variables-check/node_modules/leven/license"
+  },
+  "levn@0.2.5": {
+    "licenses": "MIT",
+    "repository": "https://github.com/gkz/levn",
+    "licenseFile": "/Users/tenaciousmv/Code/tradling/node_modules/standard/node_modules/eslint/node_modules/optionator/node_modules/levn/LICENSE"
+  },
+  "lexicographic-integer@1.1.0": {
+    "licenses": "MIT",
+    "repository": "https://github.com/substack/lexicographic-integer",
+    "licenseFile": "/Users/tenaciousmv/Code/tradling/node_modules/lexicographic-integer/LICENSE"
+  },
+  "line-numbers@0.2.0": {
+    "licenses": "MIT",
+    "repository": "https://github.com/lydell/line-numbers",
+    "licenseFile": "/Users/tenaciousmv/Code/tradling/node_modules/standard/node_modules/standard-format/node_modules/esformatter-jsx/node_modules/babel-core/node_modules/line-numbers/LICENSE"
+  },
+  "lodash@3.10.1": {
+    "licenses": "MIT",
+    "repository": "https://github.com/lodash/lodash",
+    "licenseFile": "/Users/tenaciousmv/Code/tradling/node_modules/standard/node_modules/eslint/node_modules/inquirer/node_modules/lodash/LICENSE"
+  },
+  "logbase@3.3.2": {
+    "licenses": "ISC",
+    "repository": "https://github.com/mvayngrib/logbase"
+  },
+  "longest@1.0.1": {
+    "licenses": "MIT",
+    "repository": "https://github.com/jonschlinkert/longest",
+    "licenseFile": "/Users/tenaciousmv/Code/tradling/node_modules/standard/node_modules/standard-format/node_modules/esformatter-jsx/node_modules/babel-core/node_modules/regenerator/node_modules/defs/node_modules/yargs/node_modules/cliui/node_modules/center-align/node_modules/align-text/node_modules/longest/LICENSE"
+  },
+  "looper@2.0.0": {
+    "licenses": "MIT",
+    "repository": "https://github.com/dominictarr/looper",
+    "licenseFile": "/Users/tenaciousmv/Code/tradling/node_modules/level-live-stream/node_modules/pull-level/node_modules/pull-window/node_modules/looper/LICENSE"
+  },
+  "lru-cache@3.2.0": {
+    "licenses": "ISC",
+    "repository": "https://github.com/isaacs/node-lru-cache",
+    "licenseFile": "/Users/tenaciousmv/Code/tradling/node_modules/pre-commit/node_modules/cross-spawn/node_modules/cross-spawn-async/node_modules/lru-cache/LICENSE"
+  },
+  "ltgt@1.0.2": {
+    "licenses": "MIT",
+    "repository": "https://github.com/dominictarr/ltgt",
+    "licenseFile": "/Users/tenaciousmv/Code/tradling/node_modules/memdown/node_modules/ltgt/LICENSE"
+  },
+  "ltgt@2.0.0": {
+    "licenses": "MIT",
+    "repository": "https://github.com/dominictarr/ltgt",
+    "licenseFile": "/Users/tenaciousmv/Code/tradling/node_modules/level-live-stream/node_modules/level-sublevel/node_modules/ltgt/LICENSE"
+  },
+  "magnet-uri@4.2.3": {
+    "licenses": "MIT",
+    "repository": "https://github.com/feross/magnet-uri",
+    "licenseFile": "/Users/tenaciousmv/Code/tradling/node_modules/@tradle/utils/node_modules/parse-torrent/node_modules/magnet-uri/LICENSE"
+  },
+  "map-stream@0.0.6": {
+    "licenses": "MIT",
+    "repository": "https://github.com/dominictarr/map-stream",
+    "licenseFile": "/Users/tenaciousmv/Code/tradling/node_modules/map-stream/LICENCE"
+  },
+  "media-typer@0.3.0": {
+    "licenses": "MIT",
+    "repository": "https://github.com/jshttp/media-typer",
+    "licenseFile": "/Users/tenaciousmv/Code/tradling/node_modules/express/node_modules/type-is/node_modules/media-typer/LICENSE"
+  },
+  "memdown@1.1.0": {
+    "licenses": "MIT",
+    "repository": "git+https://github.com/rvagg/node-memdown",
+    "licenseFile": "/Users/tenaciousmv/Code/tradling/node_modules/memdown/LICENSE"
+  },
+  "merge-descriptors@1.0.0": {
+    "licenses": "MIT",
+    "repository": "https://github.com/component/merge-descriptors",
+    "licenseFile": "/Users/tenaciousmv/Code/tradling/node_modules/express/node_modules/merge-descriptors/LICENSE"
+  },
+  "methods@1.0.1": {
+    "licenses": "MIT",
+    "repository": "https://github.com/visionmedia/node-methods",
+    "licenseFile": "/Users/tenaciousmv/Code/tradling/node_modules/@tradle/cb-blockr/node_modules/superagent/node_modules/methods/LICENSE"
+  },
+  "methods@1.1.1": {
+    "licenses": "MIT",
+    "repository": "https://github.com/jshttp/methods",
+    "licenseFile": "/Users/tenaciousmv/Code/tradling/node_modules/express/node_modules/methods/LICENSE"
+  },
+  "mime-db@1.12.0": {
+    "licenses": "MIT",
+    "repository": "https://github.com/jshttp/mime-db",
+    "licenseFile": "/Users/tenaciousmv/Code/tradling/node_modules/@tradle/cb-blockr/node_modules/superagent/node_modules/form-data/node_modules/mime-types/node_modules/mime-db/LICENSE"
+  },
+  "mime-db@1.20.0": {
+    "licenses": "MIT",
+    "repository": "https://github.com/jshttp/mime-db",
+    "licenseFile": "/Users/tenaciousmv/Code/tradling/node_modules/nets/node_modules/request/node_modules/mime-types/node_modules/mime-db/LICENSE"
+  },
+  "mime-types@2.0.14": {
+    "licenses": "MIT",
+    "repository": "https://github.com/jshttp/mime-types",
+    "licenseFile": "/Users/tenaciousmv/Code/tradling/node_modules/@tradle/cb-blockr/node_modules/superagent/node_modules/form-data/node_modules/mime-types/LICENSE"
+  },
+  "mime-types@2.1.8": {
+    "licenses": "MIT",
+    "repository": "https://github.com/jshttp/mime-types",
+    "licenseFile": "/Users/tenaciousmv/Code/tradling/node_modules/nets/node_modules/request/node_modules/mime-types/LICENSE"
+  },
+  "mime@1.3.4": {
+    "licenses": "MIT",
+    "repository": "https://github.com/broofa/node-mime",
+    "licenseFile": "/Users/tenaciousmv/Code/tradling/node_modules/express/node_modules/send/node_modules/mime/LICENSE"
+  },
+  "min-document@2.17.0": {
+    "licenses": "MIT",
+    "repository": "https://github.com/Raynos/min-document",
+    "licenseFile": "/Users/tenaciousmv/Code/tradling/node_modules/nets/node_modules/xhr/node_modules/global/node_modules/min-document/LICENCE"
+  },
+  "minimatch@2.0.10": {
+    "licenses": "ISC",
+    "repository": "https://github.com/isaacs/minimatch",
+    "licenseFile": "/Users/tenaciousmv/Code/tradling/node_modules/standard/node_modules/eslint/node_modules/minimatch/LICENSE"
+  },
+  "minimatch@3.0.0": {
+    "licenses": "ISC",
+    "repository": "https://github.com/isaacs/minimatch",
+    "licenseFile": "/Users/tenaciousmv/Code/tradling/node_modules/rimraf/node_modules/glob/node_modules/minimatch/LICENSE"
+  },
+  "minimist@0.0.8": {
+    "licenses": "MIT",
+    "repository": "https://github.com/substack/minimist",
+    "licenseFile": "/Users/tenaciousmv/Code/tradling/node_modules/@tradle/utils/node_modules/mkdirp/node_modules/minimist/LICENSE"
+  },
+  "minimist@1.2.0": {
+    "licenses": "MIT",
+    "repository": "https://github.com/substack/minimist",
+    "licenseFile": "/Users/tenaciousmv/Code/tradling/node_modules/@tradle/utils/node_modules/create-torrent/node_modules/minimist/LICENSE"
+  },
+  "mkdirp@0.5.1": {
+    "licenses": "MIT",
+    "repository": "https://github.com/substack/node-mkdirp",
+    "licenseFile": "/Users/tenaciousmv/Code/tradling/node_modules/@tradle/utils/node_modules/mkdirp/LICENSE"
+  },
+  "monotonic-timestamp@0.0.9": {
+    "licenses": "MIT",
+    "repository": "https://github.com/dominictarr/monotonic-timestamp",
+    "licenseFile": "/Users/tenaciousmv/Code/tradling/node_modules/monotonic-timestamp/LICENSE"
+  },
+  "mout@0.11.1": {
+    "licenses": "MIT",
+    "repository": "https://github.com/mout/mout",
+    "licenseFile": "/Users/tenaciousmv/Code/tradling/node_modules/standard/node_modules/standard-format/node_modules/esformatter/node_modules/mout/LICENSE.md"
+  },
+  "ms@0.7.1": {
+    "licenses": "MIT*",
+    "repository": "https://github.com/guille/ms.js",
+    "licenseFile": "/Users/tenaciousmv/Code/tradling/node_modules/debug/node_modules/ms/LICENSE"
+  },
+  "multistream@2.0.2": {
+    "licenses": "MIT",
+    "repository": "https://github.com/feross/multistream",
+    "licenseFile": "/Users/tenaciousmv/Code/tradling/node_modules/@tradle/utils/node_modules/create-torrent/node_modules/multistream/LICENSE"
+  },
+  "mute-stream@0.0.4": {
+    "licenses": "BSD",
+    "repository": "https://github.com/isaacs/mute-stream",
+    "licenseFile": "/Users/tenaciousmv/Code/tradling/node_modules/standard/node_modules/eslint/node_modules/inquirer/node_modules/readline2/node_modules/mute-stream/LICENSE"
+  },
+  "mutexify@1.1.0": {
+    "licenses": "MIT",
+    "repository": "https://github.com/mafintosh/mutexify",
+    "licenseFile": "/Users/tenaciousmv/Code/tradling/node_modules/logbase/node_modules/mutexify/LICENSE"
+  },
+  "negotiator@0.5.3": {
+    "licenses": "MIT",
+    "repository": "https://github.com/jshttp/negotiator",
+    "licenseFile": "/Users/tenaciousmv/Code/tradling/node_modules/express/node_modules/accepts/node_modules/negotiator/LICENSE"
+  },
+  "nets@3.2.0": {
+    "licenses": "ISC",
+    "repository": "https://github.com/maxogden/nets"
+  },
+  "network-address@1.0.0": {
+    "licenses": "MIT",
+    "repository": "https://github.com/mafintosh/network-address",
+    "licenseFile": "/Users/tenaciousmv/Code/tradling/node_modules/@tradle/bittorrent-dht/node_modules/network-address/LICENSE"
+  },
+  "node-uuid@1.4.7": {
+    "licenses": "MIT",
+    "repository": "https://github.com/broofa/node-uuid",
+    "licenseFile": "/Users/tenaciousmv/Code/tradling/node_modules/nets/node_modules/request/node_modules/node-uuid/LICENSE.md"
+  },
+  "nopt@3.0.6": {
+    "licenses": "ISC",
+    "repository": "https://github.com/npm/nopt",
+    "licenseFile": "/Users/tenaciousmv/Code/tradling/node_modules/standard/node_modules/standard-format/node_modules/esformatter-jsx/node_modules/js-beautify/node_modules/nopt/LICENSE"
+  },
+  "npm-path@1.0.2": {
+    "licenses": "MIT",
+    "repository": "git+https://github.com/timoxley/npm-path",
+    "licenseFile": "/Users/tenaciousmv/Code/tradling/node_modules/standard/node_modules/standard-format/node_modules/esformatter/node_modules/npm-run/node_modules/npm-path/LICENSE"
+  },
+  "npm-run@1.1.1": {
+    "licenses": "MIT",
+    "repository": "https://github.com/timoxley/npm-run",
+    "licenseFile": "/Users/tenaciousmv/Code/tradling/node_modules/standard/node_modules/standard-format/node_modules/esformatter/node_modules/npm-run/LICENSE"
+  },
+  "number-is-nan@1.0.0": {
+    "licenses": "MIT",
+    "repository": "https://github.com/sindresorhus/number-is-nan",
+    "licenseFile": "/Users/tenaciousmv/Code/tradling/node_modules/standard/node_modules/standard-format/node_modules/esformatter-jsx/node_modules/babel-core/node_modules/repeating/node_modules/is-finite/node_modules/number-is-nan/license"
+  },
+  "oauth-sign@0.8.0": {
+    "licenses": "Apache-2.0",
+    "repository": "https://github.com/mikeal/oauth-sign",
+    "licenseFile": "/Users/tenaciousmv/Code/tradling/node_modules/nets/node_modules/request/node_modules/oauth-sign/LICENSE"
+  },
+  "object-assign@2.1.1": {
+    "licenses": "MIT",
+    "repository": "https://github.com/sindresorhus/object-assign",
+    "licenseFile": "/Users/tenaciousmv/Code/tradling/node_modules/standard/node_modules/eslint/node_modules/object-assign/license"
+  },
+  "object-inspect@1.0.2": {
+    "licenses": "MIT",
+    "repository": "https://github.com/substack/object-inspect",
+    "licenseFile": "/Users/tenaciousmv/Code/tradling/node_modules/tape/node_modules/object-inspect/LICENSE"
+  },
+  "object-keys@1.0.9": {
+    "licenses": "MIT",
+    "repository": "https://github.com/ljharb/object-keys",
+    "licenseFile": "/Users/tenaciousmv/Code/tradling/node_modules/tape/node_modules/string.prototype.trim/node_modules/define-properties/node_modules/object-keys/LICENSE"
+  },
+  "object-path@0.6.0": {
+    "licenses": "MIT",
+    "repository": "https://github.com/mariocasciaro/object-path",
+    "licenseFile": "/Users/tenaciousmv/Code/tradling/node_modules/time-method/node_modules/sort-by/node_modules/object-path/LICENSE"
+  },
+  "object.omit@1.1.0": {
+    "licenses": "MIT",
+    "repository": "https://github.com/jonschlinkert/object.omit",
+    "licenseFile": "/Users/tenaciousmv/Code/tradling/node_modules/object.omit/LICENSE"
+  },
+  "object.pick@1.1.1": {
+    "licenses": "MIT",
+    "repository": "https://github.com/jonschlinkert/object.pick"
+  },
+  "on-finished@2.3.0": {
+    "licenses": "MIT",
+    "repository": "https://github.com/jshttp/on-finished",
+    "licenseFile": "/Users/tenaciousmv/Code/tradling/node_modules/express/node_modules/on-finished/LICENSE"
+  },
+  "once@1.1.1": {
+    "licenses": "BSD",
+    "repository": "https://github.com/isaacs/once",
+    "licenseFile": "/Users/tenaciousmv/Code/tradling/node_modules/nets/node_modules/xhr/node_modules/once/LICENSE"
+  },
+  "once@1.3.3": {
+    "licenses": "ISC",
+    "repository": "https://github.com/isaacs/once",
+    "licenseFile": "/Users/tenaciousmv/Code/tradling/node_modules/@tradle/utils/node_modules/create-torrent/node_modules/once/LICENSE"
+  },
+  "optionator@0.5.0": {
+    "licenses": "MIT",
+    "repository": "https://github.com/gkz/optionator",
+    "licenseFile": "/Users/tenaciousmv/Code/tradling/node_modules/standard/node_modules/eslint/node_modules/optionator/LICENSE"
+  },
+  "os-homedir@1.0.1": {
+    "licenses": "MIT",
+    "repository": "https://github.com/sindresorhus/os-homedir",
+    "licenseFile": "/Users/tenaciousmv/Code/tradling/node_modules/standard/node_modules/standard-format/node_modules/esformatter/node_modules/user-home/node_modules/os-homedir/license"
+  },
+  "os-locale@1.4.0": {
+    "licenses": "MIT",
+    "repository": "https://github.com/sindresorhus/os-locale",
+    "licenseFile": "/Users/tenaciousmv/Code/tradling/node_modules/standard/node_modules/standard-format/node_modules/esformatter-jsx/node_modules/babel-core/node_modules/regenerator/node_modules/defs/node_modules/yargs/node_modules/os-locale/license"
+  },
+  "os-shim@0.1.3": {
+    "licenses": "MIT",
+    "repository": "https://github.com/h2non/node-os-shim",
+    "licenseFile": "/Users/tenaciousmv/Code/tradling/node_modules/pre-commit/node_modules/cross-spawn/node_modules/spawn-sync/node_modules/os-shim/LICENSE"
+  },
+  "os-tmpdir@1.0.1": {
+    "licenses": "MIT",
+    "repository": "https://github.com/sindresorhus/os-tmpdir",
+    "licenseFile": "/Users/tenaciousmv/Code/tradling/node_modules/standard/node_modules/standard-format/node_modules/esformatter-jsx/node_modules/babel-core/node_modules/home-or-tmp/node_modules/os-tmpdir/license"
+  },
+  "output-file-sync@1.1.1": {
+    "licenses": "MIT",
+    "repository": "https://github.com/shinnn/output-file-sync",
+    "licenseFile": "/Users/tenaciousmv/Code/tradling/node_modules/standard/node_modules/standard-format/node_modules/esformatter-jsx/node_modules/babel-core/node_modules/output-file-sync/LICENSE"
+  },
+  "parse-headers@2.0.1": {
+    "licenses": "MIT",
+    "repository": "https://github.com/kesla/parse-headers",
+    "licenseFile": "/Users/tenaciousmv/Code/tradling/node_modules/nets/node_modules/xhr/node_modules/parse-headers/LICENCE"
+  },
+  "parse-torrent-file@2.1.4": {
+    "licenses": "MIT",
+    "repository": "https://github.com/feross/parse-torrent-file",
+    "licenseFile": "/Users/tenaciousmv/Code/tradling/node_modules/@tradle/utils/node_modules/parse-torrent/node_modules/parse-torrent-file/LICENSE"
+  },
+  "parse-torrent@3.0.1": {
+    "licenses": "MIT",
+    "repository": "https://github.com/feross/parse-torrent",
+    "licenseFile": "/Users/tenaciousmv/Code/tradling/node_modules/@tradle/utils/node_modules/parse-torrent/LICENSE"
+  },
+  "parseurl@1.3.0": {
+    "licenses": "MIT",
+    "repository": "https://github.com/expressjs/parseurl",
+    "licenseFile": "/Users/tenaciousmv/Code/tradling/node_modules/express/node_modules/parseurl/LICENSE"
+  },
+  "path-exists@1.0.0": {
+    "licenses": "MIT",
+    "repository": "https://github.com/sindresorhus/path-exists",
+    "licenseFile": "/Users/tenaciousmv/Code/tradling/node_modules/standard/node_modules/standard-format/node_modules/esformatter-jsx/node_modules/babel-core/node_modules/path-exists/license"
+  },
+  "path-is-absolute@1.0.0": {
+    "licenses": "MIT",
+    "repository": "https://github.com/sindresorhus/path-is-absolute",
+    "licenseFile": "/Users/tenaciousmv/Code/tradling/node_modules/rimraf/node_modules/glob/node_modules/path-is-absolute/license"
+  },
+  "path-to-regexp@0.1.7": {
+    "licenses": "MIT",
+    "repository": "git+https://github.com/component/path-to-regexp",
+    "licenseFile": "/Users/tenaciousmv/Code/tradling/node_modules/express/node_modules/path-to-regexp/LICENSE"
+  },
+  "piece-length@0.0.0": {
+    "licenses": "MIT",
+    "repository": "https://github.com/michaelrhodes/piece-length"
+  },
+  "pinkie-promise@2.0.0": {
+    "licenses": "MIT",
+    "repository": "https://github.com/floatdrop/pinkie-promise",
+    "licenseFile": "/Users/tenaciousmv/Code/tradling/node_modules/nets/node_modules/request/node_modules/har-validator/node_modules/pinkie-promise/license"
+  },
+  "pinkie@2.0.1": {
+    "licenses": "MIT",
+    "repository": "https://github.com/floatdrop/pinkie",
+    "licenseFile": "/Users/tenaciousmv/Code/tradling/node_modules/nets/node_modules/request/node_modules/har-validator/node_modules/pinkie-promise/node_modules/pinkie/license"
+  },
+  "pkg-config@1.1.0": {
+    "licenses": "MIT",
+    "repository": "git+https://github.com/ahmadnassri/pkg-config",
+    "licenseFile": "/Users/tenaciousmv/Code/tradling/node_modules/standard/node_modules/pkg-config/LICENSE"
+  },
+  "pre-commit@1.1.2": {
+    "licenses": "MIT",
+    "repository": "https://github.com/observing/pre-commit",
+    "licenseFile": "/Users/tenaciousmv/Code/tradling/node_modules/pre-commit/LICENSE"
+  },
+  "prelude-ls@1.1.2": {
+    "licenses": "MIT",
+    "repository": "https://github.com/gkz/prelude-ls",
+    "licenseFile": "/Users/tenaciousmv/Code/tradling/node_modules/standard/node_modules/eslint/node_modules/optionator/node_modules/prelude-ls/LICENSE"
+  },
+  "private@0.1.6": {
+    "licenses": "MIT",
+    "repository": "https://github.com/benjamn/private",
+    "licenseFile": "/Users/tenaciousmv/Code/tradling/node_modules/standard/node_modules/standard-format/node_modules/esformatter-jsx/node_modules/babel-core/node_modules/private/LICENSE"
+  },
+  "process-nextick-args@1.0.6": {
+    "licenses": "MIT",
+    "repository": "https://github.com/calvinmetcalf/process-nextick-args",
+    "licenseFile": "/Users/tenaciousmv/Code/tradling/node_modules/@tradle/multiplex-utp/node_modules/@tradle/utp/node_modules/readable-stream/node_modules/process-nextick-args/license.md"
+  },
+  "process@0.5.2": {
+    "licenses": "MIT*",
+    "repository": "https://github.com/shtylman/node-process",
+    "licenseFile": "/Users/tenaciousmv/Code/tradling/node_modules/nets/node_modules/xhr/node_modules/global/node_modules/process/LICENSE"
+  },
+  "proto-list@1.2.4": {
+    "licenses": "ISC",
+    "repository": "git+https://github.com/isaacs/proto-list",
+    "licenseFile": "/Users/tenaciousmv/Code/tradling/node_modules/standard/node_modules/standard-format/node_modules/esformatter-jsx/node_modules/js-beautify/node_modules/config-chain/node_modules/proto-list/LICENSE"
+  },
+  "protochain@1.0.3": {
+    "licenses": "ISC",
+    "repository": "git+https://github.com/timoxley/protochain",
+    "licenseFile": "/Users/tenaciousmv/Code/tradling/node_modules/standard/node_modules/standard-format/node_modules/esformatter/node_modules/npm-run/node_modules/serializerr/node_modules/protochain/LICENSE"
+  },
+  "proxy-addr@1.0.10": {
+    "licenses": "MIT",
+    "repository": "https://github.com/jshttp/proxy-addr",
+    "licenseFile": "/Users/tenaciousmv/Code/tradling/node_modules/express/node_modules/proxy-addr/LICENSE"
+  },
+  "prr@0.0.0": {
+    "licenses": "MIT",
+    "repository": "https://github.com/rvagg/prr",
+    "licenseFile": "/Users/tenaciousmv/Code/tradling/node_modules/level-errors/node_modules/errno/node_modules/prr/LICENSE"
+  },
+  "pseudomap@1.0.1": {
+    "licenses": "ISC",
+    "repository": "git+https://github.com/isaacs/pseudomap",
+    "licenseFile": "/Users/tenaciousmv/Code/tradling/node_modules/pre-commit/node_modules/cross-spawn/node_modules/cross-spawn-async/node_modules/lru-cache/node_modules/pseudomap/LICENSE"
+  },
+  "pull-cat@1.1.8": {
+    "licenses": "MIT",
+    "repository": "https://github.com/dominictarr/pull-cat",
+    "licenseFile": "/Users/tenaciousmv/Code/tradling/node_modules/level-live-stream/node_modules/pull-level/node_modules/pull-cat/LICENSE"
+  },
+  "pull-core@1.0.0": {
+    "licenses": "MIT",
+    "repository": "https://github.com/dominictarr/pull-core",
+    "licenseFile": "/Users/tenaciousmv/Code/tradling/node_modules/level-live-stream/node_modules/level-sublevel/node_modules/pull-stream/node_modules/pull-core/LICENSE"
+  },
+  "pull-core@1.1.0": {
+    "licenses": "MIT",
+    "repository": "https://github.com/dominictarr/pull-core",
+    "licenseFile": "/Users/tenaciousmv/Code/tradling/node_modules/level-live-stream/node_modules/pull-level/node_modules/pull-stream/node_modules/pull-core/LICENSE"
+  },
+  "pull-level@1.4.1": {
+    "licenses": "MIT",
+    "repository": "https://github.com/dominictarr/pull-level",
+    "licenseFile": "/Users/tenaciousmv/Code/tradling/node_modules/level-live-stream/node_modules/pull-level/LICENSE"
+  },
+  "pull-pushable@1.1.4": {
+    "licenses": "MIT",
+    "repository": "https://github.com/dominictarr/pull-pushable",
+    "licenseFile": "/Users/tenaciousmv/Code/tradling/node_modules/level-live-stream/node_modules/pull-level/node_modules/pull-pushable/LICENSE"
+  },
+  "pull-stream-to-stream@1.2.6": {
+    "licenses": "MIT",
+    "repository": "https://github.com/dominictarr/pull-stream-to-stream",
+    "licenseFile": "/Users/tenaciousmv/Code/tradling/node_modules/level-live-stream/node_modules/pull-stream-to-stream/LICENSE"
+  },
+  "pull-stream@2.18.3": {
+    "licenses": "MIT",
+    "repository": "https://github.com/dominictarr/pull-stream",
+    "licenseFile": "/Users/tenaciousmv/Code/tradling/node_modules/level-live-stream/node_modules/pull-level/node_modules/pull-pushable/node_modules/pull-stream/LICENSE"
+  },
+  "pull-stream@2.21.0": {
+    "licenses": "MIT",
+    "repository": "https://github.com/dominictarr/pull-stream",
+    "licenseFile": "/Users/tenaciousmv/Code/tradling/node_modules/level-live-stream/node_modules/level-sublevel/node_modules/pull-stream/LICENSE"
+  },
+  "pull-stream@2.28.4": {
+    "licenses": "MIT",
+    "repository": "https://github.com/dominictarr/pull-stream",
+    "licenseFile": "/Users/tenaciousmv/Code/tradling/node_modules/level-live-stream/node_modules/pull-level/node_modules/pull-stream/LICENSE"
+  },
+  "pull-window@2.1.3": {
+    "licenses": "MIT",
+    "repository": "https://github.com/dominictarr/pull-window",
+    "licenseFile": "/Users/tenaciousmv/Code/tradling/node_modules/level-live-stream/node_modules/pull-level/node_modules/pull-window/LICENSE"
+  },
+  "pump@1.0.1": {
+    "licenses": "MIT",
+    "repository": "https://github.com/mafintosh/pump",
+    "licenseFile": "/Users/tenaciousmv/Code/tradling/node_modules/pump/LICENSE"
+  },
+  "q@1.4.1": {
+    "licenses": "MIT",
+    "repository": "https://github.com/kriskowal/q",
+    "licenseFile": "/Users/tenaciousmv/Code/tradling/node_modules/q/LICENSE"
+  },
+  "qs@2.3.3": {
+    "licenses": "BSD",
+    "repository": "https://github.com/hapijs/qs",
+    "licenseFile": "/Users/tenaciousmv/Code/tradling/node_modules/@tradle/cb-blockr/node_modules/superagent/node_modules/qs/LICENSE"
+  },
+  "qs@4.0.0": {
+    "licenses": "BSD-3-Clause",
+    "repository": "https://github.com/hapijs/qs",
+    "licenseFile": "/Users/tenaciousmv/Code/tradling/node_modules/express/node_modules/qs/LICENSE"
+  },
+  "qs@5.2.0": {
+    "licenses": "BSD-3-Clause",
+    "repository": "https://github.com/hapijs/qs",
+    "licenseFile": "/Users/tenaciousmv/Code/tradling/node_modules/nets/node_modules/request/node_modules/qs/LICENSE"
+  },
+  "randombytes@2.0.1": {
+    "licenses": "MIT",
+    "repository": "https://github.com/crypto-browserify/randombytes"
+  },
+  "range-parser@1.0.3": {
+    "licenses": "MIT",
+    "repository": "https://github.com/jshttp/range-parser",
+    "licenseFile": "/Users/tenaciousmv/Code/tradling/node_modules/express/node_modules/range-parser/LICENSE"
+  },
+  "re-emitter@1.1.1": {
+    "licenses": "MIT",
+    "repository": "https://github.com/feross/re-emitter",
+    "licenseFile": "/Users/tenaciousmv/Code/tradling/node_modules/re-emitter/LICENSE"
+  },
+  "readable-stream@1.0.27-1": {
+    "licenses": "MIT",
+    "repository": "https://github.com/isaacs/readable-stream",
+    "licenseFile": "/Users/tenaciousmv/Code/tradling/node_modules/@tradle/cb-blockr/node_modules/superagent/node_modules/readable-stream/LICENSE"
+  },
+  "readable-stream@1.0.33": {
+    "licenses": "MIT",
+    "repository": "https://github.com/isaacs/readable-stream",
+    "licenseFile": "/Users/tenaciousmv/Code/tradling/node_modules/readable-stream/LICENSE"
+  },
+  "readable-stream@1.0.33-1": {
+    "licenses": "MIT",
+    "repository": "https://github.com/isaacs/readable-stream",
+    "licenseFile": "/Users/tenaciousmv/Code/tradling/node_modules/logbase/node_modules/readable-stream/LICENSE"
+  },
+  "readable-stream@1.1.13": {
+    "licenses": "MIT",
+    "repository": "https://github.com/isaacs/readable-stream",
+    "licenseFile": "/Users/tenaciousmv/Code/tradling/node_modules/logbase/node_modules/changes-feed/node_modules/from2/node_modules/readable-stream/LICENSE"
+  },
+  "readable-stream@2.0.4": {
+    "licenses": "MIT",
+    "repository": "https://github.com/nodejs/readable-stream",
+    "licenseFile": "/Users/tenaciousmv/Code/tradling/node_modules/@tradle/multiplex-utp/node_modules/@tradle/utp/node_modules/readable-stream/LICENSE"
+  },
+  "readline2@0.1.1": {
+    "licenses": "MIT",
+    "repository": "https://github.com/SBoudrias/readline2"
+  },
+  "recast@0.10.33": {
+    "licenses": "MIT",
+    "repository": "https://github.com/benjamn/recast",
+    "licenseFile": "/Users/tenaciousmv/Code/tradling/node_modules/standard/node_modules/standard-format/node_modules/esformatter-jsx/node_modules/babel-core/node_modules/regenerator/node_modules/recast/LICENSE"
+  },
+  "recast@0.10.39": {
+    "licenses": "MIT",
+    "repository": "https://github.com/benjamn/recast",
+    "licenseFile": "/Users/tenaciousmv/Code/tradling/node_modules/standard/node_modules/standard-format/node_modules/esformatter-jsx/node_modules/babel-core/node_modules/regexpu/node_modules/recast/LICENSE"
+  },
+  "reduce-component@1.0.1": {
+    "licenses": "Apache, Version 2.0",
+    "repository": "https://github.com/redventures/reduce",
+    "licenseFile": "/Users/tenaciousmv/Code/tradling/node_modules/@tradle/cb-blockr/node_modules/superagent/node_modules/reduce-component/LICENSE"
+  },
+  "regenerate@1.2.1": {
+    "licenses": "MIT",
+    "repository": "https://github.com/mathiasbynens/regenerate",
+    "licenseFile": "/Users/tenaciousmv/Code/tradling/node_modules/standard/node_modules/standard-format/node_modules/esformatter-jsx/node_modules/babel-core/node_modules/regexpu/node_modules/regenerate/LICENSE-MIT.txt"
+  },
+  "regenerator@0.8.40": {
+    "licenses": "BSD",
+    "repository": "https://github.com/facebook/regenerator",
+    "licenseFile": "/Users/tenaciousmv/Code/tradling/node_modules/standard/node_modules/standard-format/node_modules/esformatter-jsx/node_modules/babel-core/node_modules/regenerator/LICENSE"
+  },
+  "regexpu@1.3.0": {
+    "licenses": "MIT",
+    "repository": "https://github.com/mathiasbynens/regexpu",
+    "licenseFile": "/Users/tenaciousmv/Code/tradling/node_modules/standard/node_modules/standard-format/node_modules/esformatter-jsx/node_modules/babel-core/node_modules/regexpu/LICENSE-MIT.txt"
+  },
+  "regjsgen@0.2.0": {
+    "licenses": "MIT",
+    "repository": "https://github.com/d10/regjsgen",
+    "licenseFile": "/Users/tenaciousmv/Code/tradling/node_modules/standard/node_modules/standard-format/node_modules/esformatter-jsx/node_modules/babel-core/node_modules/regexpu/node_modules/regjsgen/LICENSE.txt"
+  },
+  "regjsparser@0.1.5": {
+    "licenses": "BSD",
+    "repository": "https://github.com/jviereck/regjsparser",
+    "licenseFile": "/Users/tenaciousmv/Code/tradling/node_modules/standard/node_modules/standard-format/node_modules/esformatter-jsx/node_modules/babel-core/node_modules/regexpu/node_modules/regjsparser/LICENSE.BSD"
+  },
+  "repeat-string@1.5.2": {
+    "licenses": "MIT",
+    "repository": "https://github.com/jonschlinkert/repeat-string",
+    "licenseFile": "/Users/tenaciousmv/Code/tradling/node_modules/standard/node_modules/standard-format/node_modules/esformatter/node_modules/rocambole-whitespace/node_modules/repeat-string/LICENSE"
+  },
+  "repeating@1.1.3": {
+    "licenses": "MIT",
+    "repository": "https://github.com/sindresorhus/repeating",
+    "licenseFile": "/Users/tenaciousmv/Code/tradling/node_modules/standard/node_modules/standard-format/node_modules/esformatter-jsx/node_modules/babel-core/node_modules/repeating/license"
+  },
+  "request@2.67.0": {
+    "licenses": "Apache-2.0",
+    "repository": "https://github.com/request/request",
+    "licenseFile": "/Users/tenaciousmv/Code/tradling/node_modules/nets/node_modules/request/LICENSE"
+  },
+  "resolve@1.1.6": {
+    "licenses": "MIT",
+    "repository": "https://github.com/substack/node-resolve",
+    "licenseFile": "/Users/tenaciousmv/Code/tradling/node_modules/standard/node_modules/standard-format/node_modules/esformatter/node_modules/resolve/LICENSE"
+  },
+  "resumer@0.0.0": {
+    "licenses": "MIT",
+    "repository": "https://github.com/substack/resumer",
+    "licenseFile": "/Users/tenaciousmv/Code/tradling/node_modules/tape/node_modules/resumer/LICENSE"
+  },
+  "right-align@0.1.3": {
+    "licenses": "MIT",
+    "repository": "https://github.com/jonschlinkert/right-align",
+    "licenseFile": "/Users/tenaciousmv/Code/tradling/node_modules/standard/node_modules/standard-format/node_modules/esformatter-jsx/node_modules/babel-core/node_modules/regenerator/node_modules/defs/node_modules/yargs/node_modules/cliui/node_modules/right-align/LICENSE"
+  },
+  "rimraf@2.4.4": {
+    "licenses": "ISC",
+    "repository": "https://github.com/isaacs/rimraf",
+    "licenseFile": "/Users/tenaciousmv/Code/tradling/node_modules/rimraf/LICENSE"
+  },
+  "ripemd160@1.0.1": {
+    "licenses": "BSD-3-Clause",
+    "repository": "https://github.com/crypto-browserify/ripemd160"
+  },
+  "rocambole-indent@2.0.4": {
+    "licenses": "MIT",
+    "repository": "https://github.com/millermedeiros/rocambole-indent",
+    "licenseFile": "/Users/tenaciousmv/Code/tradling/node_modules/standard/node_modules/standard-format/node_modules/esformatter/node_modules/rocambole-indent/LICENSE.md"
+  },
+  "rocambole-linebreak@1.0.1": {
+    "licenses": "MIT",
+    "repository": "https://github.com/millermedeiros/rocambole-linebreak",
+    "licenseFile": "/Users/tenaciousmv/Code/tradling/node_modules/standard/node_modules/standard-format/node_modules/esformatter/node_modules/rocambole-linebreak/LICENSE.md"
+  },
+  "rocambole-node@1.0.0": {
+    "licenses": "MIT",
+    "repository": "https://github.com/millermedeiros/rocambole-node"
+  },
+  "rocambole-token@1.2.1": {
+    "licenses": "MIT",
+    "repository": "https://github.com/millermedeiros/rocambole-token"
+  },
+  "rocambole-whitespace@1.0.0": {
+    "licenses": "MIT",
+    "repository": "https://github.com/millermedeiros/rocambole-whitespace",
+    "licenseFile": "/Users/tenaciousmv/Code/tradling/node_modules/standard/node_modules/standard-format/node_modules/esformatter/node_modules/rocambole-whitespace/LICENSE.md"
+  },
+  "rocambole@0.3.6": {
+    "licenses": "MIT",
+    "repository": "https://github.com/millermedeiros/rocambole"
+  },
+  "rocambole@0.7.0": {
+    "licenses": "MIT",
+    "repository": "git+https://github.com/millermedeiros/rocambole"
+  },
+  "run-parallel@1.1.4": {
+    "licenses": "MIT",
+    "repository": "https://github.com/feross/run-parallel",
+    "licenseFile": "/Users/tenaciousmv/Code/tradling/node_modules/@tradle/utils/node_modules/create-torrent/node_modules/run-parallel/LICENSE"
+  },
+  "rusha@0.8.3": {
+    "licenses": "MIT",
+    "repository": "https://github.com/srijs/rusha",
+    "licenseFile": "/Users/tenaciousmv/Code/tradling/node_modules/@tradle/utils/node_modules/create-torrent/node_modules/simple-sha1/node_modules/rusha/LICENSE"
+  },
+  "rx@2.5.3": {
+    "licenses": "Apache-2.0",
+    "repository": "https://github.com/Reactive-Extensions/RxJS",
+    "licenseFile": "/Users/tenaciousmv/Code/tradling/node_modules/standard/node_modules/eslint/node_modules/inquirer/node_modules/rx/license.txt"
+  },
+  "safecb@0.0.1": {
+    "licenses": "MIT",
+    "repository": "https://github.com/mvayngrib/safecb",
+    "licenseFile": "/Users/tenaciousmv/Code/tradling/node_modules/safecb/LICENSE"
+  },
+  "semver@2.3.2": {
+    "licenses": "BSD",
+    "repository": "https://github.com/isaacs/node-semver",
+    "licenseFile": "/Users/tenaciousmv/Code/tradling/node_modules/level-live-stream/node_modules/level-sublevel/node_modules/levelup/node_modules/semver/LICENSE"
+  },
+  "semver@4.3.6": {
+    "licenses": "ISC",
+    "repository": "https://github.com/npm/node-semver",
+    "licenseFile": "/Users/tenaciousmv/Code/tradling/node_modules/standard/node_modules/standard-format/node_modules/esformatter/node_modules/rocambole-linebreak/node_modules/semver/LICENSE"
+  },
+  "send@0.13.0": {
+    "licenses": "MIT",
+    "repository": "https://github.com/pillarjs/send",
+    "licenseFile": "/Users/tenaciousmv/Code/tradling/node_modules/express/node_modules/send/LICENSE"
+  },
+  "serializerr@1.0.2": {
+    "licenses": "ISC",
+    "repository": "git+https://github.com/timoxley/serializerr",
+    "licenseFile": "/Users/tenaciousmv/Code/tradling/node_modules/standard/node_modules/standard-format/node_modules/esformatter/node_modules/npm-run/node_modules/serializerr/LICENSE"
+  },
+  "serve-static@1.10.0": {
+    "licenses": "MIT",
+    "repository": "https://github.com/expressjs/serve-static",
+    "licenseFile": "/Users/tenaciousmv/Code/tradling/node_modules/express/node_modules/serve-static/LICENSE"
+  },
+  "sha.js@2.4.4": {
+    "licenses": "MIT",
+    "repository": "https://github.com/crypto-browserify/sha.js",
+    "licenseFile": "/Users/tenaciousmv/Code/tradling/node_modules/@tradle/bitcoinjs-lib/node_modules/create-hash/node_modules/sha.js/LICENSE"
+  },
+  "shebang-regex@1.0.0": {
+    "licenses": "MIT",
+    "repository": "https://github.com/sindresorhus/shebang-regex",
+    "licenseFile": "/Users/tenaciousmv/Code/tradling/node_modules/standard/node_modules/standard-format/node_modules/esformatter-jsx/node_modules/babel-core/node_modules/shebang-regex/license"
+  },
+  "simple-fmt@0.1.0": {
+    "licenses": "MIT",
+    "repository": "https://github.com/olov/simple-fmt",
+    "licenseFile": "/Users/tenaciousmv/Code/tradling/node_modules/standard/node_modules/standard-format/node_modules/esformatter-jsx/node_modules/babel-core/node_modules/regenerator/node_modules/defs/node_modules/simple-fmt/LICENSE"
+  },
+  "simple-get@1.4.3": {
+    "licenses": "MIT",
+    "repository": "https://github.com/feross/simple-get",
+    "licenseFile": "/Users/tenaciousmv/Code/tradling/node_modules/@tradle/bittorrent-dht/node_modules/simple-get/LICENSE"
+  },
+  "simple-is@0.2.0": {
+    "licenses": "MIT",
+    "repository": "https://github.com/olov/simple-is",
+    "licenseFile": "/Users/tenaciousmv/Code/tradling/node_modules/standard/node_modules/standard-format/node_modules/esformatter-jsx/node_modules/babel-core/node_modules/regenerator/node_modules/defs/node_modules/simple-is/LICENSE"
+  },
+  "simple-sha1@2.0.7": {
+    "licenses": "MIT",
+    "repository": "https://github.com/michaelrhodes/simple-sha1"
+  },
+  "slash@1.0.0": {
+    "licenses": "MIT",
+    "repository": "https://github.com/sindresorhus/slash"
+  },
+  "sntp@1.0.9": {
+    "licenses": "BSD",
+    "repository": "https://github.com/hueniverse/sntp",
+    "licenseFile": "/Users/tenaciousmv/Code/tradling/node_modules/nets/node_modules/request/node_modules/hawk/node_modules/sntp/LICENSE"
+  },
+  "sock-plex@1.0.2": {
+    "licenses": "MIT",
+    "repository": "git+https://github.com/mvayngrib/sock-plex",
+    "licenseFile": "/Users/tenaciousmv/Code/tradling/node_modules/@tradle/multiplex-utp/node_modules/sock-plex/LICENSE"
+  },
+  "sort-by@1.1.1": {
+    "licenses": "MIT",
+    "repository": "https://github.com/kvnneff/sort-by",
+    "licenseFile": "/Users/tenaciousmv/Code/tradling/node_modules/time-method/node_modules/sort-by/LICENSE.txt"
+  },
+  "source-map-support@0.2.10": {
+    "licenses": "MIT",
+    "repository": "https://github.com/evanw/node-source-map-support",
+    "licenseFile": "/Users/tenaciousmv/Code/tradling/node_modules/standard/node_modules/standard-format/node_modules/esformatter-jsx/node_modules/babel-core/node_modules/source-map-support/LICENSE.md"
+  },
+  "source-map@0.1.32": {
+    "licenses": "BSD",
+    "repository": "http://github.com/mozilla/source-map",
+    "licenseFile": "/Users/tenaciousmv/Code/tradling/node_modules/standard/node_modules/standard-format/node_modules/esformatter-jsx/node_modules/babel-core/node_modules/source-map-support/node_modules/source-map/LICENSE"
+  },
+  "source-map@0.5.3": {
+    "licenses": "BSD-3-Clause",
+    "repository": "http://github.com/mozilla/source-map"
+  },
+  "spawn-sync@1.0.13": {
+    "licenses": "MIT",
+    "repository": "https://github.com/ForbesLindesay/spawn-sync",
+    "licenseFile": "/Users/tenaciousmv/Code/tradling/node_modules/pre-commit/node_modules/cross-spawn/node_modules/spawn-sync/LICENSE"
+  },
+  "sprintf-js@1.0.3": {
+    "licenses": "BSD-3-Clause",
+    "repository": "git+https://github.com/alexei/sprintf.js",
+    "licenseFile": "/Users/tenaciousmv/Code/tradling/node_modules/standard/node_modules/eslint/node_modules/js-yaml/node_modules/argparse/node_modules/sprintf-js/LICENSE"
+  },
+  "sshpk@1.7.1": {
+    "licenses": "MIT",
+    "repository": "git+https://github.com/arekinath/node-sshpk",
+    "licenseFile": "/Users/tenaciousmv/Code/tradling/node_modules/nets/node_modules/request/node_modules/http-signature/node_modules/sshpk/LICENSE"
+  },
+  "stable@0.1.5": {
+    "licenses": "MIT",
+    "repository": "https://github.com/Two-Screen/stable"
+  },
+  "standard-format@1.6.10": {
+    "licenses": "BSD-2-Clause",
+    "repository": "git+https://github.com/maxogden/standard-format"
+  },
+  "standard@4.5.4": {
+    "licenses": "MIT",
+    "repository": "https://github.com/feross/standard",
+    "licenseFile": "/Users/tenaciousmv/Code/tradling/node_modules/standard/LICENSE"
+  },
+  "statuses@1.2.1": {
+    "licenses": "MIT",
+    "repository": "https://github.com/jshttp/statuses",
+    "licenseFile": "/Users/tenaciousmv/Code/tradling/node_modules/express/node_modules/send/node_modules/statuses/LICENSE"
+  },
+  "stdin@0.0.1": {
+    "licenses": "MIT*"
+  },
+  "stream-collector@1.0.1": {
+    "licenses": "MIT",
+    "repository": "https://github.com/mafintosh/stream-collector",
+    "licenseFile": "/Users/tenaciousmv/Code/tradling/node_modules/stream-collector/LICENSE"
+  },
+  "stream-combiner2@1.0.2": {
+    "licenses": "MIT",
+    "repository": "https://github.com/substack/stream-combiner2",
+    "licenseFile": "/Users/tenaciousmv/Code/tradling/node_modules/stream-combiner2/LICENSE"
+  },
+  "stream-to-pull-stream@1.6.6": {
+    "licenses": "MIT",
+    "repository": "https://github.com/dominictarr/stream-to-pull-stream",
+    "licenseFile": "/Users/tenaciousmv/Code/tradling/node_modules/level-live-stream/node_modules/pull-level/node_modules/stream-to-pull-stream/LICENSE"
+  },
+  "string-range@1.2.2": {
+    "licenses": "MIT",
+    "repository": "https://github.com/dominictarr/string-range",
+    "licenseFile": "/Users/tenaciousmv/Code/tradling/node_modules/level-live-stream/node_modules/pull-level/node_modules/level-post/node_modules/string-range/LICENSE"
+  },
+  "string-template@0.2.1": {
+    "licenses": "MIT",
+    "repository": "https://github.com/Matt-Esch/string-template",
+    "licenseFile": "/Users/tenaciousmv/Code/tradling/node_modules/error/node_modules/string-template/LICENCE"
+  },
+  "string.prototype.endswith@0.2.0": {
+    "licenses": "MIT",
+    "repository": "https://github.com/mathiasbynens/String.prototype.endsWith",
+    "licenseFile": "/Users/tenaciousmv/Code/tradling/node_modules/standard/node_modules/standard-format/node_modules/esformatter-eol-last/node_modules/string.prototype.endswith/LICENSE-MIT.txt"
+  },
+  "string.prototype.trim@1.1.1": {
+    "licenses": "MIT",
+    "repository": "https://github.com/es-shims/String.prototype.trim",
+    "licenseFile": "/Users/tenaciousmv/Code/tradling/node_modules/tape/node_modules/string.prototype.trim/LICENSE"
+  },
+  "string2compact@1.2.2": {
+    "licenses": "MIT",
+    "repository": "https://github.com/feross/string2compact",
+    "licenseFile": "/Users/tenaciousmv/Code/tradling/node_modules/@tradle/bittorrent-dht/node_modules/string2compact/LICENSE"
+  },
+  "string_decoder@0.10.31": {
+    "licenses": "MIT",
+    "repository": "https://github.com/rvagg/string_decoder",
+    "licenseFile": "/Users/tenaciousmv/Code/tradling/node_modules/readable-stream/node_modules/string_decoder/LICENSE"
+  },
+  "stringmap@0.2.2": {
+    "licenses": "MIT",
+    "repository": "https://github.com/olov/stringmap",
+    "licenseFile": "/Users/tenaciousmv/Code/tradling/node_modules/standard/node_modules/standard-format/node_modules/esformatter-jsx/node_modules/babel-core/node_modules/regenerator/node_modules/defs/node_modules/stringmap/LICENSE"
+  },
+  "stringset@0.2.1": {
+    "licenses": "MIT",
+    "repository": "https://github.com/olov/stringset",
+    "licenseFile": "/Users/tenaciousmv/Code/tradling/node_modules/standard/node_modules/standard-format/node_modules/esformatter-jsx/node_modules/babel-core/node_modules/regenerator/node_modules/defs/node_modules/stringset/LICENSE"
+  },
+  "stringstream@0.0.5": {
+    "licenses": "MIT",
+    "repository": "https://github.com/mhart/StringStream",
+    "licenseFile": "/Users/tenaciousmv/Code/tradling/node_modules/nets/node_modules/request/node_modules/stringstream/LICENSE.txt"
+  },
+  "strip-ansi@2.0.1": {
+    "licenses": "MIT",
+    "repository": "https://github.com/sindresorhus/strip-ansi"
+  },
+  "strip-ansi@3.0.0": {
+    "licenses": "MIT",
+    "repository": "https://github.com/sindresorhus/strip-ansi",
+    "licenseFile": "/Users/tenaciousmv/Code/tradling/node_modules/nets/node_modules/request/node_modules/har-validator/node_modules/chalk/node_modules/strip-ansi/license"
+  },
+  "strip-json-comments@0.1.3": {
+    "licenses": "MIT",
+    "repository": "https://github.com/sindresorhus/strip-json-comments"
+  },
+  "strip-json-comments@1.0.4": {
+    "licenses": "MIT",
+    "repository": "https://github.com/sindresorhus/strip-json-comments",
+    "licenseFile": "/Users/tenaciousmv/Code/tradling/node_modules/standard/node_modules/eslint/node_modules/strip-json-comments/license"
+  },
+  "superagent@1.5.0": {
+    "licenses": "MIT",
+    "repository": "https://github.com/visionmedia/superagent",
+    "licenseFile": "/Users/tenaciousmv/Code/tradling/node_modules/@tradle/cb-blockr/node_modules/superagent/LICENSE"
+  },
+  "supports-color@1.3.1": {
+    "licenses": "MIT",
+    "repository": "https://github.com/sindresorhus/supports-color",
+    "licenseFile": "/Users/tenaciousmv/Code/tradling/node_modules/standard/node_modules/standard-format/node_modules/esformatter/node_modules/supports-color/license"
+  },
+  "supports-color@2.0.0": {
+    "licenses": "MIT",
+    "repository": "https://github.com/chalk/supports-color",
+    "licenseFile": "/Users/tenaciousmv/Code/tradling/node_modules/nets/node_modules/request/node_modules/har-validator/node_modules/chalk/node_modules/supports-color/license"
+  },
+  "sync-exec@0.5.0": {
+    "note": "only used as dev dep, for javascript linting/style-checking",
+    "licenses": "GNU GPLv2",
+    "repository": "https://github.com/gvarsanyi/sync-exec",
+    "licenseFile": "/Users/tenaciousmv/Code/tradling/node_modules/standard/node_modules/standard-format/node_modules/esformatter/node_modules/npm-run/node_modules/sync-exec/LICENSE"
+  },
+  "tape-extra@1.0.0": {
+    "licenses": "ISC"
+  },
+  "tape@4.2.2": {
+    "licenses": "MIT",
+    "repository": "https://github.com/substack/tape",
+    "licenseFile": "/Users/tenaciousmv/Code/tradling/node_modules/tape/LICENSE"
+  },
+  "text-table@0.2.0": {
+    "licenses": "MIT",
+    "repository": "https://github.com/substack/text-table",
+    "licenseFile": "/Users/tenaciousmv/Code/tradling/node_modules/standard/node_modules/eslint/node_modules/text-table/LICENSE"
+  },
+  "thirty-two@0.0.2": {
+    "licenses": "MIT*",
+    "repository": "https://github.com/chrisumbel/thirty-two",
+    "licenseFile": "/Users/tenaciousmv/Code/tradling/node_modules/@tradle/utils/node_modules/parse-torrent/node_modules/magnet-uri/node_modules/thirty-two/LICENSE.txt"
+  },
+  "throttleme@1.0.3": {
+    "licenses": "ISC",
+    "repository": "https://github.com/mvayngrib/throttleme"
+  },
+  "through2@0.5.1": {
+    "licenses": "MIT",
+    "repository": "https://github.com/rvagg/through2",
+    "licenseFile": "/Users/tenaciousmv/Code/tradling/node_modules/stream-combiner2/node_modules/through2/LICENSE"
+  },
+  "through2@0.6.5": {
+    "licenses": "MIT",
+    "repository": "https://github.com/rvagg/through2",
+    "licenseFile": "/Users/tenaciousmv/Code/tradling/node_modules/logbase/node_modules/changes-feed/node_modules/through2/LICENSE"
+  },
+  "through@2.3.8": {
+    "licenses": "MIT",
+    "repository": "https://github.com/dominictarr/through",
+    "licenseFile": "/Users/tenaciousmv/Code/tradling/node_modules/tape/node_modules/through/LICENSE.MIT"
+  },
+  "thunky@0.1.0": {
+    "licenses": "MIT*",
+    "repository": "https://github.com/mafintosh/thunky"
+  },
+  "tim@2.0.0": {
+    "licenses": "ISC",
+    "repository": "https://github.com/tradle/tim",
+    "licenseFile": "/Users/tenaciousmv/Code/tradling/licenses.json"
+  },
+  "time-method@2.0.0": {
+    "licenses": "ISC",
+    "repository": "https://github.com/mvayngrib/time-method"
+  },
+  "to-fast-properties@1.0.1": {
+    "licenses": "MIT",
+    "repository": "https://github.com/sindresorhus/to-fast-properties",
+    "licenseFile": "/Users/tenaciousmv/Code/tradling/node_modules/standard/node_modules/standard-format/node_modules/esformatter-jsx/node_modules/babel-core/node_modules/to-fast-properties/license"
+  },
+  "to-utf8@0.0.1": {
+    "licenses": "MIT",
+    "repository": "https://github.com/chrisdickinson/to-utf8"
+  },
+  "tough-cookie@2.2.1": {
+    "licenses": "BSD-3-Clause",
+    "repository": "https://github.com/SalesforceEng/tough-cookie",
+    "licenseFile": "/Users/tenaciousmv/Code/tradling/node_modules/nets/node_modules/request/node_modules/tough-cookie/LICENSE"
+  },
+  "trim-right@1.0.1": {
+    "licenses": "MIT",
+    "repository": "https://github.com/sindresorhus/trim-right",
+    "licenseFile": "/Users/tenaciousmv/Code/tradling/node_modules/standard/node_modules/standard-format/node_modules/esformatter-jsx/node_modules/babel-core/node_modules/trim-right/license"
+  },
+  "trim@0.0.1": {
+    "licenses": "MIT*"
+  },
+  "try-resolve@1.0.1": {
+    "licenses": "MIT",
+    "repository": "https://github.com/sebmck/try-resolve"
+  },
+  "tryor@0.1.2": {
+    "licenses": "MIT",
+    "repository": "https://github.com/olov/tryor",
+    "licenseFile": "/Users/tenaciousmv/Code/tradling/node_modules/standard/node_modules/standard-format/node_modules/esformatter-jsx/node_modules/babel-core/node_modules/regenerator/node_modules/defs/node_modules/tryor/LICENSE"
+  },
+  "tunnel-agent@0.4.2": {
+    "licenses": "Apache-2.0",
+    "repository": "git+https://github.com/mikeal/tunnel-agent",
+    "licenseFile": "/Users/tenaciousmv/Code/tradling/node_modules/nets/node_modules/request/node_modules/tunnel-agent/LICENSE"
+  },
+  "tweetnacl@0.13.2": {
+    "licenses": "CC0-1.0",
+    "repository": "https://github.com/dchest/tweetnacl-js"
+  },
+  "type-check@0.3.1": {
+    "licenses": "MIT",
+    "repository": "https://github.com/gkz/type-check",
+    "licenseFile": "/Users/tenaciousmv/Code/tradling/node_modules/standard/node_modules/eslint/node_modules/optionator/node_modules/type-check/LICENSE"
+  },
+  "type-is@1.6.10": {
+    "licenses": "MIT",
+    "repository": "https://github.com/jshttp/type-is",
+    "licenseFile": "/Users/tenaciousmv/Code/tradling/node_modules/express/node_modules/type-is/LICENSE"
+  },
+  "typedarray-to-buffer@3.0.4": {
+    "licenses": "MIT",
+    "repository": "https://github.com/feross/typedarray-to-buffer",
+    "licenseFile": "/Users/tenaciousmv/Code/tradling/node_modules/@tradle/utils/node_modules/create-torrent/node_modules/filestream/node_modules/typedarray-to-buffer/LICENSE"
+  },
+  "typedarray@0.0.6": {
+    "licenses": "MIT",
+    "repository": "https://github.com/substack/typedarray",
+    "licenseFile": "/Users/tenaciousmv/Code/tradling/node_modules/pre-commit/node_modules/cross-spawn/node_modules/spawn-sync/node_modules/concat-stream/node_modules/typedarray/LICENSE"
+  },
+  "typeforce@1.6.1": {
+    "licenses": "MIT",
+    "repository": "https://github.com/dcousens/typeforce",
+    "licenseFile": "/Users/tenaciousmv/Code/tradling/node_modules/typeforce/LICENSE"
+  },
+  "typewiselite@1.0.0": {
+    "licenses": "MIT",
+    "repository": "https://github.com/dominictarr/typewiselite"
+  },
+  "uniq@1.0.1": {
+    "licenses": "MIT",
+    "repository": "https://github.com/mikolalysenko/uniq",
+    "licenseFile": "/Users/tenaciousmv/Code/tradling/node_modules/uniq/LICENSE"
+  },
+  "unpipe@1.0.0": {
+    "licenses": "MIT",
+    "repository": "https://github.com/stream-utils/unpipe",
+    "licenseFile": "/Users/tenaciousmv/Code/tradling/node_modules/express/node_modules/finalhandler/node_modules/unpipe/LICENSE"
+  },
+  "unzip-response@1.0.0": {
+    "licenses": "MIT",
+    "repository": "https://github.com/sindresorhus/unzip-response",
+    "licenseFile": "/Users/tenaciousmv/Code/tradling/node_modules/@tradle/bittorrent-dht/node_modules/simple-get/node_modules/unzip-response/license"
+  },
+  "user-home@1.1.1": {
+    "licenses": "MIT",
+    "repository": "https://github.com/sindresorhus/user-home",
+    "licenseFile": "/Users/tenaciousmv/Code/tradling/node_modules/standard/node_modules/eslint/node_modules/user-home/license"
+  },
+  "user-home@2.0.0": {
+    "licenses": "MIT",
+    "repository": "https://github.com/sindresorhus/user-home",
+    "licenseFile": "/Users/tenaciousmv/Code/tradling/node_modules/standard/node_modules/standard-format/node_modules/esformatter/node_modules/user-home/license"
+  },
+  "util-deprecate@1.0.2": {
+    "licenses": "MIT",
+    "repository": "https://github.com/TooTallNate/util-deprecate",
+    "licenseFile": "/Users/tenaciousmv/Code/tradling/node_modules/@tradle/multiplex-utp/node_modules/@tradle/utp/node_modules/readable-stream/node_modules/util-deprecate/LICENSE"
+  },
+  "utils-merge@1.0.0": {
+    "licenses": "MIT",
+    "repository": "https://github.com/jaredhanson/utils-merge",
+    "licenseFile": "/Users/tenaciousmv/Code/tradling/node_modules/express/node_modules/utils-merge/LICENSE"
+  },
+  "varint@4.0.0": {
+    "licenses": "MIT",
+    "repository": "https://github.com/chrisdickinson/varint"
+  },
+  "vary@1.0.1": {
+    "licenses": "MIT",
+    "repository": "https://github.com/jshttp/vary",
+    "licenseFile": "/Users/tenaciousmv/Code/tradling/node_modules/express/node_modules/vary/LICENSE"
+  },
+  "verror@1.3.6": {
+    "licenses": "MIT*",
+    "repository": "https://github.com/davepacheco/node-verror",
+    "licenseFile": "/Users/tenaciousmv/Code/tradling/node_modules/nets/node_modules/request/node_modules/http-signature/node_modules/jsprim/node_modules/verror/LICENSE"
+  },
+  "which@1.1.2": {
+    "licenses": "ISC",
+    "repository": "https://github.com/isaacs/node-which",
+    "licenseFile": "/Users/tenaciousmv/Code/tradling/node_modules/pre-commit/node_modules/which/LICENSE"
+  },
+  "which@1.2.0": {
+    "licenses": "ISC",
+    "repository": "https://github.com/isaacs/node-which",
+    "licenseFile": "/Users/tenaciousmv/Code/tradling/node_modules/pre-commit/node_modules/cross-spawn/node_modules/cross-spawn-async/node_modules/which/LICENSE"
+  },
+  "window-size@0.1.4": {
+    "licenses": "MIT",
+    "repository": "https://github.com/jonschlinkert/window-size",
+    "licenseFile": "/Users/tenaciousmv/Code/tradling/node_modules/standard/node_modules/standard-format/node_modules/esformatter-jsx/node_modules/babel-core/node_modules/regenerator/node_modules/defs/node_modules/yargs/node_modules/window-size/LICENSE"
+  },
+  "wordwrap@0.0.2": {
+    "licenses": "MIT/X11",
+    "repository": "https://github.com/substack/node-wordwrap"
+  },
+  "wordwrap@0.0.3": {
+    "licenses": "MIT",
+    "repository": "https://github.com/substack/node-wordwrap",
+    "licenseFile": "/Users/tenaciousmv/Code/tradling/node_modules/standard/node_modules/eslint/node_modules/optionator/node_modules/wordwrap/LICENSE"
+  },
+  "wrappy@1.0.1": {
+    "licenses": "ISC",
+    "repository": "https://github.com/npm/wrappy",
+    "licenseFile": "/Users/tenaciousmv/Code/tradling/node_modules/@tradle/utils/node_modules/create-torrent/node_modules/dezalgo/node_modules/wrappy/LICENSE"
+  },
+  "xhr@2.2.0": {
+    "licenses": "MIT",
+    "repository": "https://github.com/Raynos/xhr",
+    "licenseFile": "/Users/tenaciousmv/Code/tradling/node_modules/nets/node_modules/xhr/LICENCE"
+  },
+  "xml-escape@1.0.0": {
+    "licenses": "MIT License",
+    "repository": "https://github.com/miketheprogrammer/xml-escape",
+    "licenseFile": "/Users/tenaciousmv/Code/tradling/node_modules/standard/node_modules/eslint/node_modules/xml-escape/LICENSE"
+  },
+  "xtend@3.0.0": {
+    "licenses": "MIT",
+    "repository": "https://github.com/Raynos/xtend",
+    "licenseFile": "/Users/tenaciousmv/Code/tradling/node_modules/level-live-stream/node_modules/level-sublevel/node_modules/levelup/node_modules/xtend/LICENCE"
+  },
+  "xtend@4.0.1": {
+    "licenses": "MIT",
+    "repository": "https://github.com/Raynos/xtend",
+    "licenseFile": "/Users/tenaciousmv/Code/tradling/node_modules/xtend/LICENCE"
+  },
+  "y18n@3.2.0": {
+    "licenses": "ISC",
+    "repository": "https://github.com/bcoe/y18n"
+  },
+  "yargs@3.27.0": {
+    "licenses": "MIT",
+    "repository": "http://github.com/bcoe/yargs",
+    "licenseFile": "/Users/tenaciousmv/Code/tradling/node_modules/standard/node_modules/standard-format/node_modules/esformatter-jsx/node_modules/babel-core/node_modules/regenerator/node_modules/defs/node_modules/yargs/LICENSE"
+  },
+  "zlorp@2.0.1": {
+    "licenses": "MIT",
+    "repository": "https://github.com/tradle/zlorp",
+    "licenseFile": "/Users/tenaciousmv/Code/tradling/node_modules/zlorp/LICENSE"
+  }
+}
