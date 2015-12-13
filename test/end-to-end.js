@@ -392,8 +392,14 @@ test('the reader and the writer', function (t) {
   var writer = driverTed
   var writerCoords = [getIdentifier(writer.identityJSON)]
   writer.publishMyIdentity().done()
+
   // publish reader's identity for them
-  writer.publishIdentity(reader.identityJSON)
+  writer.addContactIdentity(reader.identityJSON)
+    .then(function () {
+      return writer.publishIdentity(reader.identityJSON)
+    })
+    .done()
+
   reader.on('unchained', onUnchainedIdentity)
   writer.on('unchained', onUnchainedIdentity)
   var msg = toMsg({

@@ -1089,6 +1089,8 @@ Driver.prototype._fetchTxs = function () {
 
 Driver.prototype._processTxs = function (txInfos) {
   var self = this
+  if (this._destroyed) return
+
   var lookups = []
   var filtered = utils.parseCommonBlockchainTxs(txInfos)
     .filter(function (txInfo) {
@@ -1118,7 +1120,7 @@ Driver.prototype._processTxs = function (txInfos) {
         var err = result.reason
         var unexpectedErr = err && !err.notFound
         if (unexpectedErr) {
-          self._debug('unexpected txDB error: ' + JSON.stringify(err))
+          self._debug('unexpected txDB error', err)
         }
 
         var handled
@@ -1257,9 +1259,12 @@ Driver.prototype._doSend = function (entry) {
     })
 }
 
-Driver.prototype.lookupObjectByRootHash = function (rootHash) {
+Driver.prototype.lookupObjectsByRootHash = function (rootHash) {
+  var self = this
   return Q.ninvoke(this.messages(), 'byRootHash', rootHash)
-    .then(this.lookupObject)
+    .then(function (msgs) {
+      return Q.all(msgs.map(self.lookupObject))
+    })
 }
 
 Driver.prototype.lookupObjectByCurHash = function (curHash) {
@@ -1275,8 +1280,14 @@ Driver.prototype.lookupObject = function (info) {
   }
 
   // TODO: this unfortunately duplicates part of unchainer.js
-  if (!info.txData) {
-    if (!info.tx) {
+  var canLookup = info.txData || info.tx
+  if (!canLookup) {
+    if (info.txType === TxData.types.public && info[CUR_HASH]) {
+      info.txData = new Buffer(info[CUR_HASH], 'hex')
+      canLookup = true
+    }
+
+    if (!canLookup) {
       throw new Error('missing required info to lookup chained obj')
     }
   }
@@ -1387,12 +1398,8 @@ Driver.prototype.lookupIdentity = function (query) {
 
 Driver.prototype._lookupIdentity = function (query) {
   var me = this.identityJSON
-  var valid = !!query.fingerprint ^ !!query[ROOT_HASH]
-  if (!valid) {
-    return Q.reject(new Error('query by "fingerprint" OR "' + ROOT_HASH + '" (root hash)'))
-  }
-
   var isMe = query[ROOT_HASH] === this.myRootHash() ||
+    query[CUR_HASH] === this.myCurrentHash() ||
     (query.fingerprint && this.getPublicKey(query.fingerprint))
 
   if (isMe) {
@@ -1428,6 +1435,85 @@ Driver.prototype._prefix = function (path) {
   return this.pathPrefix + '-' + path
 }
 
+/**
+ * Manually add a known identity
+ * @param {Object|Buffer} identity
+ */
+Driver.prototype.addContactIdentity = function (identity) {
+  var self = this
+  var identityJSON = typeof identity === 'string' || Buffer.isBuffer(identity)
+    ? JSON.parse(identity)
+    : identity
+
+  var curHash
+  var buf = utils.toBuffer(identity)
+  return Q.ninvoke(tradleUtils, 'getStorageKeyFor', buf)
+    .then(function (_curHash) {
+      curHash = _curHash.toString('hex')
+      return Q.ninvoke(self.addressBook, 'byCurHash', curHash)
+    })
+    .catch(add)
+
+  function add () {
+    return self.keeper.put(curHash, buf)
+      .then(function () {
+        rootHash = identityJSON[ROOT_HASH] || curHash
+        var fromAddress = identityJSON.pubkeys.filter(function (key) {
+          return key.purpose === KEY_PURPOSE && key.networkName === self.networkName
+        })[0].fingerprint
+
+        var entry = new Entry({
+            type: EventType.misc.addIdentity,
+            txType: TxData.types.public,
+            parsed: identityJSON,
+            from: utils.toObj(ROOT_HASH, rootHash),
+            to: utils.toObj(ROOT_HASH, self.myRootHash()),
+            addressesFrom: [fromAddress],
+            addressesTo: [self.wallet.addressString]
+          })
+          .set(TYPE, constants.TYPES.IDENTITY)
+          .set(ROOT_HASH, rootHash)
+          .set(CUR_HASH, curHash)
+
+        return self.log(entry)
+      })
+  }
+}
+
+// Driver.prototype._receivePublicMsg = function (msg, senderInfo) {
+//   var self = this
+
+//   try {
+//     var parsed = JSON.parse(msg.data)
+//   } catch (err) {
+//     valid = false
+//   }
+
+//   var putPromise
+//   if (parsed[TYPE] === 'tradle.IdentityPublishRequest') {
+//     putPromise = this.keeper.put(parsed)
+//   }
+
+//   return (putPromise || Q.resolve())
+//     .then(function () {
+//       var txInfo = {
+//         addressesFrom: [senderInfo.fingerprint],
+//         addressesTo: [self.wallet.addressString],
+//         txData: msg.txData,
+//         txType: msg.txType
+//       }
+
+//       return self.chainloader._processTxInfo(txInfo)
+//     })
+//     .then(this.lookupObject)
+//     .then(function (obj) {
+//       debugger
+//     })
+//     .catch(function (error) {
+//       debugger
+//     })
+// }
+
 Driver.prototype.receiveMsg = function (buf, senderInfo) {
 //   return (this._receiving || Q())
 //     .finally(this._receiveMsg.bind(this, buf, senderInfo))
@@ -1457,8 +1543,15 @@ Driver.prototype.receiveMsg = function (buf, senderInfo) {
   var txInfo
   var promiseValid
   var valid = utils.validateMsg(msg)
-  if (valid) promiseValid = Q.resolve()
-  else promiseValid = Q.reject(new Error('received invalid msg'))
+  if (valid) {
+    // if (msg.txType === TxData.types.public) {
+    //   return this._receivePublicMsg(msg, senderInfo)
+    // }
+
+    promiseValid = Q.resolve()
+  } else {
+    promiseValid = Q.reject(new Error('received invalid msg'))
+  }
 
   var from
   return this._receiving = promiseValid
@@ -1480,6 +1573,9 @@ Driver.prototype.receiveMsg = function (buf, senderInfo) {
 
       // TODO: rethink how chainloader should work
       // this doesn't look right
+
+      // this will verify that the message
+      // comes from the sender in senderInfo
       return self.chainloader._processTxInfo(txInfo)
     })
     .then(function (parsed) {
