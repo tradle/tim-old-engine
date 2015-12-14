@@ -322,7 +322,13 @@ Driver.prototype._readFromChain = function () {
   this._streams.txDB = stream
   pump(
     stream,
-    toObjectStream(),
+    map(function (data, cb) {
+      if (typeof data.value === 'object') {
+        return cb(null, data.value)
+      }
+
+      cb() // skip
+    }),
     map(function (entry, cb) {
       // was read from chain and hasn't been processed yet
       if (!entry.dateDetected || entry.dateUnchained || entry.ignore) {
@@ -373,28 +379,11 @@ Driver.prototype._readFromChain = function () {
     }),
     this.unchainer,
     map(function (chainedObj, cb) {
-      // if (chainedObj.parsed) {
-      //   self._debug('unchained (read)', chainedObj.key, chainedObj.errors)
-      // }
-
-      // if (!chainedObj.errors.length && chainedObj.parsed) {
-      //   if (chainedObj.txType === TxData.types.public) {
-      //     self.keeper.put(chainedObj.key, chainedObj.data)
-      //       .then(function () {
-      //         self._push(chainedObj.key, chainedObj.data)
-      //       })
-      //   } else {
-      //     self.keeper.put(chainedObj.key, chainedObj.encryptedData)
-      //     self.keeper.put(chainedObj.permissionKey, chainedObj.encryptedPermission)
-      //   }
-      // }
-
       if (!utils.countErrors(chainedObj) &&
         chainedObj.txType === TxData.types.public) {
         self._debug('saving to keeper')
         self.keeper.put(chainedObj.key, chainedObj.data)
       }
-
 
       self.unchainResultToEntry(chainedObj)
         .done(function (entry) {
@@ -491,15 +480,6 @@ Driver.prototype._catchUpWithBlockchain = function () {
     var tasks = txIds.map(function (txId) {
       return Q.ninvoke(self.txDB, 'get', txId)
         .then(function (entry) {
-          // var erroredOut
-          // if (entry.errors && entry.errors.length) {
-          //   var maxRetries = entry.dir === Dir.outbound
-          //     ? MAX_CHAIN_RETRIES
-          //     : MAX_UNCHAIN_RETRIES
-
-          //   erroredOut = entry.errors.length >= maxRetries
-          // }
-
           var hasErrors = !!utils.countErrors(entry)
           var processed = entry.dateUnchained || entry.dateChained || entry.ignore || hasErrors
           if (!processed) {
@@ -557,25 +537,6 @@ Driver.prototype.identityPublishStatus = function () {
       status.queued = !status.current && entries.some(function (e) {
         return e[CUR_HASH] === curHash
       })
-
-      // curHash = curHash.toString('hex')
-      // status.ever = true
-
-      // var timestamp = 0
-      // var last
-      // entries.forEach(function (e) {
-      //   if (e.timestamp > timestamp) {
-      //     last = e
-      //     timestamp = e.timestamp
-      //   }
-      // })
-
-      // if (last[CUR_HASH] === curHash) {
-      //   status.queued = true
-      //   if (last.tx) {
-      //     status.current = true
-      //   }
-      // }
 
       return status
     })
@@ -1035,47 +996,47 @@ Driver.prototype._setupTxStream = function () {
   //
   // return defer.promise
 
-  this._runFetchTxsLoop(0, [])
+  this._runTxProcessingLoop(0, [])
   return Q.resolve()
 }
 
-Driver.prototype._runFetchTxsLoop = function (fromHeight, skipIds) {
+Driver.prototype._runTxProcessingLoop = function (fromHeight, skipIds) {
   var self = this
   if (this._destroyed) return
 
+  // TODO: fetch based on height
   if (!fromHeight) fromHeight = 0
 
-  // var stream = this._streams.rawTxs = new PassThrough({
-  //   objectMode: true
-  // })
-
-  // stream.destroy = stream.end
-
-  this._scheduleFetch()
   this._fetchAndReschedule()
-}
-
-Driver.prototype._scheduleFetch = function () {
-  var self = this
-  if (this._destroyed) return
-  if (this._paused) {
-    return this.once('resume', this._scheduleFetch)
-  }
-
-  this._fetchTxsTimeout = setTimeout(this._fetchAndReschedule, this.syncInterval)
 }
 
 Driver.prototype._fetchAndReschedule = function () {
   var self = this
-  return this._fetchTxs()
+  var waitTillUnpaused
+  if (this._destroyed) return
+  if (this._paused) {
+    waitTillUnpaused = Q.Promise(function (resolve) {
+      if (!self._paused) resolve()
+      else self.once('resume', resolve)
+    })
+  }
+
+  return (waitTillUnpaused || Q.resolve())
+    .then(this._fetchTxs)
     .then(this._processTxs)
     .catch(function (err) {
       debug('failed to fetch/process txs', err)
     })
-    .finally(function () {
-      self._scheduleFetch()
+    .then(function () {
+      if (!self._destroyed) {
+        return waitAndLoop()
+      }
     })
-    .done()
+
+  function waitAndLoop() {
+    return utils.promiseDelay(self.syncInterval) // wait
+      .then(self._fetchAndReschedule)            // loop
+  }
 }
 
 Driver.prototype._fetchTxs = function () {
@@ -2095,18 +2056,6 @@ function throttleIfRetrying (errors, throttle, cb) {
   wait = Math.min(wait, throttle)
   setTimeout(cb, wait)
 }
-
-// function prettyPrint (json) {
-//   console.log(JSON.stringify(json, null, 2))
-// }
-
-var toObjectStream = map.bind(null, function (data, cb) {
-  if (typeof data.value !== 'object') {
-    return cb()
-  }
-
-  cb(null, data.value)
-})
 
 function alwaysFalse () {
   return false
