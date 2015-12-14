@@ -206,15 +206,29 @@ test('export history', function (t) {
 
 test('pause/unpause', function (t) {
   t.timeoutAfter(20000)
+  var timesPaused = 0
+  driverBill.on('pause', function () {
+    t.equal(++timesPaused, 1)
+  })
+
   driverBill.pause()
+  driverBill.pause() // no double 'pause' events
   driverTed.pause()
   driverBill.publishMyIdentity()
   driverTed.on('unchained', t.fail)
+
   setTimeout(function () {
     t.ok(driverBill.isPaused())
     t.ok(driverTed.isPaused())
     driverTed.removeListener('unchained', t.fail)
+    var timesResumed = 0
+    driverBill.on('resume', function () {
+      t.equal(++timesResumed, 1)
+    })
+
     driverBill.resume()
+    t.notOk(driverBill.isPaused())
+    driverBill.resume() // no double 'resume' events
     driverTed.resume()
     driverTed.on('unchained', function () {
       t.pass()
