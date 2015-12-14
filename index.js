@@ -240,11 +240,6 @@ Driver.prototype.setHttpServer = function (server) {
   this.httpServer = server
 }
 
-Driver.prototype.addSender = function (messenger, rootHash) {
-  typeforce('String', rootHash)
-  this._senders[rootHash] = messenger
-}
-
 Driver.prototype.ready = function () {
   return this._readyPromise
 }
