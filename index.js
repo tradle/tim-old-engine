@@ -1021,7 +1021,7 @@ Driver.prototype._fetchAndReschedule = function () {
     })
   }
 
-  return (waitTillUnpaused || Q.resolve())
+  return Q(waitTillUnpaused)
     .then(this._fetchTxs)
     .then(this._processTxs)
     .catch(function (err) {
@@ -1450,7 +1450,7 @@ Driver.prototype.addContactIdentity = function (identity) {
 //     putPromise = this.keeper.put(parsed)
 //   }
 
-//   return (putPromise || Q.resolve())
+//   return Q(putPromise)
 //     .then(function () {
 //       var txInfo = {
 //         addressesFrom: [senderInfo.fingerprint],
