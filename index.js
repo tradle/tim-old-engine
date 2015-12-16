@@ -1,3 +1,4 @@
+require('./lib/optimizations')
 var EventEmitter = require('events').EventEmitter
 var assert = require('assert')
 var util = require('util')
