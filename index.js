@@ -351,7 +351,8 @@ Driver.prototype._readFromChain = function () {
       if (errs.length >= Errors.MAX_UNCHAIN) {
         // console.log(entry.errors, entry.id)
         self._debug('skipping unchain after', errs.length, 'errors for tx:', txId)
-        self._remove(entry)
+        // TODO: remove
+        // self._remove(entry)
         return finish()
       }
 
@@ -405,24 +406,24 @@ Driver.prototype._pauseStreamIfPaused = function (stream) {
   }
 }
 
-Driver.prototype._remove = function (info) {
-  var self = this
-  this.lookupObject(info)
-    .catch(function (err) {
-      return err.progress
-    })
-    .then(function (chainedObj) {
-      var tasks = ['key', 'permissionKey']
-        .map(function (p) {
-          return chainedObj[p]
-        })
-        .filter(function (key) {
-          return !!key
-        })
+// Driver.prototype._remove = function (info, lookup) {
+//   var self = this
+//   this.lookupObject(info)
+//     .catch(function (err) {
+//       return err.progress
+//     })
+//     .then(function (chainedObj) {
+//       var tasks = ['key', 'permissionKey']
+//         .map(function (p) {
+//           return chainedObj[p]
+//         })
+//         .filter(function (key) {
+//           return !!key
+//         })
 
-      return Q.all(tasks)
-    })
-}
+//       return Q.all(tasks)
+//     })
+// }
 
 Driver.prototype._rmPending = function (txId) {
   var idx = this._pendingTxs.indexOf(txId)

@@ -29,6 +29,7 @@ var ChainedObj = require('@tradle/chained-obj')
 var Builder = ChainedObj.Builder
 var kiki = require('@tradle/kiki')
 var toKey = kiki.toKey
+var ChainLoaderErrs = require('@tradle/chainloader').Errors
 var ChainRequest = require('@tradle/bitjoe-js/lib/requests/chain')
 var CreateRequest = require('@tradle/bitjoe-js/lib/requests/create')
 CreateRequest.prototype._generateSymmetricKey = function () {
@@ -392,6 +393,41 @@ test('give up chaining after max retries', function (t) {
       chain: true
     })
     .done()
+  })
+})
+
+test('give up unchaining after max retries', function (t) {
+  // t.timeoutAfter(15000)
+  publishIdentities([driverBill, driverTed], function () {
+    driverBill.on('error', noop)
+    var msg = toMsg({ hey: 'ho' })
+    var tries = 0
+
+    driverBill.send({
+        msg: msg,
+        to: [{
+          fingerprint: tedPub.pubkeys[0].fingerprint
+        }],
+        chain: true
+      })
+      .done()
+
+    driverBill.once('chained', function (info) {
+      var txId = info.txId
+      var load = driverBill.chainloader.load
+      driverTed.chainloader.load = function (txInfo) {
+        if (txInfo.txId !== txId) {
+          return load.call(driverTed.chainloader, hash)
+        }
+
+        t.ok(++tries <= Errors.MAX_UNCHAIN)
+        if (tries === Errors.MAX_UNCHAIN) {
+          setTimeout(t.end, Driver.CHAIN_READ_THROTTLE * 3)
+        }
+
+        return Q.reject(new ChainLoaderErrs.FileNotFound(new Error('not found')))
+      }
+    })
   })
 })
 
