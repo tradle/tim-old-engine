@@ -74,7 +74,7 @@ Driver.EventType = EventType
 // TODO: export other deps
 
 var DEFAULT_OPTIONS = {
-  opReturnPrefix: constants.OP_RETURN_PREFIX,
+  opReturnPrefix: '',
   chainThrottle: Driver.CHAIN_WRITE_THROTTLE,
   syncInterval: Driver.CHAIN_READ_THROTTLE,
   sendThrottle: Driver.SEND_THROTTLE,
