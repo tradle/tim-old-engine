@@ -57,7 +57,6 @@ var SIGNEE = constants.SIGNEE
 var ROOT_HASH = constants.ROOT_HASH
 var PREV_HASH = constants.PREV_HASH
 var CUR_HASH = constants.CUR_HASH
-var PREFIX = constants.OP_RETURN_PREFIX
 var NONCE = constants.NONCE
 var CONFIRMATIONS_BEFORE_CONFIRMED = 10
 var KEY_PURPOSE = 'messaging'
@@ -74,6 +73,36 @@ Driver.Messengers = Messengers
 Driver.EventType = EventType
 // TODO: export other deps
 
+var DEFAULT_OPTIONS = {
+  opReturnPrefix: constants.OP_RETURN_PREFIX,
+  chainThrottle: Driver.CHAIN_WRITE_THROTTLE,
+  syncInterval: Driver.CHAIN_READ_THROTTLE,
+  sendThrottle: Driver.SEND_THROTTLE,
+  afterBlockTimestamp: 0
+}
+
+var optionsTypes = {
+  // maybe allow read-only mode if this is missing
+  // TODO: replace with kiki (will need to adjust otr, zlorp for async APIs)
+  identityKeys: 'Array',
+  identity: 'Identity',
+  blockchain: 'Object',
+  networkName: 'String',
+  keeper: 'Object',
+  leveldown: 'Function',
+  port: 'Number',
+  pathPrefix: 'String',
+  opReturnPrefix: '?String',
+  dht: '?Object',
+  messenger: '?Object',
+  syncInterval: '?Number',
+  chainThrottle: '?Number',
+  sendThrottle: '?Number',
+  readOnly: '?Boolean',
+  relay: '?Object',
+  afterBlockTimestamp: '?Number'
+}
+
 var noop = function () {}
 
 module.exports = Driver
@@ -82,33 +111,12 @@ util.inherits(Driver, EventEmitter)
 function Driver (options) {
   var self = this
 
-  typeforce({
-    // maybe allow read-only mode if this is missing
-    // TODO: replace with kiki (will need to adjust otr, zlorp for async APIs)
-    identityKeys: 'Array',
-    identity: 'Identity',
-    blockchain: 'Object',
-    networkName: 'String',
-    keeper: 'Object',
-    leveldown: 'Function',
-    port: 'Number',
-    pathPrefix: 'String',
-    dht: '?Object',
-    messenger: '?Object',
-    syncInterval: '?Number',
-    chainThrottle: '?Number',
-    readOnly: '?Boolean',
-    relay: '?Object',
-    afterBlockTimestamp: '?Number'
-  }, options)
+  typeforce(optionsTypes, options)
 
   EventEmitter.call(this)
   tradleUtils.bindPrototypeFunctions(this)
-  this._options = options
-  extend(this, options)
-
-  this.chainThrottle = this.chainThrottle || Driver.CHAIN_WRITE_THROTTLE
-  this.syncInterval = this.syncInterval || Driver.CHAIN_READ_THROTTLE
+  extend(this, DEFAULT_OPTIONS, options)
+  this._options = utils.pick(this, Object.keys(optionsTypes))
 
   this._otrKey = toKey(
     this.getPrivateKey({
@@ -128,7 +136,6 @@ function Driver (options) {
   this.identityMeta = {}
 
   this.setIdentity(options.identity.toJSON())
-  this.afterBlockTimestamp = this.afterBlockTimestamp || 0
   if (this.afterBlockTimestamp) {
     this._debug('ignoring txs before', new Date(this.afterBlockTimestamp * 1000).toString())
   }
@@ -176,13 +183,13 @@ function Driver (options) {
     keeper: keeper,
     networkName: networkName,
     minConf: 0,
-    prefix: PREFIX
+    prefix: this.opReturnPrefix
   })
 
   this.chainloader = new ChainLoader({
     keeper: keeper,
     networkName: networkName,
-    prefix: PREFIX,
+    prefix: this.opReturnPrefix,
     lookup: this.getKeyAndIdentity2
   })
 
@@ -364,7 +371,7 @@ Driver.prototype._readFromChain = function () {
 
       self._queuedUnchains[txId] = true
       self._debug('throttling unchain retry of tx', txId)
-      throttleIfRetrying(errs, Driver.CHAIN_READ_THROTTLE, function () {
+      throttleIfRetrying(errs, self.syncInterval, function () {
         finish(null, entry)
       })
 
@@ -747,7 +754,7 @@ Driver.prototype._sendTheUnsent = function () {
     maxErrors: Errors.MAX_RESEND,
     errorsGroup: Errors.group.send,
     processItem: this._trySend,
-    retryDelay: Driver.SEND_THROTTLE,
+    retryDelay: this.sendThrottle,
     successType: EventType.msg.sendSuccess
   })
 }
@@ -1096,7 +1103,7 @@ Driver.prototype._processTxs = function (txInfos) {
         var type
 
         // console.log(TxInfo.parse(txInfo.tx))
-        var parsedTx = TxInfo.parse(txInfo.tx, self.networkName, PREFIX)
+        var parsedTx = TxInfo.parse(txInfo.tx, self.networkName, self.opReturnPrefix)
         if (entry) {
           if (entry.dateDetected || entry.ignore) {
             // already got this from chain

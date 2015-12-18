@@ -83,9 +83,9 @@ var networkName = 'testnet'
 // var blockchain = new Fakechain({ networkName: networkName })
 var Driver = require('../')
 Driver.CATCH_UP_INTERVAL = 1000
-Driver.SEND_THROTTLE = 1000
-Driver.CHAIN_WRITE_THROTTLE = 1000
-Driver.CHAIN_READ_THROTTLE = 1000
+// Driver.SEND_THROTTLE = 1000
+// Driver.CHAIN_WRITE_THROTTLE = 1000
+// Driver.CHAIN_READ_THROTTLE = 1000
 var utils = require('../lib/utils')
 var Messengers = require('../lib/messengers')
 var Errors = require('../lib/errors')
@@ -354,7 +354,7 @@ test('give up sending after max retries', function (t) {
       tries++
       t.ok(tries <= Errors.MAX_RESEND)
       if (tries === Errors.MAX_RESEND) {
-        setTimeout(t.end, Driver.SEND_THROTTLE * 3)
+        setTimeout(t.end, driverBill.sendThrottle * 3)
       }
 
       return Q.reject(new Error('failed to send'))
@@ -372,7 +372,7 @@ test('give up sending after max retries', function (t) {
 })
 
 test('give up chaining after max retries', function (t) {
-  t.timeoutAfter(15000)
+  // t.timeoutAfter(15000)
   publishIdentities([driverBill, driverTed], function () {
     driverBill.on('error', noop)
     var msg = toMsg({ hey: 'ho' })
@@ -387,7 +387,7 @@ test('give up chaining after max retries', function (t) {
           // unhack ChainRequest
           ChainRequest.prototype.execute = execute
           t.end()
-        }, Driver.CHAIN_WRITE_THROTTLE * 3)
+        }, driverBill.chainThrottle * 3)
       }
 
       return Q.reject(new Error('failed to chain'))
@@ -430,7 +430,7 @@ test('give up unchaining after max retries', function (t) {
 
         t.ok(++tries <= Errors.MAX_UNCHAIN)
         if (tries === Errors.MAX_UNCHAIN) {
-          setTimeout(t.end, Driver.CHAIN_READ_THROTTLE * 3)
+          setTimeout(t.end, driverTed.syncInterval * 3)
         }
 
         return Q.reject(new ChainLoaderErrs.FileNotFound(new Error('not found')))
@@ -1044,11 +1044,13 @@ function init (cb) {
   var billWallet = walletFor(billPriv, null, 'messaging')
   var blockchain = billWallet.blockchain
   var commonOpts = {
+    syncInterval: 1000,
+    chainThrottle: 1000,
+    sendThrottle: 1000,
     networkName: networkName,
     // keeper: keeper,
     blockchain: blockchain,
-    leveldown: memdown,
-    syncInterval: Driver.CHAIN_READ_THROTTLE
+    leveldown: memdown
   }
 
   bootstrapDHT = new DHT({ bootstrap: false })
