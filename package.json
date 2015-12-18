@@ -29,7 +29,7 @@
   "license": "ISC",
   "dependencies": {
     "@tradle/bitcoinjs-lib": "^1.5.7",
-    "@tradle/bitjoe-js": "^1.0.1",
+    "@tradle/bitjoe-js": "^1.0.2",
     "@tradle/bittorrent-dht": "^3.2.1",
     "@tradle/chained-obj": "^2.0.3",
     "@tradle/chainloader": "^2.0.1",
