@@ -33,7 +33,15 @@ var ChainLoaderErrs = require('@tradle/chainloader').Errors
 var ChainRequest = require('@tradle/bitjoe-js/lib/requests/chain')
 var CreateRequest = require('@tradle/bitjoe-js/lib/requests/create')
 CreateRequest.prototype._generateSymmetricKey = function () {
-  return new Buffer('1111111111111111111111111111111111111111111111111111111111111111', 'hex')
+  return Q(new Buffer('1111111111111111111111111111111111111111111111111111111111111111', 'hex'))
+}
+
+var tradleUtils = require('@tradle/utils')
+var encryptAsync = tradleUtils.encryptAsync
+var TEST_IV = new Buffer('f5bc75d07a12c86b581c5719e05e9af4', 'hex')
+tradleUtils.encryptAsync = function (opts, cb) {
+  opts.iv = TEST_IV
+  return encryptAsync.call(tradleUtils, opts, cb)
 }
 
 var Identity = require('@tradle/identity').Identity
@@ -263,11 +271,11 @@ test('resending & order guarantees', function (t) {
     })
 
     var encrypted = [
-      "P767yN9gJZpg6DPFoXt+g5Ho8ZDPt9Bp1KUI",
-      "P767yN9gJZlg6DPFoXt+g5Ho8ZDPt9Bp1KEI",
-      "P767yN9gJZhg6DPFoXt+g5Ho8ZDPt9Bp1KEI",
-      "P767yN9gJZ9g6DPFoXt+g5Ho8ZDPt9Bp1KEI",
-      "P767yN9gJZ5g6DPFoXt+g5Ho8ZDPt9Bp1KEI"
+      "9bx10HoSyGtYHFcZ4F6a9E6MuS1bw2i7UxRICFM0elWmkPjEdxWdz8XQRg==",
+      "9bx10HoSyGtYHFcZ4F6a9E6MuS1bw2i4UxRICFM0elWmkPjEdxWdz8XURg==",
+      "9bx10HoSyGtYHFcZ4F6a9E6MuS1bw2i5UxRICFM0elWmkPjEdxWdz8XURg==",
+      "9bx10HoSyGtYHFcZ4F6a9E6MuS1bw2i+UxRICFM0elWmkPjEdxWdz8XURg==",
+      "9bx10HoSyGtYHFcZ4F6a9E6MuS1bw2i/UxRICFM0elWmkPjEdxWdz8XURg=="
     ]
 
     var copy = msgs.map(function (m) {

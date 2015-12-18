@@ -1537,11 +1537,13 @@ Driver.prototype.receiveMsg = function (buf, senderInfo) {
       return self.chainloader._processTxInfo(txInfo)
     })
     .then(function (parsed) {
-      var permission = Permission.recover(msg.encryptedPermission, parsed.sharedKey)
-      return Q.all([
-        self.keeper.put(parsed.permissionKey.toString('hex'), msg.encryptedPermission),
-        self.keeper.put(permission.fileKeyString(), msg.encryptedData)
-      ])
+      return Q.ninvoke(Permission, 'recover', msg.encryptedPermission, parsed.sharedKey)
+        .then(function (permission) {
+          return Q.all([
+            self.keeper.put(parsed.permissionKey.toString('hex'), msg.encryptedPermission),
+            self.keeper.put(permission.fileKeyString(), msg.encryptedData)
+          ])
+        })
     })
     .then(function () {
       // yes, it repeats work
