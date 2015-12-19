@@ -92,6 +92,7 @@ var Errors = require('../lib/errors')
 Errors.MAX_RESEND = 5
 Errors.MAX_CHAIN = 5
 Errors.MAX_UNCHAIN = 3
+Driver.enableOptimizations()
 // var TimeMethod = require('time-method')
 // var timTimer = TimeMethod(Driver.prototype)
 // for (var p in Driver.prototype) {

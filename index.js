@@ -1,4 +1,3 @@
-require('./lib/optimizations')
 var EventEmitter = require('events').EventEmitter
 var assert = require('assert')
 var util = require('util')
@@ -107,6 +106,7 @@ var noop = function () {}
 
 module.exports = Driver
 util.inherits(Driver, EventEmitter)
+Driver.enableOptimizations = require('./lib/optimizations').enable
 
 function Driver (options) {
   var self = this
@@ -1211,7 +1211,8 @@ Driver.prototype._doSend = function (entry) {
   var self = this
   return this.lookupObject(entry)
     .then(function (obj) {
-      obj.to.identity = obj.to.identity.toJSON()
+      var to = clone(obj.to)
+      to.identity = to.identity.toJSON()
       self._debug('sending msg to peer', obj.parsed.data[TYPE])
       var msg = utils.msgToBuffer(utils.getMsgProps(obj))
       var toRootHash = obj.to[ROOT_HASH]
@@ -1220,7 +1221,7 @@ Driver.prototype._doSend = function (entry) {
         messenger = self.httpClient
       }
 
-      return messenger.send(toRootHash, msg, obj.to)
+      return messenger.send(toRootHash, msg, to)
     })
 }
 
