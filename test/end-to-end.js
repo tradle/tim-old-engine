@@ -406,7 +406,7 @@ test('give up chaining after max retries', function (t) {
 })
 
 test('give up unchaining after max retries', function (t) {
-  // t.timeoutAfter(15000)
+  t.timeoutAfter(15000)
   publishIdentities([driverBill, driverTed], function () {
     driverBill.on('error', noop)
     var msg = toMsg({ hey: 'ho' })

@@ -386,15 +386,25 @@ Driver.prototype._readFromChain = function () {
         cb(err, ret)
       }
     }),
-    this.unchainer,
-    map(function (chainedObj, cb) {
-      if (!utils.countErrors(chainedObj) &&
-        chainedObj.txType === TxData.types.public) {
-        self._debug('saving to keeper')
-        self.keeper.put(chainedObj.key, chainedObj.data)
-      }
+    map(function (txEntry, cb) {
+      var chainedObj
+      self.unchainer.unchain(txEntry)
+        .then(function (result) {
+          chainedObj = result
+          if (chainedObj.txType === TxData.types.public) {
+            self._debug('saving to keeper')
+            self.keeper.put(chainedObj.key, chainedObj.data)
+          }
 
-      self.unchainResultToEntry(chainedObj)
+          return chainedObj
+        })
+        .catch(function (err) {
+          chainedObj = err.progress
+        })
+        // record failed unchains as well
+        .then(function () {
+          return self.unchainResultToEntry(chainedObj)
+        })
         .done(function (entry) {
           self._rmPending(utils.getEntryProp(entry, 'txId'))
           cb(null, entry)
@@ -1258,21 +1268,9 @@ Driver.prototype.lookupObject = function (info) {
     }
   }
 
-  var chainedObj
-  return this.chainloader.load(clone(info))
-    .then(function (obj) {
-      chainedObj = obj
-      return Parser.parse(obj.data)
-    })
-    .then(function (parsed) {
-      chainedObj.parsed = parsed
-      return chainedObj
-    })
-    .catch(function (err) {
-      // repeats unchainer
-      err.progress = chainedObj || info
-      throw err
-    })
+  return this.unchainer.unchain(clone(info), {
+    verify: false
+  })
 }
 
 Driver.prototype.lookupRootHash = function (fingerprint) {
