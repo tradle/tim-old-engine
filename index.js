@@ -676,24 +676,17 @@ Driver.prototype.unchainResultToEntry = function (chainedObj) {
   var entry = new Entry(safeProps)
     .set('type', type)
 
-  if ('key' in chainedObj) {
-    entry.set(CUR_HASH, chainedObj.key)
-  }
+  // if ('key' in chainedObj) {
+  //   entry.set(CUR_HASH, chainedObj.key)
+  // }
 
   if ('parsed' in chainedObj) {
-    entry
-      .set(ROOT_HASH, chainedObj.parsed.data[ROOT_HASH] || chainedObj.key)
-      .set(TYPE, chainedObj.parsed.data[TYPE])
-      .set('public', chainedObj.txType === TxData.types.public)
+    entry.set('public', chainedObj.txType === TxData.types.public)
   }
 
   if ('tx' in chainedObj) {
     entry.set('tx', utils.toBuffer(chainedObj.tx))
   }
-
-  // if ('id' in chainedObj) {
-  //   entry.prev(chainedObj.id)
-  // }
 
   var tasks = ['from', 'to'].map(function (party) {
     return chainedObj[party]
