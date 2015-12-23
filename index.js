@@ -52,6 +52,7 @@ var RETRY_UNCHAIN_ERRORS = [
 })
 
 var TYPE = constants.TYPE
+var TYPES = constants.TYPES
 var SIGNEE = constants.SIGNEE
 var ROOT_HASH = constants.ROOT_HASH
 var PREV_HASH = constants.PREV_HASH
@@ -1197,6 +1198,12 @@ Driver.prototype._setupDBs = function () {
     })
   })
 
+  self.on('unchained', function (entry) {
+    if (entry[TYPE] === TYPES.IDENTITY && entry[CUR_HASH] === self.myCurrentHash()) {
+      self.emit('unchained-self')
+    }
+  })
+
   this.txDB = createTxDB(this._prefix('txs.db'), {
     leveldown: this.leveldown,
     log: this._log,
@@ -1428,7 +1435,7 @@ Driver.prototype.addContactIdentity = function (identity) {
             addressesFrom: [fromAddress],
             addressesTo: [self.wallet.addressString]
           })
-          .set(TYPE, constants.TYPES.IDENTITY)
+          .set(TYPE, TYPES.IDENTITY)
           .set(ROOT_HASH, rootHash)
           .set(CUR_HASH, curHash)
 

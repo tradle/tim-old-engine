@@ -128,6 +128,13 @@ test.afterEach = function (cb) {
 
 rimraf.sync(STORAGE_DIR)
 
+test('unchained-self event', function (t) {
+  t.plan(1)
+  t.timeoutAfter(5000)
+  driverBill.on('unchained-self', t.pass)
+  publishIdentities([driverBill])
+})
+
 test('msgDB', function (t) {
   t.plan(6)
 
