@@ -119,13 +119,6 @@ function Driver (options) {
   extend(this, DEFAULT_OPTIONS, options)
   this._options = utils.pick(this, Object.keys(optionsTypes))
 
-  this._otrKey = toKey(
-    this.getPrivateKey({
-      type: 'dsa',
-      purpose: 'sign'
-    })
-  )
-
   this._signingKey = toKey(
     this.getPrivateKey({
       type: 'ec',
@@ -158,17 +151,29 @@ function Driver (options) {
   this._paused = false
 
   // this._monkeypatchWallet()
-  this.messenger = options.messenger || new Messengers.P2P({
-    zlorp: new Zlorp({
-      name: this.name(),
-      available: true,
-      leveldown: leveldown,
-      port: this.port,
-      dht: dht,
-      key: this._otrKey.priv(),
-      relay: this.relay
+  this.messenger = options.messenger
+  if (!this.messenger) {
+    var otrKey = this.getPrivateKey({
+      type: 'dsa',
+      purpose: 'sign'
     })
-  })
+
+    if (!otrKey) {
+      throw new Error('missing key required for p2p comm')
+    }
+
+    this.messenger = new Messengers.P2P({
+      zlorp: new Zlorp({
+        name: this.name(),
+        available: true,
+        leveldown: leveldown,
+        port: this.port,
+        dht: dht,
+        key: toKey(otrKey).priv(),
+        relay: this.relay
+      })
+    })
+  }
 
   this.messenger.on('message', this.receiveMsg)
 
