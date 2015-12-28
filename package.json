@@ -26,7 +26,7 @@
     "url": "https://github.com/tradle/tim.git"
   },
   "author": "Mark Vayngrib <mark.vayngrib@lablz.com> (http://github.com/mvayngrib)",
-  "license": "ISC",
+  "license": "GPLv3",
   "dependencies": {
     "@tradle/bitcoinjs-lib": "^1.5.7",
     "@tradle/bitjoe-js": "^1.0.2",
