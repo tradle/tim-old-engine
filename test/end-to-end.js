@@ -255,7 +255,7 @@ test('pause/unpause', function (t) {
 })
 
 test('resending & order guarantees', function (t) {
-  t.timeoutAfter(20000)
+//   t.timeoutAfter(20000)
   publishIdentities([driverBill, driverTed], function () {
     var msgs = [
       {
@@ -308,15 +308,22 @@ test('resending & order guarantees', function (t) {
       }
     }
 
-    msgs.forEach(function (msg) {
-      driverTed.send({
-        msg: msg,
-        deliver: true,
-        to: [{
-          fingerprint: billPub.pubkeys[0].fingerprint
-        }]
+    Q.all(msgs.map(function (msg) {
+        return driverTed.send({
+          msg: msg,
+          deliver: true,
+          to: [{
+            fingerprint: billPub.pubkeys[0].fingerprint
+          }]
+        })
+      }))
+      .then(function () {
+        return driverTed.getSendQueue()
       })
-    })
+      .then(function (queued) {
+        t.equal(queued.length, 5)
+      })
+
 
     var togo = msgs.length * 2 // send + receive
     var received = 0
@@ -407,6 +414,12 @@ test('give up chaining after max retries', function (t) {
         fingerprint: tedPub.pubkeys[0].fingerprint
       }],
       chain: true
+    })
+    .then(function () {
+      return driverBill.getChainQueue()
+    })
+    .then(function (queued) {
+      t.equal(queued.length, 1)
     })
     .done()
   })

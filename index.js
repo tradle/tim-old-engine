@@ -751,6 +751,46 @@ Driver.prototype._writeToChain = function () {
   })
 }
 
+Driver.prototype.getSendQueue = function () {
+  var msgDB = this.msgDB
+  var stream = pump(
+    msgDB.getToSendStream({
+      old: true,
+      tail: false
+    }),
+    map(function (data, cb) {
+      msgDB.get(data.value, cb)
+    })
+    // ,
+    // utils.filterStream(function (data) {
+    //   var errs = utils.getErrors(data, 'send')
+    //   return !(errs && errs.length >= Errors.MAX_SEND)
+    // })
+  )
+
+  return Q.nfcall(collect, stream)
+}
+
+Driver.prototype.getChainQueue = function () {
+  var msgDB = this.msgDB
+  var stream = pump(
+    msgDB.getToChainStream({
+      old: true,
+      tail: false
+    }),
+    map(function (data, cb) {
+      msgDB.get(data.value, cb)
+    })
+    // ,
+    // utils.filterStream(function (data) {
+    //   var errs = utils.getErrors(data, 'chain')
+    //   return !(errs && errs.length >= Errors.MAX_CHAIN)
+    // })
+  )
+
+  return Q.nfcall(collect, stream)
+}
+
 Driver.prototype._sendTheUnsent = function () {
   var getStream = this.msgDB.getToSendStream.bind(this.msgDB, {
     old: true,
