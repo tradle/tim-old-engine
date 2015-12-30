@@ -35,3 +35,12 @@ example.js
 publishIdentity.js
 schema.md
 storage/
+
+checkLicenses.js
+lib/promise-queue.js
+shim.js
+storage1/
+test/dsaKeys.json
+test/helpers/testDriver.js
+test/makeBill.js
+test/queue.js
