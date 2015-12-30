@@ -59,7 +59,7 @@ var PREV_HASH = constants.PREV_HASH
 var CUR_HASH = constants.CUR_HASH
 var NONCE = constants.NONCE
 var CONFIRMATIONS_BEFORE_CONFIRMED = 10
-var KEY_PURPOSE = 'messaging'
+var BLOCKCHAIN_KEY_PURPOSE = 'messaging'
 Driver.MIN_BALANCE = 10000
 Driver.CHAIN_WRITE_THROTTLE = 60000
 Driver.CHAIN_READ_THROTTLE = 60000
@@ -142,7 +142,7 @@ function Driver (options) {
   var wallet = this.wallet = this.wallet || new Wallet({
     networkName: networkName,
     blockchain: blockchain,
-    priv: this.getBlockchainKey().priv
+    priv: this.getBlockchainKey().priv()
   })
 
   // init balance while we rely on blockr for this info
@@ -1379,11 +1379,11 @@ Driver.prototype.getPrivateKey = function (where) {
 }
 
 Driver.prototype.getBlockchainKey = function () {
-  return this.getPrivateKey({
+  return toKey(this.getPrivateKey({
     networkName: this.networkName,
     type: 'bitcoin',
-    purpose: KEY_PURPOSE
-  })
+    purpose: BLOCKCHAIN_KEY_PURPOSE
+  }))
 }
 
 Driver.prototype.getCachedIdentity = function (query) {
@@ -1468,7 +1468,7 @@ Driver.prototype.addContactIdentity = function (identity) {
       .then(function () {
         rootHash = identityJSON[ROOT_HASH] || curHash
         var fromAddress = identityJSON.pubkeys.filter(function (key) {
-          return key.purpose === KEY_PURPOSE && key.networkName === self.networkName
+          return key.purpose === BLOCKCHAIN_KEY_PURPOSE && key.networkName === self.networkName
         })[0].fingerprint
 
         var entry = new Entry({
@@ -1952,7 +1952,7 @@ Driver.prototype._getBTCKey = function (identity) {
   return utils.firstKey(identity.pubkeys, {
     type: 'bitcoin',
     networkName: this.networkName,
-    purpose: KEY_PURPOSE
+    purpose: BLOCKCHAIN_KEY_PURPOSE
   })
 }
 
@@ -1963,7 +1963,7 @@ Driver.prototype.lookupBTCKey = function (recipient) {
       return utils.firstKey(result.identity.pubkeys, {
         type: 'bitcoin',
         networkName: self.networkName,
-        purpose: KEY_PURPOSE
+        purpose: BLOCKCHAIN_KEY_PURPOSE
       })
     })
 }
