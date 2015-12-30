@@ -34,7 +34,7 @@
     "@tradle/chained-obj": "^2.0.3",
     "@tradle/chainloader": "^2.0.3",
     "@tradle/constants": "^1.1.3",
-    "@tradle/identity": "^1.0.9",
+    "@tradle/identity": "^1.1.0",
     "@tradle/kiki": "^1.1.11",
     "@tradle/multiplex-utp": "^1.0.1",
     "@tradle/permission": "^1.0.4",
