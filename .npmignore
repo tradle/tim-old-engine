@@ -28,7 +28,6 @@ node_modules
 
 *.js1
 *.sublime-*
-depromisify.js
 eventTypes.md
 eventTypes1.md
 example.js
@@ -39,10 +38,7 @@ storage/
 checkLicenses.js
 lib/promise-queue.js
 shim.js
+storage/
 storage1/
-test/dsaKeys.json
-test/helpers/testDriver.js
-test/makeBill.js
-test/queue.js
-
 coverage/
+test/
