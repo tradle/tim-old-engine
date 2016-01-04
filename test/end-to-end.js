@@ -1025,6 +1025,7 @@ test('forget contact', function (t) {  // t.timeoutAfter(20000)
     driverBill.send({
         msg: toMsg({ yo: 'ted' }),
         deliver: true,
+        chain: true,
         to: [getIdentifier(tedPub)]
       })
       .then(function () {
@@ -1039,6 +1040,17 @@ test('forget contact', function (t) {  // t.timeoutAfter(20000)
       })
       .then(function (msgs) {
         t.equal(msgs.length, 1)
+
+        // this message should be forgotten
+        // before it gets sent
+        return driverBill.send({
+          msg: toMsg({ yo: 'again' }),
+          deliver: true,
+          chain: true,
+          to: [getIdentifier(tedPub)]
+        })
+      })
+      .then(function () {
         return driverBill.forget(tedRootHash)
       })
       .then(function () {
