@@ -1541,7 +1541,7 @@ Driver.prototype.receiveMsg = function (buf, senderInfo) {
   try {
     msg = utils.bufferToMsg(buf)
   } catch (err) {
-    return this.emit('warn', 'received message not in JSON format', buf)
+    return Q.reject(new Error('expected JSON'))
   }
 
   this._debug('received msg', msg)
