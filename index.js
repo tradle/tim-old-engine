@@ -1646,14 +1646,11 @@ Driver.prototype.putOnChain = function (entry) {
   var data = entry.txData
   var nextEntry = new Entry()
     .set(utils.pick(entry, ROOT_HASH, CUR_HASH, TYPE, 'uid', 'txType'))
-    .set({
-      chain: true,
-      dir: Dir.outbound
-    })
 
-//   return this.lookupBTCAddress(to)
-//     .then(shareWith)
-  var addr = entry.addressesTo[0]
+  var addr = entry.dir === Dir.outbound
+    ? entry.addressesTo[0]
+    : entry.addressesFrom[0]
+
   this.emit('chaining')
   return self.chainwriter.chain()
     .type(type)
@@ -1705,6 +1702,32 @@ Driver.prototype.sign = function (msg) {
     .data(msg)
     .signWith(this._signingKey, signee)
     .build()
+}
+
+/**
+ * chain an existing message
+ * @param  {String} uid - uid by which to find this message in msgDB
+ * @return {Promise}
+ */
+Driver.prototype.chainExisting = function (uid) {
+  var self = this
+
+  typeforce('String', uid)
+
+  return Q.ninvoke(this.msgDB, 'byUID', uid)
+    .then(function (info) {
+      if (info.chain || info.dateUnchained) {
+        throw new Error('already chained')
+      }
+
+      var entry = new Entry({
+        uid: uid,
+        type: EventType.msg.edit,
+        chain: true
+      })
+
+      return self.log(entry)
+    })
 }
 
 Driver.prototype.chain = function (options) {

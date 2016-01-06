@@ -6,6 +6,7 @@ if (process.env.MULTIPLEX) {
 var path = require('path')
 var test = require('tape-extra')
 var rimraf = require('rimraf')
+var typeforce = require('typeforce')
 var find = require('array-find')
 var pick = require('object.pick')
 var crypto = require('crypto')
@@ -32,8 +33,15 @@ var toKey = kiki.toKey
 var ChainLoaderErrs = require('@tradle/chainloader').Errors
 var ChainRequest = require('@tradle/bitjoe-js/lib/requests/chain')
 var CreateRequest = require('@tradle/bitjoe-js/lib/requests/create')
-CreateRequest.prototype._generateSymmetricKey = function () {
-  return Q(new Buffer('1111111111111111111111111111111111111111111111111111111111111111', 'hex'))
+var origGenerateSymmetricKey = CreateRequest.prototype._generateSymmetricKey
+var unhackCreateRequest = function () {
+  CreateRequest.prototype._generateSymmetricKey = origGenerateSymmetricKey
+}
+
+var hackCreateRequest = function () {
+  CreateRequest.prototype._generateSymmetricKey = function () {
+    return Q(new Buffer('1111111111111111111111111111111111111111111111111111111111111111', 'hex'))
+  }
 }
 
 var tradleUtils = require('@tradle/utils')
@@ -92,7 +100,7 @@ var Errors = require('../lib/errors')
 Errors.MAX_RESEND = 5
 Errors.MAX_CHAIN = 5
 Errors.MAX_UNCHAIN = 3
-Driver.enableOptimizations()
+// Driver.enableOptimizations() // can't enable because cache-sharing between instances fakes test results
 // var TimeMethod = require('time-method')
 // var timTimer = TimeMethod(Driver.prototype)
 // for (var p in Driver.prototype) {
@@ -255,7 +263,8 @@ test('pause/unpause', function (t) {
 })
 
 test('resending & order guarantees', function (t) {
-//   t.timeoutAfter(20000)
+  t.timeoutAfter(20000)
+  hackCreateRequest()
   publishIdentities([driverBill, driverTed], function () {
     var msgs = [
       {
@@ -354,6 +363,7 @@ test('resending & order guarantees', function (t) {
           // msg should not be queued for resend
           t.equal(results.length, 0, 'msg not requeued after succesfully sent')
           t.end()
+          unhackCreateRequest()
         })
         .done()
     }
@@ -461,7 +471,7 @@ test('give up unchaining after max retries', function (t) {
 })
 
 test('the reader and the writer', function (t) {
-  t.timeoutAfter(20000)
+  // t.timeoutAfter(20000)
 
   var togo = 4
   var reader = driverBill
@@ -486,18 +496,7 @@ test('the reader and the writer', function (t) {
   })
 
   writer.once('message', function (info) {
-    writer.lookupObject(info)
-      .then(function (obj) {
-        return writer.send({
-          chain: true,
-          deliver: false,
-          public: info.public,
-          msg: obj.parsed.data,
-          to: readerCoords
-        })
-      })
-      .done()
-
+    writer.chainExisting(info.uid)
     reader.once('unchained', function (info) {
       reader.lookupObject(info)
         .done(function (obj) {
@@ -606,14 +605,23 @@ test('no chaining attempted if low balance', function (t) {
 })
 
 test('delivered/chained/both', function (t) {
-  t.plan(4)
-  //t.timeoutAfter(60000)
+  t.timeoutAfter(20000)
+
   publishIdentities([driverBill, driverTed], function () {
+    // make sure all the combinations work
+    // make it easier to check by sending settings as messages
     var msgs = [
-      { chain: true, deliver: false },
       { chain: false, deliver: true },
-      { chain: true, deliver: true }
+      { chain: true, deliver: true },
+      // will never get unchained, because message body
+      // has no way of getting to recipient
+      { chain: true, deliver: false },
     ].map(toMsg)
+
+    var togo = {
+      message: 2,
+      unchained: 1
+    }
 
     msgs.forEach(function (msg) {
       driverTed.send(extend({
@@ -622,10 +630,13 @@ test('delivered/chained/both', function (t) {
           fingerprint: billPub.pubkeys[0].fingerprint
         }]
       }, msg))
+      .done()
     })
 
-    ;['message', 'unchained'].forEach(function (event) {
+    Object.keys(togo).forEach(function (event) {
       driverBill.on(event, function (info) {
+        togo[event]--
+        if (!togo[event]) delete togo[event]
         driverBill.lookupObject(info)
           .done(function (chainedObj) {
             if (event === 'message') {
@@ -633,6 +644,8 @@ test('delivered/chained/both', function (t) {
             } else {
               t.deepEqual(chainedObj.parsed.data.chain, true)
             }
+
+            if (!Object.keys(togo).length) t.end()
           })
       })
     })
@@ -810,13 +823,12 @@ test('delivery check', function (t) {
 })
 
 test('share chained content with 3rd party', function (t) {
-  t.plan(6)
+  t.plan(5)
   t.timeoutAfter(60000)
   publishIdentities([driverBill, driverTed, driverRufus], function () {
     // make sure all the combinations work
     // make it easier to check by sending settings as messages
     var msgs = [
-      { chain: true, deliver: false },
       { chain: false, deliver: true },
       { chain: true, deliver: true }
     ].map(function (m) {
@@ -834,20 +846,20 @@ test('share chained content with 3rd party', function (t) {
       }, msg))
     })
 
-    var togo = 4
+    var togo = 3 // 2 message, 1 unchained
     ;['message', 'unchained'].forEach(function (event) {
       driverBill.on(event, function () {
         if (--togo) return
 
+        // # 1
         t.pass('2nd party is up to date')
 
         // share all msgs with rufus
-        togo = 4
+        togo = 3
         share()
       })
 
       driverRufus.on(event, function (info) {
-        // console.log(event)
         driverRufus.lookupObject(info)
           .done(function (chainedObj) {
             var msg = chainedObj.parsed.data
@@ -859,6 +871,7 @@ test('share chained content with 3rd party', function (t) {
 
             if (--togo === 0) {
               // check for other events coming in
+              // # 5
               setTimeout(t.pass, 2000)
             }
           })
@@ -1102,7 +1115,7 @@ function init (cb) {
     pathPrefix: 'bill' + reinitCount,
     identity: bill,
     identityKeys: billPriv,
-    keeper: sharedKeeper,
+    keeper: newKeeper(),
     // keeper: new Keeper({ dht: billDHT, storage: STORAGE_DIR + '/bill' }),
     // kiki: kiki.kiki(billPriv),
     wallet: billWallet,
@@ -1114,7 +1127,7 @@ function init (cb) {
     pathPrefix: 'ted' + reinitCount,
     identity: ted,
     identityKeys: tedPriv,
-    keeper: sharedKeeper,
+    keeper: newKeeper(),
     // keeper: new Keeper({ dht: tedDHT, storage: STORAGE_DIR + '/ted' }),
     // kiki: kiki.kiki(tedPriv),
     wallet: walletFor(tedPriv, blockchain, 'messaging'),
@@ -1126,7 +1139,7 @@ function init (cb) {
     pathPrefix: 'rufus' + reinitCount,
     identity: rufus,
     identityKeys: rufusPriv,
-    keeper: sharedKeeper,
+    keeper: newKeeper(),
     // keeper: new Keeper({ dht: rufusDHT, storage: STORAGE_DIR + '/rufus' }),
     // kiki: kiki.kiki(rufusPriv),
     wallet: walletFor(rufusPriv, blockchain, 'messaging'),
@@ -1282,4 +1295,29 @@ function getRHIdentifier (driver) {
 
 function getFunctionName(fn) {
   return fn.name || fn.toString().match(/function (.*?)\s*\(/)[1];
+}
+
+/**
+ * returns mock keeper with fallback to sharedKeeper (which hosts identities)
+ */
+function newKeeper () {
+  var k = FakeKeeper.empty()
+  var getOne = k.getOne
+  k.getOne = function (key) {
+    return getOne.apply(this, arguments)
+      .catch(function (err) {
+        return sharedKeeper.getOne(key)
+      })
+  }
+
+  k.push = function (opts) {
+    typeforce({
+      key: 'String',
+      value: 'Buffer'
+    }, opts)
+
+    return sharedKeeper.put(opts.key, opts.value)
+  }
+
+  return k
 }
