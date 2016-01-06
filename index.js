@@ -1712,6 +1712,10 @@ Driver.prototype.sign = function (msg) {
 Driver.prototype.chainExisting = function (uid) {
   var self = this
 
+  if (typeof uid !== 'string') {
+    uid = utils.getUID(uid)
+  }
+
   typeforce('String', uid)
 
   return Q.ninvoke(this.msgDB, 'byUID', uid)
