@@ -906,7 +906,11 @@ Driver.prototype._processQueue = function (opts) {
     var errors = rawNext.errors[errorsGroup] = rawNext.errors[errorsGroup] || []
     var next = omit(rawNext, ['errors']) // defensive copy
     return processItem(next)
-      .done(function (entry) {
+      .catch(function (err) {
+        debug(name + ' processItem crashed (this should not happen)', err)
+        throw err
+      })
+      .then(function (entry) {
         if (self._destroyed) return
 
         self._debug('processed item from queue', name)
