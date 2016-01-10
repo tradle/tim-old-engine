@@ -44,6 +44,7 @@ var createMsgDB = require('./lib/msgDB')
 var createTxDB = require('./lib/txDB')
 var Errors = require('./lib/errors')
 var utils = require('./lib/utils')
+var getViaCache = require('./lib/getViaCache')
 var RETRY_UNCHAIN_ERRORS = [
   ChainLoader.Errors.ParticipantsNotFound,
   ChainLoader.Errors.FileNotFound
@@ -212,6 +213,8 @@ function Driver (options) {
   this._pendingTxs = []
 
   this._setupDBs()
+  this._setupTxCaching()
+
   var keeperReadyDfd = Q.defer()
   var keeperReady = keeperReadyDfd.promise
   if (!keeper.isReady || keeper.isReady()) keeperReadyDfd.resolve()
@@ -463,6 +466,33 @@ Driver.prototype._rethrow = function (err) {
   }
 }
 
+Driver.prototype._setupTxCaching = function () {
+  var self = this
+  var txDB = this.txDB
+  var txSubmodule = this.blockchain.transactions
+  txSubmodule.get = getViaCache(
+    txSubmodule.get.bind(txSubmodule),
+    getFromCache
+  )
+
+  function getFromCache (ids, cb) {
+    var togo = ids.length
+    var results = []
+    ids.forEach(function (id, i) {
+      txDB.get(id, function (err, tx) {
+        results[i] = tx
+        if (tx && !tx.txHex) {
+          tx.txHex = tx.tx && tx.tx.toString('hex')
+        }
+
+        if (--togo === 0) {
+          cb(null, results)
+        }
+      })
+    })
+  }
+}
+
 Driver.prototype._catchUpWithBlockchain = function () {
   var self = this
   if (this._caughtUpPromise) return this._caughtUpPromise
@@ -478,30 +508,23 @@ Driver.prototype._catchUpWithBlockchain = function () {
       done = true
     })
 
-  tryAgain()
+  this.once('txs', function (txInfos) {
+    txIds = txInfos
+      .filter(function (txInfo) {
+        return txInfo.blockTimestamp > self.afterBlockTimestamp
+      })
+      .map(function (txInfo) {
+        return txInfo.tx.getId()
+      })
+
+    checkDBs()
+  })
+
   return this._caughtUpPromise
 
-  function tryAgain () {
-    if (self._destroyed) return
-    if (txIds) return checkDBs()
-
-    self.blockchain.addresses.transactions(self._addresses(), null, function (err, txInfos) {
-      if (err) return scheduleRetry()
-
-      txInfos = utils.parseCommonBlockchainTxs(txInfos)
-      txIds = txInfos
-        .filter(function (txInfo) {
-          return txInfo.blockTimestamp > self.afterBlockTimestamp
-        })
-        .map(function (txInfo) {
-          return txInfo.tx.getId()
-        })
-
-      checkDBs()
-    })
-  }
-
   function checkDBs () {
+    if (self._destroyed) return
+
     var tasks = txIds.map(function (txId) {
       return Q.ninvoke(self.txDB, 'get', txId)
         .then(function (entry) {
@@ -521,7 +544,7 @@ Driver.prototype._catchUpWithBlockchain = function () {
 
   function scheduleRetry () {
     self._debug('not caught up yet with blockchain...')
-    setTimeout(tryAgain, txIds ? Driver.CATCH_UP_INTERVAL : self.syncInterval)
+    setTimeout(checkDBs, Driver.CATCH_UP_INTERVAL)
   }
 }
 
@@ -1102,7 +1125,13 @@ Driver.prototype._fetchAndReschedule = function () {
 }
 
 Driver.prototype._fetchTxs = function () {
+  var self = this
   return Q.ninvoke(this.blockchain.addresses, 'transactions', this._addresses())
+    .then(function (txInfos) {
+      txInfos = utils.parseCommonBlockchainTxs(txInfos)
+      self.emit('txs', txInfos)
+      return txInfos
+    })
 }
 
 Driver.prototype._processTxs = function (txInfos) {
@@ -1110,14 +1139,21 @@ Driver.prototype._processTxs = function (txInfos) {
   if (this._destroyed) return
 
   var lookups = []
-  var filtered = utils.parseCommonBlockchainTxs(txInfos)
-    .filter(function (txInfo) {
+  var filtered = txInfos.filter(function (txInfo) {
+      var id = txInfo.tx.getId()
       if (txInfo.blockTimestamp &&
           txInfo.blockTimestamp <= self.afterBlockTimestamp) {
+
+        // TODO: remove this when we have a blockchain API
+        // that supports height-based queries
+        self.log(new Entry({
+          type: EventType.tx.ignore,
+          txId: id
+        }))
+
         return
       }
 
-      var id = txInfo.tx.getId()
       if (self._pendingTxs.indexOf(id) !== -1) {
         return
       }
