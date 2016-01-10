@@ -477,12 +477,17 @@ Driver.prototype._setupTxCaching = function () {
 
   function getFromCache (ids, cb) {
     var togo = ids.length
-    var results = []
+    var results = ids.map(function () {
+      return null
+    })
+
     ids.forEach(function (id, i) {
       txDB.get(id, function (err, tx) {
-        results[i] = tx
-        if (tx && !tx.txHex) {
-          tx.txHex = tx.tx && tx.tx.toString('hex')
+        if (tx && tx.confirmations > CONFIRMATIONS_BEFORE_CONFIRMED) {
+          results[i] = tx
+          if (!tx.txHex) {
+            tx.txHex = tx.tx.toString('hex')
+          }
         }
 
         if (--togo === 0) {
