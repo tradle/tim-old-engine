@@ -96,8 +96,8 @@ var fakeWallet = help.fakeWallet
 var FakeKeeper = help.fakeKeeper
 // var bill = Identity.fromJSON(billPriv)
 // var ted = Identity.fromJSON(tedPriv)
-var networkName = 'testnet'
-// var blockchain = new Fakechain({ networkName: networkName })
+var NETWORK_NAME = 'testnet'
+// var blockchain = new Fakechain({ networkName: NETWORK_NAME })
 var Driver = require('../')
 Driver.CATCH_UP_INTERVAL = 1000
 // Driver.SEND_THROTTLE = 1000
@@ -183,6 +183,7 @@ test('msgDB', function (t) {
 
   var people = [driverBill, driverTed, driverRufus]
   var me = driverBill
+  monitorIdentityPublishAddr(people)
   publishIdentities(people, function () {
     people.forEach(function (a) {
       var myRootHash = me.myRootHash()
@@ -202,7 +203,9 @@ test('msgDB', function (t) {
 
 test('export history', function (t) {
   t.timeoutAfter(20000)
-  publishIdentities([driverBill, driverTed, driverRufus], function () {
+  var people = [driverBill, driverTed, driverRufus]
+  monitorIdentityPublishAddr(people)
+  publishIdentities(people, function () {
     var toTed = toMsg({ to: 'ted' })
     var toBill = toMsg({ to: 'bill' })
 
@@ -263,6 +266,7 @@ test('export history', function (t) {
 test('pause/unpause', function (t) {
   t.timeoutAfter(20000)
   var timesPaused = 0
+  monitorIdentityPublishAddr(driverBill, driverTed)
   driverBill.on('pause', function () {
     t.equal(++timesPaused, 1)
   })
@@ -296,7 +300,9 @@ test('pause/unpause', function (t) {
 test('resending & order guarantees', function (t) {
   t.timeoutAfter(20000)
   hackCreateRequest()
-  publishIdentities([driverBill, driverTed], function () {
+  var people = [driverBill, driverTed]
+  monitorIdentityPublishAddr(people)
+  publishIdentities(people, function () {
     var msgs = [
       {
         succeedAfter: Errors.MAX_RESEND - 1
@@ -402,7 +408,9 @@ test('resending & order guarantees', function (t) {
 
 test('give up sending after max retries', function (t) {
   t.timeoutAfter(15000)
-  publishIdentities([driverBill, driverTed], function () {
+  var people = [driverBill, driverTed]
+  monitorIdentityPublishAddr(people)
+  publishIdentities(people, function () {
     var msg = toMsg({ hey: 'ho' })
     var tries = 0
     driverBill._send = function (rh, msg) {
@@ -428,7 +436,9 @@ test('give up sending after max retries', function (t) {
 
 test('give up chaining after max retries', function (t) {
   // t.timeoutAfter(15000)
-  publishIdentities([driverBill, driverTed], function () {
+  var people = [driverBill, driverTed]
+  monitorIdentityPublishAddr(people)
+  publishIdentities(people, function () {
     driverBill.on('error', noop)
     var msg = toMsg({ hey: 'ho' })
     var tries = 0
@@ -467,7 +477,9 @@ test('give up chaining after max retries', function (t) {
 
 test('give up unchaining after max retries', function (t) {
   t.timeoutAfter(15000)
-  publishIdentities([driverBill, driverTed], function () {
+  var people = [driverBill, driverTed]
+  monitorIdentityPublishAddr(people)
+  publishIdentities(people, function () {
     driverBill.on('error', noop)
     var msg = toMsg({ hey: 'ho' })
     var tries = 0
@@ -513,12 +525,20 @@ test('the reader and the writer', function (t) {
   var readerCoords = [getIdentifier(reader.identityJSON)]
   var writer = driverTed
   var writerCoords = [getIdentifier(writer.identityJSON)]
+  // publish to constants.IDENTITY_PUBLISH_ADDRESS
   writer.publishMyIdentity().done()
+
+  monitorIdentityPublishAddr(reader, writer)
 
   // publish reader's identity for them
   writer.addContactIdentity(reader.identityJSON)
     .then(function () {
-      return writer.publishIdentity(reader.identityJSON)
+      var readerAddr = findBitcoinKey(
+        reader.identityJSON.pubkeys,
+        Driver.BLOCKCHAIN_KEY_PURPOSE
+      ).fingerprint
+
+      return writer.publishIdentity(reader.identityJSON, readerAddr)
     })
     .done()
 
@@ -630,7 +650,9 @@ test('no chaining attempted if low balance', function (t) {
 test('delivered/chained/both', function (t) {
   t.timeoutAfter(20000)
 
-  publishIdentities([driverBill, driverTed], function () {
+  var people = [driverBill, driverTed]
+  monitorIdentityPublishAddr(people)
+  publishIdentities(people, function () {
     // make sure all the combinations work
     // make it easier to check by sending settings as messages
     var msgs = [
@@ -698,6 +720,8 @@ test('handle non-data tx', function (t) {
 })
 
 test('self publish, edit, republish', function (t) {
+  var people = [driverBill, driverTed]
+  monitorIdentityPublishAddr(people)
   publish(function () {
     failToRepeatPublish(function () {
       republish(function () {
@@ -814,7 +838,9 @@ test('throttle chaining', function (t) {
 test('delivery check', function (t) {
   t.plan(2)
   t.timeoutAfter(60000)
-  publishIdentities([driverBill, driverTed], function () {
+  var people = [driverBill, driverTed]
+  monitorIdentityPublishAddr(people)
+  publishIdentities(people, function () {
     var billCoords = getIdentifier(billPub)
     var msg = toMsg({ hey: 'blah' })
 
@@ -848,7 +874,10 @@ test('delivery check', function (t) {
 test('share chained content with 3rd party', function (t) {
   t.plan(5)
   t.timeoutAfter(60000)
-  publishIdentities([driverBill, driverTed, driverRufus], function () {
+
+  var people = [driverBill, driverTed, driverRufus]
+  monitorIdentityPublishAddr(people)
+  publishIdentities(people, function () {
     // make sure all the combinations work
     // make it easier to check by sending settings as messages
     var msgs = [
@@ -938,8 +967,10 @@ test('message resolution - contents match on p2p and chain channels', function (
   t.plan(6)
   t.timeoutAfter(20000)
 
-  publishIdentities([driverBill, driverTed], function () {
-    ;[driverBill, driverTed].forEach(function (driver) {
+  var people = [driverBill, driverTed]
+  monitorIdentityPublishAddr(people)
+  publishIdentities(people, function () {
+    people.forEach(function (driver) {
       driver.on('unchained', onUnchained.bind(driver))
     })
 
@@ -1011,7 +1042,9 @@ test('message resolution - contents match on p2p and chain channels', function (
 test('http messenger, recipient-specific', function (t) {
   t.timeoutAfter(20000)
 
-  publishIdentities([driverBill, driverTed], function () {
+  var people = [driverBill, driverTed]
+  monitorIdentityPublishAddr(people)
+  publishIdentities(people, function () {
     // ted runs an http server
     var app = express()
     var server = app.listen(++BASE_PORT)
@@ -1054,9 +1087,15 @@ test('http messenger, recipient-specific', function (t) {
   })
 })
 
-test('forget contact forgets just contact', function (t) {
+test('forget contact', function (t) {
   t.timeoutAfter(20000)
-  publishIdentities([driverBill, driverTed, driverRufus], function () {
+  var people = [driverBill, driverTed, driverRufus]
+  monitorIdentityPublishAddr(people)
+  publishIdentities(people, function () {
+    var receivePromise = Q.Promise(function (resolve) {
+      driverTed.once('message', resolve)
+    })
+
     var rufusRootHash = driverRufus.myRootHash()
     var tedRootHash = driverTed.myRootHash()
     var billRootHash = driverBill.myRootHash()
@@ -1121,7 +1160,9 @@ test('forget contact forgets just contact', function (t) {
 
 test('forget contact does not forget messages with more than one unforgotten recipient', function (t) {
   t.timeoutAfter(20000)
-  publishIdentities([driverBill, driverTed, driverRufus], function () {
+  var people = [driverBill, driverTed, driverRufus]
+  monitorIdentityPublishAddr(people)
+  publishIdentities(people, function () {
     var rufusRootHash = driverRufus.myRootHash()
     var tedRootHash = driverTed.myRootHash()
     var billRootHash = driverBill.myRootHash()
@@ -1204,7 +1245,7 @@ test('forget contact does not forget messages with more than one unforgotten rec
 test('shouldLoadTx', function (t) {
   t.timeoutAfter(10000)
 
-  var people = [driverBill, driverTed, driverRufus]
+  monitorIdentityPublishAddr(driverBill, driverTed, driverRufus)
   var billTxId
   var tedTxId
   driverRufus.on('unchained', function (info) {
@@ -1229,6 +1270,7 @@ test('shouldLoadTx', function (t) {
 })
 
 test('watchTxs', function (t) {
+  t.plan(2)
   t.timeoutAfter(5000)
 
   var someAddress = 'n2v6PrjuCFBoCn8MmbaK1bcZfC5aDY3RvP'
@@ -1244,9 +1286,12 @@ test('watchTxs', function (t) {
     driverTed.watchTxs(info.txId)
   })
 
+  driverTed.miscDB.once('watchedTxs', function (txIds) {
+    t.deepEqual(txIds, [txId])
+  })
+
   driverTed.on('unchained', function (info) {
     t.equal(info.txId, txId)
-    t.end()
   })
 })
 
@@ -1282,7 +1327,7 @@ function init (cb) {
     chainThrottle: 1000,
     unchainThrottle: 1000,
     sendThrottle: 1000,
-    networkName: networkName,
+    networkName: NETWORK_NAME,
     // keeper: keeper,
     blockchain: blockchain,
     leveldown: memdown
@@ -1564,7 +1609,7 @@ function byTimestampAsc (a, b) {
 function findBitcoinKey (keys, purpose) {
   return find(keys, function (k) {
     return k.type === 'bitcoin' &&
-      k.networkName === networkName &&
+      k.networkName === NETWORK_NAME &&
       k.purpose === purpose
   })
 }
@@ -1573,4 +1618,10 @@ function onceReceivedMessage (driver) {
   var defer = Q.defer()
   driver.once('message', defer.resolve)
   return defer.promise
+}
+
+function monitorIdentityPublishAddr (/* people */) {
+  utils.argsToArray(arguments).forEach(function (tim) {
+    tim.watchAddresses(constants.IDENTITY_PUBLISH_ADDRESS)
+  })
 }

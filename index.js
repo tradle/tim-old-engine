@@ -40,6 +40,7 @@ var Dir = require('./lib/dir')
 var createIdentityDB = require('./lib/identityDB')
 var createMsgDB = require('./lib/msgDB')
 var createTxDB = require('./lib/txDB')
+var createMiscDB = require('./lib/miscDB')
 var Errors = require('./lib/errors')
 var utils = require('./lib/utils')
 var getViaCache = require('./lib/getViaCache')
@@ -59,7 +60,7 @@ var PREV_HASH = constants.PREV_HASH
 var CUR_HASH = constants.CUR_HASH
 var NONCE = constants.NONCE
 var CONFIRMATIONS_BEFORE_CONFIRMED = 10
-var BLOCKCHAIN_KEY_PURPOSE = 'messaging'
+Driver.BLOCKCHAIN_KEY_PURPOSE = 'messaging'
 Driver.MIN_BALANCE = 10000
 Driver.CHAIN_WRITE_THROTTLE = 60000
 Driver.CHAIN_READ_THROTTLE = 300000
@@ -177,8 +178,7 @@ function Driver (options) {
   this._streams = {}
   this._ignoreTxs = []
   this._watchedAddresses = [
-    this.wallet.addressString,
-    constants.IDENTITY_PUBLISH_ADDRESS
+    this.wallet.addressString
   ]
 
   this._watchedTxs = []
@@ -200,6 +200,7 @@ function Driver (options) {
       self._prepIdentity(),
       self._setupTxStream(),
       keeperReady,
+      this._loadWatches(),
       this._updateBalance()
         .catch(function (e) {
           self._debug('unable to get balance')
@@ -213,6 +214,7 @@ function Driver (options) {
       self.msgDB.start()
       self.txDB.start()
       self.addressBook.start()
+      self.miscDB.start()
 
       self._ready = true
       self._debug('ready')
@@ -222,6 +224,20 @@ function Driver (options) {
       self._readFromChain()
       self._sendTheUnsent()
       // self._watchMsgStatuses()
+    })
+}
+
+/**
+ * specify txIds for which to load txs
+ * @param  {Array} txIds - transaction ids
+ */
+Driver.prototype.loadTxs = function (txIds) {
+  var self = this
+  Q.ninvoke(this.blockchain.transactions, 'get', txIds)
+    .then(function (txInfos) {
+      // TODO: get rid of this parse everywhere
+      txInfos = utils.parseCommonBlockchainTxs(txInfos)
+      return self._processTxs(txInfos)
     })
 }
 
@@ -559,6 +575,14 @@ Driver.prototype._shouldLoadTx = function (txInfo) {
   return true
 }
 
+Driver.prototype._willLoadTx = function (txInfo) {
+  var txId = txInfo.txId
+  if (this._ignoreTxs.indexOf(txId) !== -1) return false
+  if (this._watchedTxs.indexOf(txId) !== -1) return true
+
+  return this._shouldLoadTx(txInfo)
+}
+
 // Driver.prototype.shouldLoadTxData = function (txData) {
 //   // override this if you want to be more choosy
 //   return true
@@ -627,11 +651,11 @@ Driver.prototype.identityPublishStatus = function () {
     })
 }
 
-Driver.prototype.publishIdentity = function (identity) {
+Driver.prototype.publishIdentity = function (identity, toAddress) {
   identity = identity || this.identityJSON
   return this.publish({
     msg: identity,
-    to: [{ fingerprint: constants.IDENTITY_PUBLISH_ADDRESS }]
+    to: [{ fingerprint: toAddress || constants.IDENTITY_PUBLISH_ADDRESS }]
   })
 }
 
@@ -642,7 +666,7 @@ Driver.prototype.setIdentity = function (identityJSON) {
   this.identityJSON = this.identity.toJSON()
 }
 
-Driver.prototype.publishMyIdentity = function () {
+Driver.prototype.publishMyIdentity = function (toAddr) {
   var self = this
 
   if (this._publishingIdentity) {
@@ -651,6 +675,10 @@ Driver.prototype.publishMyIdentity = function () {
 
   if (!this._ready) {
     return this._readyPromise.then(this.publishMyIdentity)
+  }
+
+  if (toAddr) {
+    this.watchAddresses(toAddr)
   }
 
   this._publishingIdentity = true
@@ -688,7 +716,7 @@ Driver.prototype.publishMyIdentity = function () {
         extend(self.identityMeta, utils.pick(update, PREV_HASH, ROOT_HASH))
         return Q.all([
           self._prepIdentity(),
-          self.publishIdentity(buf)
+          self.publishIdentity(buf, toAddr)
         ])
       })
   }
@@ -1188,6 +1216,7 @@ Driver.prototype._fetchTxs = function () {
     ])
     .spread(function (part1, part2) {
       var txInfos = part2 ? part1.concat(part2) : part1
+      // TODO: get rid of this parse everywhere
       txInfos = utils.parseCommonBlockchainTxs(txInfos)
       self.emit('txs', txInfos)
       return txInfos
@@ -1282,7 +1311,7 @@ Driver.prototype._processTxs = function (txInfos) {
         }
 
         if (type !== EventType.tx.ignore) {
-          if (!(entry && entry.ignore === false) && !self._shouldLoadTx(parsedTx)) {
+          if (!(entry && entry.ignore === false) && !self._willLoadTx(parsedTx)) {
             type = EventType.tx.ignore
           }
         }
@@ -1307,7 +1336,7 @@ Driver.prototype._processTxs = function (txInfos) {
 
         // clear errors
         nextEntry.set('errors', {})
-        return self.log(utils.jsonifyErrors(nextEntry))
+        return self.log(nextEntry)
       })
 
     return Q.all(logPromises)
@@ -1362,7 +1391,7 @@ Driver.prototype._setupDBs = function () {
     })
   })
 
-  self.on('unchained', function (entry) {
+  this.on('unchained', function (entry) {
     if (entry[TYPE] === TYPES.IDENTITY && entry[CUR_HASH] === self.myCurrentHash()) {
       self.emit('unchained-self', entry)
     }
@@ -1376,6 +1405,23 @@ Driver.prototype._setupDBs = function () {
   })
 
   this.txDB.name = this.name()
+
+  this.miscDB = createMiscDB(this._prefix('misc.db'), {
+    leveldown: this.leveldown,
+    log: this._log,
+    timeout: false,
+    autostart: false
+  })
+
+  this.miscDB.on('watchedAddresses', function (addrs) {
+    self._setWatchedAddresses(addrs)
+  })
+
+  this.miscDB.on('watchedTxs', function (txIds) {
+    self._setWatchedTxs(txIds)
+  })
+
+  this.miscDB.name = this.name()
 }
 
 Driver.prototype._trySend = function (entry) {
@@ -1578,7 +1624,7 @@ Driver.prototype.getBlockchainKey = function () {
   return toKey(this.getPrivateKey({
     networkName: this.networkName,
     type: 'bitcoin',
-    purpose: BLOCKCHAIN_KEY_PURPOSE
+    purpose: Driver.BLOCKCHAIN_KEY_PURPOSE
   }))
 }
 
@@ -1695,7 +1741,7 @@ Driver.prototype.addContactIdentity = function (identity) {
       .then(function () {
         rootHash = identityJSON[ROOT_HASH] || curHash
         var fromAddress = identityJSON.pubkeys.filter(function (key) {
-          return key.purpose === BLOCKCHAIN_KEY_PURPOSE && key.networkName === self.networkName
+          return key.purpose === Driver.BLOCKCHAIN_KEY_PURPOSE && key.networkName === self.networkName
         })[0].fingerprint
 
         var entry = new Entry({
@@ -2286,7 +2332,7 @@ Driver.prototype._getBTCKey = function (identity) {
   return utils.firstKey(identity.pubkeys, {
     type: 'bitcoin',
     networkName: this.networkName,
-    purpose: BLOCKCHAIN_KEY_PURPOSE
+    purpose: Driver.BLOCKCHAIN_KEY_PURPOSE
   })
 }
 
@@ -2297,7 +2343,7 @@ Driver.prototype.lookupBTCKey = function (recipient) {
       return utils.firstKey(result.identity.pubkeys, {
         type: 'bitcoin',
         networkName: self.networkName,
-        purpose: BLOCKCHAIN_KEY_PURPOSE
+        purpose: Driver.BLOCKCHAIN_KEY_PURPOSE
       })
     })
 }
@@ -2391,31 +2437,125 @@ Driver.prototype._getWatchedTxs = function () {
   return this._watchedTxs.slice()
 }
 
-Driver.prototype.watchAddresses = function (/* addresses */) {
-  utils.argsToArray(arguments).forEach(function (addr) {
-    if (this._watchedAddresses.indexOf(addr) === -1) {
-      this._watchedAddresses.push(addr)
-    }
-  }, this)
+/**
+ * TODO: record why we're watching a particular address
+ * so we can stop watching it later
+ */
+Driver.prototype.watchAddresses = function (/* addrs */) {
+  var self = this
+  var addrs = utils.argsToArray(arguments)
+  typeforce(typeforce.arrayOf('String'), addrs)
+
+  this._loadWatchesPromise.then(function () {
+    addrs = addrs.filter(function (addr) {
+      return self._watchedAddresses.indexOf(addr) === -1
+    })
+
+    if (!addrs.length) return
+
+    self.log(new Entry({
+      type: EventType.misc.watchAddresses,
+      addresses: addrs
+    }))
+  })
 
   return this
 }
 
 Driver.prototype.watchTxs = function (/* txIds */) {
-  utils.argsToArray(arguments).forEach(function (txId) {
-    if (this._watchedTxs.indexOf(txId) !== -1) return
+  var self = this
+  var txIds = utils.argsToArray(arguments)
+  typeforce(typeforce.arrayOf('String'), txIds)
 
-    this._watchedTxs.push(txId)
-    this.log(new Entry({
-      type: EventType.tx.watch,
-      txId: txId
-    }))
+  return this._loadWatchesPromise
+    .then(function () {
+      txIds = txIds.filter(function (txId) {
+        return self._watchedTxs.indexOf(txId) === -1
+      })
 
-    var idx = this._ignoreTxs.indexOf(txId)
-    if (idx !== -1) this._ignoreTxs.splice(idx, 1)
-  }, this)
+      if (!txIds.length) return
+
+      return Q.all(txIds.map(function (txId) {
+        return self.log(new Entry({
+          type: EventType.tx.watch,
+          txId: txId
+        }))
+      }))
+    })
+}
+
+Driver.prototype.unwatchAddresses = function (/* addrs */) {
+  var self = this
+  var addrs = utils.argsToArray(arguments)
+  typeforce(typeforce.arrayOf('String'), addrs)
+
+  return this.ready()
+    .then(function () {
+      addrs = addrs.filter(function (addr) {
+        return self._watchedAddresses.indexOf(addr) !== -1
+      })
+
+      if (!addrs.length) return
+
+      self.log(new Entry({
+        type: EventType.misc.unwatchAddresses,
+        addresses: addrs
+      }))
+    })
 
   return this
+}
+
+Driver.prototype._loadWatches = function () {
+  var self = this
+  if (this._loadWatchesPromise) return this._loadWatchesPromise
+
+  return this._loadWatchesPromise = Q.all([
+    this._loadWatchedAddrs(),
+    this._loadWatchedTxs()
+  ])
+}
+
+Driver.prototype._loadWatchedAddrs = function () {
+  var self = this
+  return Q.ninvoke(this.miscDB, 'getWatchedAddresses')
+    .then(this._setWatchedAddresses)
+    .then(function () {
+      var addrs = self.identityJSON.pubkeys
+        .filter(function (k) {
+          return k.type === 'bitcoin' &&
+            k.networkName === self.networkName
+        })
+        .map(function (k) {
+          return k.fingerprint
+        })
+
+      return self.watchAddresses(addrs)
+    })
+}
+
+Driver.prototype._setWatchedAddresses = function (addrs) {
+  this._watchedAddresses = addrs
+}
+
+Driver.prototype._addresses = function () {
+  return this._watchedAddresses.slice()
+}
+
+Driver.prototype._setWatchedTxs = function (txIds) {
+  this._watchedTxs = txIds
+  this._ignoreTxs = this._ignoreTxs.filter(function (txId) {
+    return this._watchedTxs.indexOf(txId) !== -1
+  }, this)
+}
+
+Driver.prototype._addresses = function () {
+  return this._watchedAddresses.slice()
+}
+
+Driver.prototype._loadWatchedTxs = function () {
+  return Q.ninvoke(this.miscDB, 'getWatchedTxs')
+    .then(this._setWatchedTxs)
 }
 
 function copyDHTKeys (dest, src, curHash) {
