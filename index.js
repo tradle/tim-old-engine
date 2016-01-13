@@ -348,6 +348,7 @@ Driver.prototype._readFromChain = function () {
     }),
     map(function (entry, cb) {
       // was read from chain and hasn't been processed yet
+      var txId = entry.txId
       if (!entry.dateDetected || entry.dateUnchained || entry.ignore) {
         return finish()
       }
@@ -364,7 +365,6 @@ Driver.prototype._readFromChain = function () {
 
       if (!shouldTryAgain) return finish()
 
-      var txId = entry.txId
       if (errs.length >= Errors.MAX_UNCHAIN) {
         // console.log(entry.errors, entry.id)
         self._debug('skipping unchain after', errs.length, 'errors for tx:', txId)
@@ -453,6 +453,8 @@ Driver.prototype._pauseStreamIfPaused = function (stream) {
 // }
 
 Driver.prototype._rmPending = function (txId) {
+  typeforce('String', txId)
+
   var idx = this._pendingTxs.indexOf(txId)
   if (idx !== -1) {
     this._pendingTxs.splice(idx, 1)
