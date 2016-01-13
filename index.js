@@ -893,6 +893,13 @@ Driver.prototype._processQueue = function (opts) {
           throw err
         }
 
+        // HACK for bug fixed in 3.5.1
+        // to kill orphaned timestamps that were already introduced
+        if (state.timestamp !== Number(data.key.split('!')[1])) {
+          self._debug('ignoring orphaned timestamp', state.uuid)
+          return cb()
+        }
+
         if (shouldSkipQueue(state)) {
           runASAP(state)
         } else {
