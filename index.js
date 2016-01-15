@@ -66,6 +66,7 @@ Driver.CHAIN_WRITE_THROTTLE = 60000
 Driver.CHAIN_READ_THROTTLE = 300000
 Driver.SEND_THROTTLE = 10000
 Driver.CATCH_UP_INTERVAL = 2000
+Driver.UNCHAIN_THROTTLE = 20000
 Driver.Zlorp = Zlorp
 Driver.Kiki = kiki
 Driver.Identity = Identity
@@ -78,6 +79,7 @@ var DEFAULT_OPTIONS = {
   opReturnPrefix: '',
   chainThrottle: Driver.CHAIN_WRITE_THROTTLE,
   syncInterval: Driver.CHAIN_READ_THROTTLE,
+  unchainThrottle: Driver.UNCHAIN_THROTTLE,
   sendThrottle: Driver.SEND_THROTTLE,
   afterBlockTimestamp: 0
 }
@@ -98,6 +100,7 @@ var optionsTypes = {
   messenger: '?Object',
   syncInterval: '?Number',
   chainThrottle: '?Number',
+  unchainThrottle: '?Number',
   sendThrottle: '?Number',
   readOnly: '?Boolean',
   relay: '?Object',
@@ -379,7 +382,7 @@ Driver.prototype._readFromChain = function () {
       }
 
       self._queuedUnchains[txId] = true
-      var throttled = throttleIfRetrying(errs, self.syncInterval, function () {
+      var throttled = throttleIfRetrying(errs, self.unchainThrottle, function () {
         finish(null, entry)
       })
 
@@ -538,7 +541,7 @@ Driver.prototype._catchUpWithBlockchain = function () {
           var hasErrors = !!utils.countErrors(entry)
           var processed = entry.dateUnchained || entry.dateChained || entry.ignore || hasErrors
           if (!processed) {
-            self._debug('still waiting for tx', txId)
+            self._debug('still waiting for tx', entry.txId)
             throw new Error('not ready')
           }
         }
@@ -1714,12 +1717,6 @@ Driver.prototype.receiveMsg = function (buf, senderInfo) {
     .then(function () {
       return self.lookupObject(chainedObj, true)
     })
-    // .then(function () {
-    //   // yes, it repeats work
-    //   // but it makes the code simpler
-    //   // TODO optimize
-    //   return self.lookupObject(chainedObj, true) // verify
-    // })
     .then(self.unchainResultToEntry)
     .then(function (entry) {
       return entry.set({

@@ -1122,6 +1122,7 @@ function init (cb) {
   var commonOpts = {
     syncInterval: 1000,
     chainThrottle: 1000,
+    unchainThrottle: 1000,
     sendThrottle: 1000,
     networkName: networkName,
     // keeper: keeper,
