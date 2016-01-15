@@ -139,7 +139,10 @@ rimraf.sync(STORAGE_DIR)
 test('unchained-self event', function (t) {
   t.plan(1)
   t.timeoutAfter(5000)
-  driverBill.on('unchained-self', t.pass)
+  driverBill.on('unchained-self', function (info) {
+    t.equal(info[CUR_HASH], driverBill.myCurrentHash())
+  })
+
   publishIdentities([driverBill])
 })
 

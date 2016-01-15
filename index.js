@@ -1348,7 +1348,7 @@ Driver.prototype._setupDBs = function () {
 
   self.on('unchained', function (entry) {
     if (entry[TYPE] === TYPES.IDENTITY && entry[CUR_HASH] === self.myCurrentHash()) {
-      self.emit('unchained-self')
+      self.emit('unchained-self', entry)
     }
   })
 
@@ -1654,7 +1654,7 @@ Driver.prototype.receiveMsg = function (buf, senderInfo) {
   var timestamp = hrtime()
 
   // this thing repeats work all over the place
-  var txInfo
+  var chainedObj
   var promiseValid
   var valid = utils.validateMsg(msg)
   if (valid) {
@@ -1678,11 +1678,13 @@ Driver.prototype.receiveMsg = function (buf, senderInfo) {
         purpose: 'messaging'
       })
 
-      txInfo = {
+      chainedObj = {
         addressesFrom: [fromKey.fingerprint],
         addressesTo: [self.wallet.addressString],
         txData: msg.txData,
-        txType: msg.txType
+        txType: msg.txType,
+        encryptedData: msg.encryptedData,
+        encryptedPermission: msg.encryptedPermission
       }
 
       // TODO: rethink how chainloader should work
@@ -1690,23 +1692,34 @@ Driver.prototype.receiveMsg = function (buf, senderInfo) {
 
       // this will verify that the message
       // comes from the sender in senderInfo
-      return self.chainloader._processTxInfo(txInfo)
+      return self.chainloader._processTxInfo(chainedObj)
     })
-    .then(function (parsed) {
-      return Q.ninvoke(Permission, 'recover', msg.encryptedPermission, parsed.sharedKey)
-        .then(function (permission) {
-          return Q.all([
-            self.keeper.put(parsed.permissionKey.toString('hex'), msg.encryptedPermission),
-            self.keeper.put(permission.fileKeyString(), msg.encryptedData)
-          ])
-        })
+    .then(function (info) {
+      extend(chainedObj, info)
+      return Q.ninvoke(Permission, 'recover', msg.encryptedPermission, chainedObj.sharedKey)
+    })
+    .then(function (permission) {
+      chainedObj.permission = permission
+      return self.keeper.putMany([
+        {
+          key: chainedObj.permissionKey.toString('hex'),
+          value: msg.encryptedPermission
+        },
+        {
+          key: permission.fileKeyString(),
+          value: msg.encryptedData
+        }
+      ])
     })
     .then(function () {
-      // yes, it repeats work
-      // but it makes the code simpler
-      // TODO optimize
-      return self.lookupObject(txInfo)
+      return self.lookupObject(chainedObj, true)
     })
+    // .then(function () {
+    //   // yes, it repeats work
+    //   // but it makes the code simpler
+    //   // TODO optimize
+    //   return self.lookupObject(chainedObj, true) // verify
+    // })
     .then(self.unchainResultToEntry)
     .then(function (entry) {
       return entry.set({
@@ -1730,6 +1743,7 @@ Driver.prototype.receiveMsg = function (buf, senderInfo) {
     })
     .then(function (entry) {
       entry.set('timestamp', timestamp)
+      self._debug('processed received msg')
       return self.log(entry)
     })
 }
@@ -2244,7 +2258,7 @@ function throttleIfRetrying (errors, throttle, cb) {
   }
 
   // just in case the device clock time-traveled
-  wait = Math.min(wait, throttle)
+  wait = Math.min(wait, throttle) | 0
   setTimeout(cb, wait)
   return wait
 }
