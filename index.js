@@ -340,11 +340,11 @@ Driver.prototype._readFromChain = function () {
   pump(
     stream,
     map(function (data, cb) {
-      if (typeof data.value === 'object') {
-        return cb(null, data.value)
+      if (self._destroyed || typeof data.value !== 'object') {
+        return cb()
       }
 
-      cb() // skip
+      return cb(null, data.value)
     }),
     map(function (entry, cb) {
       // was read from chain and hasn't been processed yet
@@ -379,10 +379,13 @@ Driver.prototype._readFromChain = function () {
       }
 
       self._queuedUnchains[txId] = true
-      self._debug('throttling unchain retry of tx', txId)
-      throttleIfRetrying(errs, self.syncInterval, function () {
+      var throttled = throttleIfRetrying(errs, self.syncInterval, function () {
         finish(null, entry)
       })
+
+      if (throttled) {
+        self._debug('throttling unchain retry of tx', txId, throttled, 'millis')
+      }
 
       function finish (err, ret) {
         if (err || !ret) self._rmPending(txId)
@@ -396,8 +399,10 @@ Driver.prototype._readFromChain = function () {
       }
     }),
     map(function (txEntry, cb) {
+      if (self._destroyed) return cb()
+
       var chainedObj
-      self.unchainer.unchain(txEntry)
+      self.lookupObject(txEntry, true) // verify=true
         .then(function (result) {
           chainedObj = result
           if (chainedObj.txType === TxData.types.public) {
@@ -483,19 +488,12 @@ Driver.prototype._setupTxCaching = function () {
       return null
     })
 
-    ids.forEach(function (id, i) {
-      txDB.get(id, function (err, tx) {
-        if (tx && tx.confirmations > CONFIRMATIONS_BEFORE_CONFIRMED) {
-          results[i] = tx
-          if (!tx.txHex) {
-            tx.txHex = tx.tx.toString('hex')
-          }
-        }
-
-        if (--togo === 0) {
-          cb(null, results)
-        }
-      })
+    self._multiGetFromDB({
+      db: self.txDB,
+      keys: ids
+    })
+    .then(function (results) {
+      cb(null, utils.pluck(results, 'value'))
     })
   }
 }
@@ -521,7 +519,7 @@ Driver.prototype._catchUpWithBlockchain = function () {
         return txInfo.blockTimestamp > self.afterBlockTimestamp
       })
       .map(function (txInfo) {
-        return txInfo.tx.getId()
+        return txInfo.txId
       })
 
     checkDBs()
@@ -532,19 +530,19 @@ Driver.prototype._catchUpWithBlockchain = function () {
   function checkDBs () {
     if (self._destroyed) return
 
-    var tasks = txIds.map(function (txId) {
-      return Q.ninvoke(self.txDB, 'get', txId)
-        .then(function (entry) {
+    self._multiGetFromDB({
+        db: self.txDB,
+        keys: txIds,
+        strict: true,
+        then: function (entry) {
           var hasErrors = !!utils.countErrors(entry)
           var processed = entry.dateUnchained || entry.dateChained || entry.ignore || hasErrors
           if (!processed) {
             self._debug('still waiting for tx', txId)
             throw new Error('not ready')
           }
-        })
-    })
-
-    Q.all(tasks)
+        }
+      })
       .then(catchUp.resolve)
       .catch(scheduleRetry)
   }
@@ -553,6 +551,44 @@ Driver.prototype._catchUpWithBlockchain = function () {
     self._debug('not caught up yet with blockchain...')
     setTimeout(checkDBs, Driver.CATCH_UP_INTERVAL)
   }
+}
+
+// Driver.prototype.unignoreTxs = function (txIds) {
+//   this.log(new Entry({
+//     type: EventType.tx.load,
+//     ignore: false,
+//     txIds: txIds
+//   }))
+// }
+
+Driver.prototype._sortParsedTxs = function (txInfos) {
+  return txInfos
+}
+
+Driver.prototype._shouldLoadTx = function (txInfo) {
+  // override this if you want to be more choosy
+  return true
+}
+
+// Driver.prototype.shouldLoadTxData = function (txData) {
+//   // override this if you want to be more choosy
+//   return true
+// }
+
+Driver.prototype._multiGetFromDB = function (opts) {
+  // override this if you have a better way
+  // e.g. in react-native, with AsyncStorage.multiGet
+  typeforce({
+    db: 'Object',
+    keys: 'Array',
+    then: '?Function',
+    strict: '?Boolean'
+  }, opts)
+
+  return Q[opts.strict ? 'all' : 'allSettled'](opts.keys.map(function (key) {
+    var promise = Q.ninvoke(opts.db, 'get', key)
+    return opts.then ? promise.then(opts.then) : promise
+  }))
 }
 
 Driver.prototype.identityPublishStatus = function () {
@@ -1152,9 +1188,11 @@ Driver.prototype._processTxs = function (txInfos) {
   var self = this
   if (this._destroyed) return
 
-  var lookups = []
+  var idsToLookup = []
+  txInfos = this._sortParsedTxs(txInfos)
+
   var filtered = txInfos.filter(function (txInfo) {
-      var id = txInfo.tx.getId()
+      var id = txInfo.txId
       if (txInfo.blockTimestamp &&
           txInfo.blockTimestamp <= self.afterBlockTimestamp) {
 
@@ -1174,12 +1212,15 @@ Driver.prototype._processTxs = function (txInfos) {
 
       // TODO: filter shouldn't have side effects
       self._pendingTxs.push(id)
+      idsToLookup.push(id)
       txInfo.id = id
-      lookups.push(Q.ninvoke(self.txDB, 'get', id))
       return true
     })
 
-  return Q.allSettled(lookups)
+  return this._multiGetFromDB({
+      db: this.txDB,
+      keys: idsToLookup
+    })
     .then(function (results) {
       var logPromises = results.map(function (result, i) {
         var txInfo = filtered[i]
@@ -1227,6 +1268,12 @@ Driver.prototype._processTxs = function (txInfos) {
           type = EventType.tx.new
         }
 
+        if (type !== EventType.tx.ignore) {
+          if (!(entry && entry.ignore === false) && !self._shouldLoadTx(parsedTx)) {
+            type = EventType.tx.ignore
+          }
+        }
+
         var isOutbound = parsedTx.addressesFrom.some(function (addr) {
           return addr === self.wallet.addressString
         })
@@ -1239,6 +1286,8 @@ Driver.prototype._processTxs = function (txInfos) {
             type: type,
             txId: id,
             tx: utils.toBuffer(txInfo.tx),
+            // ignore can be revoked
+            ignore: type === EventType.tx.ignore,
             dir: isOutbound ? Dir.outbound : Dir.inbound
           }
         ))
@@ -1338,7 +1387,9 @@ Driver.prototype.lookupObjectsByRootHash = function (rootHash) {
   var self = this
   return Q.ninvoke(this.messages(), 'byRootHash', rootHash)
     .then(function (msgs) {
-      return Q.all(msgs.map(self.lookupObject))
+      return Q.all(msgs.map(function (m) {
+        return self.lookupObject(m)
+      }))
     })
 }
 
@@ -1347,7 +1398,7 @@ Driver.prototype.lookupObjectByCurHash = function (curHash) {
     .then(this.lookupObject)
 }
 
-Driver.prototype.lookupObject = function (info) {
+Driver.prototype.lookupObject = function (info, verify) {
   var self = this
 
   if (this._destroyed) {
@@ -1368,7 +1419,7 @@ Driver.prototype.lookupObject = function (info) {
   }
 
   return this.unchainer.unchain(clone(info), {
-    verify: false
+    verify: !!verify
   })
 }
 
@@ -2129,7 +2180,9 @@ Driver.prototype.history = function (otherPartyRootHash) {
     : Q.nfcall(collect, this.msgDB.createValueStream())
 
   return getMsgs.then(function (msgs) {
-    return Q.all(msgs.map(self.lookupObject))
+    return Q.all(msgs.map(function (msg) {
+      return self.lookupObject(msg)
+    }))
   })
 }
 
@@ -2173,7 +2226,8 @@ function validateRecipients (recipients) {
 
 function throttleIfRetrying (errors, throttle, cb) {
   if (!errors || !errors.length) {
-    return cb()
+    cb()
+    return
   }
 
   var lastErr = errors[errors.length - 1]
@@ -2185,12 +2239,14 @@ function throttleIfRetrying (errors, throttle, cb) {
   var now = utils.now()
   var wait = lastErr.timestamp + throttle - now
   if (wait < 0) {
-    return cb()
+    cb()
+    return
   }
 
   // just in case the device clock time-traveled
   wait = Math.min(wait, throttle)
   setTimeout(cb, wait)
+  return wait
 }
 
 function alwaysFalse () {

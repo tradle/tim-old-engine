@@ -471,7 +471,7 @@ test('give up unchaining after max retries', function (t) {
 })
 
 test('the reader and the writer', function (t) {
-  // t.timeoutAfter(20000)
+  t.timeoutAfter(20000)
 
   var togo = 4
   var reader = driverBill
@@ -517,7 +517,7 @@ test('the reader and the writer', function (t) {
         t.ok(status.ever)
         t.ok(status.current)
       })
-      .then(function () {
+      .then(function (signed) {
         return reader.send({
           chain: false,
           deliver: true,
@@ -1081,6 +1081,33 @@ test('forget contact', function (t) {  // t.timeoutAfter(20000)
         t.end()
       })
       .done()
+  })
+})
+
+test('shouldLoadTx', function (t) {
+  t.timeoutAfter(10000)
+
+  var people = [driverBill, driverTed, driverRufus]
+  var billTxId
+  var tedTxId
+  driverRufus.on('unchained', function (info) {
+    t.equal(info.txId, billTxId)
+    // make sure ted doesn't get loaded
+    setTimeout(t.end, driverRufus.syncInterval * 3)
+  })
+
+  driverRufus._shouldLoadTx = function (tx) {
+    return tx.txId === billTxId
+  }
+
+  driverBill.publishMyIdentity().done()
+  driverTed.publishMyIdentity().done()
+  driverBill.on('chained', function (info) {
+    billTxId = info.txId
+  })
+
+  driverTed.on('chained', function (info) {
+    tedTxId = info.txId
   })
 })
 
