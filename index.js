@@ -395,7 +395,7 @@ Driver.prototype._readFromChain = function () {
 
         delete self._queuedUnchains[txId]
         if (!ret) {
-          self._debug('skipping unchain of tx', entry.txId)
+          self._debug('skipping unchain of tx', txId)
         }
 
         cb(err, ret)
@@ -496,7 +496,12 @@ Driver.prototype._setupTxCaching = function () {
       keys: ids
     })
     .then(function (results) {
-      cb(null, utils.pluck(results, 'value'))
+      results = utils.pluck(results, 'value')
+        .map(function (v) {
+          return v && v.confirmations >= CONFIRMATIONS_BEFORE_CONFIRMED ? v : undefined
+        })
+
+      cb(null, results)
     })
   }
 }
@@ -2248,14 +2253,16 @@ function throttleIfRetrying (errors, throttle, cb) {
   }
 
   var now = utils.now()
-  var wait = lastErr.timestamp + throttle - now
+  // exponential back-off
+  var wait = lastErr.timestamp + Math.pow(2, errors.length) * throttle - now
   if (wait < 0) {
     cb()
     return
   }
 
   // just in case the device clock time-traveled
-  wait = Math.min(wait, throttle) | 0
+  // max wait an hour
+  wait = Math.min(wait, throttle, 3600000) | 0
   setTimeout(cb, wait)
   return wait
 }
