@@ -1,6 +1,6 @@
 require('./end-to-end')
 require('./identityDB')
 require('./entries')
-require('./messengers')
+// require('./messengers')
 require('./getViaCache')
 // require('./typestore')
