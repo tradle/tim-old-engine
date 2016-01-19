@@ -1,6 +1,6 @@
 {
   "name": "tim",
-  "version": "3.9.0",
+  "version": "3.10.0",
   "description": "Tradle's P2P OTR-based chat with plaintext and structured messages, and the ability to externalize messages onto a blockchain (currently bitcoin's)",
   "main": "index.js",
   "scripts": {
