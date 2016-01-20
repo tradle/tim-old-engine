@@ -480,26 +480,36 @@ Driver.prototype._setupTxCaching = function () {
   var self = this
   var txDB = this.txDB
   var txSubmodule = this.blockchain.transactions
+  this._ignoreTxs = []
   txSubmodule.get = getViaCache(
     txSubmodule.get.bind(txSubmodule),
     getFromCache
   )
 
   function getFromCache (ids, cb) {
-    var togo = ids.length
-    var results = ids.map(function () {
-      return null
+    ids = ids.filter(function (id) {
+      return self._ignoreTxs.indexOf(id) === -1
     })
 
+    var togo = ids.length
     self._multiGetFromDB({
       db: self.txDB,
       keys: ids
     })
     .then(function (results) {
       results = utils.pluck(results, 'value')
-        .map(function (v) {
-          return v && v.confirmations >= CONFIRMATIONS_BEFORE_CONFIRMED ? v : undefined
-        })
+      results.forEach(function (r, i) {
+        if (r && r.ignore) {
+          var id = ids[i]
+          if (self._ignoreTxs.indexOf(id) === -1) {
+            self._ignoreTxs.push(id)
+          }
+        }
+      })
+
+      results = results.map(function (v) {
+        return v && v.confirmations >= CONFIRMATIONS_BEFORE_CONFIRMED ? v : undefined
+      })
 
       cb(null, results)
     })
@@ -1657,7 +1667,7 @@ Driver.prototype.receiveMsg = function (buf, senderInfo) {
     return Q.reject(new Error('expected JSON'))
   }
 
-  this._debug('received msg', msg)
+  this._debug('received msg', msg.txData)
 
   var timestamp = hrtime()
 
@@ -2166,6 +2176,7 @@ Driver.prototype.destroy = function () {
     tasks.push(this.httpServer.destroy())
   }
 
+  delete this._ignoreTxs
   delete this._identityCache
   // async
   return Q.all(tasks)
