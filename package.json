@@ -38,7 +38,7 @@
     "@tradle/kiki": "^1.1.12",
     "@tradle/multiplex-utp": "^1.0.1",
     "@tradle/permission": "^1.0.4",
-    "@tradle/simple-wallet": "^1.1.0",
+    "@tradle/simple-wallet": "^1.1.1",
     "@tradle/transport-p2p": "^1.0.0",
     "@tradle/tx-data": "^1.0.3",
     "@tradle/utils": "^1.0.0",
