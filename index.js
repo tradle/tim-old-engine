@@ -209,6 +209,13 @@ function Driver (options) {
   })
 
   this._streams = {}
+  this._ignoreTxs = []
+  this._watchedAddresses = [
+    this.wallet.addressString,
+    constants.IDENTITY_PUBLISH_ADDRESS
+  ]
+
+  this._watchedTxs = []
 
   // in-memory cache of recent conversants
   this._catchUpWithBlockchain()
@@ -216,7 +223,7 @@ function Driver (options) {
   this._pendingTxs = []
 
   this._setupDBs()
-  this._setupTxCaching()
+  this._setupTxFetching()
 
   var keeperReadyDfd = Q.defer()
   var keeperReady = keeperReadyDfd.promise
@@ -476,11 +483,10 @@ Driver.prototype._rethrow = function (err) {
   }
 }
 
-Driver.prototype._setupTxCaching = function () {
+Driver.prototype._setupTxFetching = function () {
   var self = this
   var txDB = this.txDB
   var txSubmodule = this.blockchain.transactions
-  this._ignoreTxs = []
   txSubmodule.get = getViaCache(
     txSubmodule.get.bind(txSubmodule),
     getFromCache
@@ -1194,8 +1200,13 @@ Driver.prototype._fetchAndReschedule = function () {
 
 Driver.prototype._fetchTxs = function () {
   var self = this
-  return Q.ninvoke(this.blockchain.addresses, 'transactions', this._addresses())
-    .then(function (txInfos) {
+  var watchedTxs = this._getWatchedTxs()
+  return Q.all([
+      Q.ninvoke(this.blockchain.addresses, 'transactions', this._getWatchedAddresses()),
+      watchedTxs.length && Q.ninvoke(this.blockchain.transactions, 'get', watchedTxs)
+    ])
+    .spread(function (part1, part2) {
+      var txInfos = part2 ? part1.concat(part2) : part1
       txInfos = utils.parseCommonBlockchainTxs(txInfos)
       self.emit('txs', txInfos)
       return txInfos
@@ -1667,7 +1678,7 @@ Driver.prototype.receiveMsg = function (buf, senderInfo) {
     return Q.reject(new Error('expected JSON'))
   }
 
-  this._debug('received msg', msg.txData)
+  this._debug('received msg')
 
   var timestamp = hrtime()
 
@@ -2217,11 +2228,32 @@ Driver.prototype.getConversation = function (rootHash) {
   return Q.ninvoke(this.msgDB, 'getConversation', rootHash)
 }
 
-Driver.prototype._addresses = function () {
-  return [
-    this.wallet.addressString,
-    constants.IDENTITY_PUBLISH_ADDRESS
-  ]
+Driver.prototype._getWatchedAddresses = function () {
+  return this._watchedAddresses.slice()
+}
+
+Driver.prototype._getWatchedTxs = function () {
+  return this._watchedTxs.slice()
+}
+
+Driver.prototype.watchAddresses = function (/* addresses */) {
+  utils.argsToArray(arguments).forEach(function (addr) {
+    if (this._watchedAddresses.indexOf(addr) === -1) {
+      this._watchedAddresses.push(addr)
+    }
+  }, this)
+
+  return this
+}
+
+Driver.prototype.watchTxs = function (/* txIds */) {
+  utils.argsToArray(arguments).forEach(function (tx) {
+    if (this._watchedTxs.indexOf(tx) === -1) {
+      this._watchedTxs.push(tx)
+    }
+  }, this)
+
+  return this
 }
 
 function copyDHTKeys (dest, src, curHash) {

@@ -1114,6 +1114,50 @@ test('shouldLoadTx', function (t) {
   })
 })
 
+test('watchTxs', function (t) {
+  t.timeoutAfter(5000)
+
+  var someAddress = 'n2v6PrjuCFBoCn8MmbaK1bcZfC5aDY3RvP'
+
+  var txId
+  driverBill.publish({
+    msg: toMsg({ hey: 'ho' }),
+    to: [{ fingerprint: someAddress }]
+  })
+
+  driverBill.on('chained', function (info) {
+    txId = info.txId
+    driverTed.watchTxs(info.txId)
+  })
+
+  driverTed.on('unchained', function (info) {
+    t.equal(info.txId, txId)
+    t.end()
+  })
+})
+
+test('watchAddresses', function (t) {
+  t.timeoutAfter(5000)
+
+  var someAddress = 'n2v6PrjuCFBoCn8MmbaK1bcZfC5aDY3RvP'
+
+  var txId
+  driverBill.publish({
+    msg: toMsg({ hey: 'ho' }),
+    to: [{ fingerprint: someAddress }]
+  })
+
+  driverBill.on('chained', function (info) {
+    txId = info.txId
+  })
+
+  driverTed.watchAddresses(someAddress)
+  driverTed.on('unchained', function (info) {
+    t.equal(info.txId, txId)
+    t.end()
+  })
+})
+
 function init (cb) {
   reinitCount++
 
