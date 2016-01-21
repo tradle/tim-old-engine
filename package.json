@@ -39,7 +39,7 @@
     "@tradle/multiplex-utp": "^1.0.1",
     "@tradle/permission": "^1.0.4",
     "@tradle/simple-wallet": "^1.1.0",
-    "@tradle/transport": "^1.0.0",
+    "@tradle/transport-p2p": "^1.0.0",
     "@tradle/tx-data": "^1.0.3",
     "@tradle/utils": "^1.0.0",
     "@tradle/verifier": "^1.1.0",
@@ -74,6 +74,7 @@
   "devDependencies": {
     "@tradle/cb-blockr": "^3.1.1",
     "@tradle/test-helpers": "^1.2.0",
+    "@tradle/transport-http": "^1.0.0",
     "express": "^4.13.3",
     "memdown": "^1.0.0",
     "pre-commit": "^1.0.10",

@@ -95,7 +95,7 @@ Driver.CATCH_UP_INTERVAL = 1000
 // Driver.CHAIN_WRITE_THROTTLE = 1000
 // Driver.CHAIN_READ_THROTTLE = 1000
 var utils = require('../lib/utils')
-var Messengers = require('@tradle/transport')
+var Transport = require('@tradle/transport-http')
 var Errors = require('../lib/errors')
 Errors.MAX_RESEND = 5
 Errors.MAX_CHAIN = 5
@@ -996,7 +996,7 @@ test('http messenger, recipient-specific', function (t) {
     var app = express()
     var server = app.listen(++BASE_PORT)
     server.once('listening', function () {
-      var tedServer = new Messengers.HttpServer({
+      var tedServer = new Transport.HttpServer({
         router: app,
         receive: function (buf, from) {
           t.equal(from[ROOT_HASH], driverBill.myRootHash())
@@ -1010,7 +1010,7 @@ test('http messenger, recipient-specific', function (t) {
       driverTed.setHttpServer(tedServer)
 
       // bill can contact ted over http
-      var httpToTed = new Messengers.HttpClient({
+      var httpToTed = new Transport.HttpClient({
         rootHash: driverBill.myRootHash()
       })
 

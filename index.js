@@ -25,7 +25,7 @@ var Permission = require('@tradle/permission')
 var Wallet = require('@tradle/simple-wallet')
 // var cbstreams = require('@tradle/cb-streams')
 var Zlorp = require('zlorp')
-var Messengers = require('@tradle/transport')
+var P2PTransport = require('@tradle/transport-p2p')
 var hrtime = require('monotonic-timestamp')
 var mi = require('@tradle/identity')
 var Identity = mi.Identity
@@ -61,6 +61,7 @@ var CUR_HASH = constants.CUR_HASH
 var NONCE = constants.NONCE
 var CONFIRMATIONS_BEFORE_CONFIRMED = 10
 var BLOCKCHAIN_KEY_PURPOSE = 'messaging'
+Driver.Transport = { P2P: P2PTransport }
 Driver.MIN_BALANCE = 10000
 Driver.CHAIN_WRITE_THROTTLE = 60000
 Driver.CHAIN_READ_THROTTLE = 300000
@@ -71,7 +72,6 @@ Driver.Zlorp = Zlorp
 Driver.Kiki = kiki
 Driver.Identity = Identity
 Driver.Wallet = Wallet
-Driver.Messengers = Messengers
 Driver.EventType = EventType
 // TODO: export other deps
 
@@ -166,7 +166,7 @@ function Driver (options) {
       throw new Error('missing key required for p2p comm')
     }
 
-    this.messenger = new Messengers.P2P({
+    this.messenger = new P2PTransport({
       zlorp: new Zlorp({
         name: this.name(),
         available: true,
