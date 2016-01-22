@@ -23,9 +23,6 @@ var ChainWriter = require('@tradle/bitjoe-js')
 var ChainLoader = require('@tradle/chainloader')
 var Permission = require('@tradle/permission')
 var Wallet = require('@tradle/simple-wallet')
-// var cbstreams = require('@tradle/cb-streams')
-var Zlorp = require('zlorp')
-var P2PTransport = require('@tradle/transport-p2p')
 var hrtime = require('monotonic-timestamp')
 var mi = require('@tradle/identity')
 var Identity = mi.Identity
@@ -61,14 +58,13 @@ var CUR_HASH = constants.CUR_HASH
 var NONCE = constants.NONCE
 var CONFIRMATIONS_BEFORE_CONFIRMED = 10
 var BLOCKCHAIN_KEY_PURPOSE = 'messaging'
-Driver.Transport = { P2P: P2PTransport }
 Driver.MIN_BALANCE = 10000
 Driver.CHAIN_WRITE_THROTTLE = 60000
 Driver.CHAIN_READ_THROTTLE = 300000
 Driver.SEND_THROTTLE = 10000
 Driver.CATCH_UP_INTERVAL = 2000
 Driver.UNCHAIN_THROTTLE = 20000
-Driver.Zlorp = Zlorp
+// Driver.Zlorp = Zlorp
 Driver.Kiki = kiki
 Driver.Identity = Identity
 Driver.Wallet = Wallet
@@ -87,23 +83,19 @@ var DEFAULT_OPTIONS = {
 var optionsTypes = {
   // maybe allow read-only mode if this is missing
   // TODO: replace with kiki (will need to adjust otr, zlorp for async APIs)
-  identityKeys: 'Array',
+  keys: 'Array',
   identity: 'Identity',
   blockchain: 'Object',
   networkName: 'String',
   keeper: 'Object',
   leveldown: 'Function',
-  port: 'Number',
   pathPrefix: 'String',
   opReturnPrefix: '?String',
-  dht: '?Object',
-  messenger: '?Object',
   syncInterval: '?Number',
   chainThrottle: '?Number',
   unchainThrottle: '?Number',
   sendThrottle: '?Number',
   readOnly: '?Boolean',
-  relay: '?Object',
   afterBlockTimestamp: '?Number'
 }
 
@@ -153,40 +145,6 @@ function Driver (options) {
   this._balance = 0
 
   this._paused = false
-
-  // this._monkeypatchWallet()
-  this.messenger = options.messenger
-  if (!this.messenger) {
-    var otrKey = this.getPrivateKey({
-      type: 'dsa',
-      purpose: 'sign'
-    })
-
-    if (!otrKey) {
-      throw new Error('missing key required for p2p comm')
-    }
-
-    this.messenger = new P2PTransport({
-      zlorp: new Zlorp({
-        name: this.name(),
-        available: true,
-        leveldown: leveldown,
-        port: this.port,
-        dht: dht,
-        key: toKey(otrKey).priv(),
-        relay: this.relay
-      })
-    })
-  }
-
-  this.messenger.on('message', this.receiveMsg)
-
-  typeforce({
-    send: 'Function',
-    on: 'Function',
-    removeListener: 'Function',
-    destroy: 'Function'
-  }, this.messenger)
 
   this.chainwriter = new ChainWriter({
     wallet: wallet,
@@ -257,14 +215,6 @@ function Driver (options) {
       self._sendTheUnsent()
       // self._watchMsgStatuses()
     })
-}
-
-Driver.prototype.setHttpClient = function (client) {
-  this.httpClient = client
-}
-
-Driver.prototype.setHttpServer = function (server) {
-  this.httpServer = server
 }
 
 Driver.prototype.ready = function () {
@@ -892,7 +842,7 @@ Driver.prototype._sendTheUnsent = function () {
     getStream: getStream,
     maxErrors: Errors.MAX_RESEND,
     errorsGroup: Errors.group.send,
-    processItem: this._trySend,
+    processItem: this._processSendQueueItem,
     retryDelay: this.sendThrottle,
     successType: EventType.msg.sendSuccess
   })
@@ -1069,7 +1019,7 @@ Driver.prototype._processQueue = function (opts) {
   }
 }
 
-Driver.prototype._trySend = function (entry) {
+Driver.prototype._processSendQueueItem = function (entry) {
   // this._markSending(entry)
   var self = this
   var nextEntry = new Entry()
@@ -1077,7 +1027,7 @@ Driver.prototype._trySend = function (entry) {
 
   // return Q.ninvoke(this.msgDB, 'onLive')
   //   .then(function () {
-      return self._doSend(entry)
+      return self._trySend(entry)
     // })
     .then(function () {
       self._debug('msg sent successfully')
@@ -1391,7 +1341,7 @@ Driver.prototype._setupDBs = function () {
   this.txDB.name = this.name()
 }
 
-Driver.prototype._doSend = function (entry) {
+Driver.prototype._trySend = function (entry) {
   // TODO:
   //   do we log that we sent it?
   //   do we log when we delivered it? How do we know it was delivered?
@@ -1403,13 +1353,16 @@ Driver.prototype._doSend = function (entry) {
       self._debug('sending msg to peer', obj.parsed.data[TYPE])
       var msg = utils.msgToBuffer(utils.getMsgProps(obj))
       var toRootHash = obj.to[ROOT_HASH]
-      var messenger = self.messenger
-      if (self.httpClient && self.httpClient.hasEndpointFor(toRootHash)) {
-        messenger = self.httpClient
-      }
-
-      return messenger.send(toRootHash, msg, to)
+      return self._send(toRootHash, msg, to)
     })
+}
+
+/**
+ * Override this
+ * @return {Promise} send a message to a particular recipient
+ */
+Driver.prototype._send = function (recipientInfo, msg) {
+  throw new Error('override this method')
 }
 
 Driver.prototype.lookupObjectsByRootHash = function (rootHash) {
@@ -1509,7 +1462,7 @@ Driver.prototype.getPublicKey = function (fingerprint, identity) {
 }
 
 Driver.prototype.getPrivateKey = function (where) {
-  return utils.firstKey(this.identityKeys, where)
+  return utils.firstKey(this.keys, where)
 }
 
 Driver.prototype.getBlockchainKey = function () {
@@ -2162,9 +2115,6 @@ Driver.prototype.destroy = function () {
   // sync
   this.chainwriter.destroy()
   clearTimeout(this._fetchTxsTimeout)
-  // if (this._rawTxStream) {
-  //   this._rawTxStream.close() // custom close method
-  // }
 
   for (var name in this._streams) {
     this._streams[name].destroy()
@@ -2172,20 +2122,11 @@ Driver.prototype.destroy = function () {
 
   var tasks = [
     self.keeper.destroy(),
-    this.messenger.destroy(),
     Q.ninvoke(self.addressBook, 'close'),
     Q.ninvoke(self.msgDB, 'close'),
     Q.ninvoke(self.txDB, 'close'),
     Q.ninvoke(self._log, 'close')
   ]
-
-  if (this.httpClient) {
-    tasks.push(this.httpClient.destroy())
-  }
-
-  if (this.httpServer) {
-    tasks.push(this.httpServer.destroy())
-  }
 
   delete this._ignoreTxs
   delete this._identityCache

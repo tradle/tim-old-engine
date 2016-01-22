@@ -26,6 +26,7 @@ var DHT = require('@tradle/bittorrent-dht')
 // var Keeper = require('bitkeeper-js')
 var Zlorp = require('zlorp')
 Zlorp.ANNOUNCE_INTERVAL = Zlorp.LOOKUP_INTERVAL = 5000
+var P2PTransport = require('@tradle/transport-p2p')
 var ChainedObj = require('@tradle/chained-obj')
 var Builder = ChainedObj.Builder
 var kiki = require('@tradle/kiki')
@@ -110,6 +111,29 @@ Errors.MAX_UNCHAIN = 3
 // }
 
 var noop = function () {}
+
+var CONFIGS = {
+  bill: {
+    identity: bill,
+    identityJSON: billPub,
+    keys: billPriv,
+    port: billPort
+  },
+
+  ted: {
+    identity: ted,
+    identityJSON: tedPub,
+    keys: tedPriv,
+    port: tedPort
+  },
+
+  rufus: {
+    identity: rufus,
+    identityJSON: rufusPub,
+    keys: rufusPriv,
+    port: rufusPort
+  }
+}
 
 var driverBill
 var driverTed
@@ -302,9 +326,9 @@ test('resending & order guarantees', function (t) {
       return extend(m)
     })
 
-    var z = driverTed.messenger
-    var send = z.send
-    z.send = function (rh, msg) {
+    var z = CONFIGS.ted.state.driver
+    var send = z._send
+    z._send = function (rh, msg) {
       var eData = JSON.parse(msg).encryptedData
       var idx = encrypted.indexOf(eData)
       var decrypted = copy[idx]
@@ -357,9 +381,8 @@ test('resending & order guarantees', function (t) {
       // console.log(event)
       if (--togo) return
 
-      driverTed.destroy()
+      killAndRessurrect('ted')
         .then(function () {
-          driverTed = cloneDeadDriver(driverTed)
           return Q.nfcall(collect, driverTed.messages().getToSendStream({ tail: false }))
         })
         .then(function (results) {
@@ -378,7 +401,7 @@ test('give up sending after max retries', function (t) {
   publishIdentities([driverBill, driverTed], function () {
     var msg = toMsg({ hey: 'ho' })
     var tries = 0
-    driverBill.messenger.send = function (rh, msg) {
+    driverBill._send = function (rh, msg) {
       tries++
       t.ok(tries <= Errors.MAX_RESEND)
       if (tries === Errors.MAX_RESEND) {
@@ -556,7 +579,9 @@ test('wipe dbs, get publish status on reload', function (t) {
       }))
     })
     .then(function () {
-      driverBill = cloneDeadDriver(driverBill)
+      return killAndRessurrect('bill')
+    })
+    .then(function () {
       driverBill.once('unchained', function (info) {
         t.equal(info[TYPE], constants.TYPES.IDENTITY)
       })
@@ -793,7 +818,7 @@ test('throttle chaining', function (t) {
 
 test('delivery check', function (t) {
   t.plan(2)
-  //t.timeoutAfter(60000)
+  t.timeoutAfter(60000)
   publishIdentities([driverBill, driverTed], function () {
     var billCoords = getIdentifier(billPub)
     var msg = toMsg({ hey: 'blah' })
@@ -803,15 +828,15 @@ test('delivery check', function (t) {
       to: [billCoords],
       deliver: true,
       chain: false
-    })
+    }).done()
 
     driverTed.on('sent', checkReceived)
     driverTed.on('chained', t.fail)
     driverTed.on('unchained', t.fail)
     driverBill.on('unchained', t.fail)
-    driverBill.destroy()
+
+    killAndRessurrect('bill')
       .done(function () {
-        driverBill = cloneDeadDriver(driverBill)
         driverBill.on('message', checkReceived)
         driverBill.on('unchained', t.fail)
       })
@@ -1007,7 +1032,7 @@ test('http messenger, recipient-specific', function (t) {
         }
       })
 
-      driverTed.setHttpServer(tedServer)
+      // driverTed.setHttpServer(tedServer)
 
       // bill can contact ted over http
       var httpToTed = new Transport.HttpClient({
@@ -1015,7 +1040,11 @@ test('http messenger, recipient-specific', function (t) {
       })
 
       httpToTed.addRecipient(driverTed.myRootHash(), 'http://127.0.0.1:' + BASE_PORT + '/')
-      driverBill.setHttpClient(httpToTed, driverTed.myRootHash())
+      // driverBill.setHttpClient(httpToTed, driverTed.myRootHash())
+      driverBill._send = httpToTed.send.bind(httpToTed)
+      httpToTed.on('message', driverBill.receiveMsg)
+
+      driverTed._send = tedServer.send.bind(tedServer)
 
       var msg = toMsg({ hey: 'ho' })
       driverBill.send({
@@ -1177,78 +1206,65 @@ function init (cb) {
   bootstrapDHT = new DHT({ bootstrap: false })
   bootstrapDHT.listen(BOOTSTRAP_DHT_PORT)
 
-  var billDHT = dhtFor(bill)
-  billDHT.listen(billPort)
+  for (var name in CONFIGS) {
+    var config = CONFIGS[name]
+    var dht = dhtFor(CONFIGS[name].identityJSON)
+    dht.listen(config.port)
+    var messenger = newMessenger(extend(config, {
+      dht: dht
+    }))
 
-  var tedDHT = dhtFor(ted)
-  tedDHT.listen(tedPort)
+    var driver = new Driver(extend(config, {
+      pathPrefix: name + reinitCount,
+      keeper: newKeeper(),
+      wallet: name === 'bill' ? billWallet : walletFor(config.keys, blockchain, 'messaging'),
+      _send: messenger.send.bind(messenger)
+    }, commonOpts))
 
-  var rufusDHT = dhtFor(rufus)
-  rufusDHT.listen(rufusPort)
+    messenger.on('message', driver.receiveMsg)
 
-  driverBill = new Driver(extend({
-    pathPrefix: 'bill' + reinitCount,
-    identity: bill,
-    identityKeys: billPriv,
-    keeper: newKeeper(),
-    // keeper: new Keeper({ dht: billDHT, storage: STORAGE_DIR + '/bill' }),
-    // kiki: kiki.kiki(billPriv),
-    wallet: billWallet,
-    dht: billDHT,
-    port: billPort
-  }, commonOpts))
+    CONFIGS[name].state = {
+      dht: dht,
+      messenger: messenger,
+      driver: driver
+    }
+  }
 
-  driverTed = new Driver(extend({
-    pathPrefix: 'ted' + reinitCount,
-    identity: ted,
-    identityKeys: tedPriv,
-    keeper: newKeeper(),
-    // keeper: new Keeper({ dht: tedDHT, storage: STORAGE_DIR + '/ted' }),
-    // kiki: kiki.kiki(tedPriv),
-    wallet: walletFor(tedPriv, blockchain, 'messaging'),
-    dht: tedDHT,
-    port: tedPort
-  }, commonOpts))
+  driverBill = CONFIGS.bill.state.driver
+  driverTed = CONFIGS.ted.state.driver
+  driverRufus = CONFIGS.rufus.state.driver
 
-  driverRufus = new Driver(extend({
-    pathPrefix: 'rufus' + reinitCount,
-    identity: rufus,
-    identityKeys: rufusPriv,
-    keeper: newKeeper(),
-    // keeper: new Keeper({ dht: rufusDHT, storage: STORAGE_DIR + '/rufus' }),
-    // kiki: kiki.kiki(rufusPriv),
-    wallet: walletFor(rufusPriv, blockchain, 'messaging'),
-    dht: rufusDHT,
-    port: rufusPort
-  }, commonOpts))
-
-  return Q.all([
-    driverBill.ready(),
-    driverTed.ready(),
-    driverRufus.ready()
-  ]).done(cb)
+  return Q.all(Object.keys(CONFIGS).map(function (name) {
+    return CONFIGS[name].state.driver.ready()
+  })).done(cb)
 }
 
 function teardown (cb) {
-  Q.all([
-      driverBill.destroy(),
-      driverTed.destroy(),
-      driverRufus.destroy()
-    ])
+  return Q.all(Object.keys(CONFIGS).map(function (name) {
+      return destroyStuff(CONFIGS[name].state)
+    }))
     .then(function () {
-      return Q.all([
-        Q.ninvoke(driverBill.dht, 'destroy'),
-        Q.ninvoke(driverTed.dht, 'destroy'),
-        Q.ninvoke(driverRufus.dht, 'destroy'),
-        Q.ninvoke(bootstrapDHT, 'destroy')
-        // Q.nfcall(rimraf, STORAGE_DIR)
-      ])
+      return Q.ninvoke(bootstrapDHT, 'destroy')
     })
     .done(function () {
       rimraf.sync(STORAGE_DIR)
+      for (var name in CONFIGS) {
+        delete CONFIGS[name].state
+      }
+
       driverBill = driverTed = driverRufus = null
       // printStats()
       safe(cb)()
+    })
+}
+
+function destroyStuff (stuff) {
+  return stuff.driver.destroy()
+    .then(function () {
+      return stuff.messenger.destroy()
+    })
+    .then(function () {
+      return Q.ninvoke(stuff.dht, 'destroy')
     })
 }
 
@@ -1289,18 +1305,18 @@ function publishIdentities (drivers, cb) {
   }
 }
 
-function dhtFor (identity) {
+function dhtFor (pub) {
   return new DHT({
-    nodeId: nodeIdFor(identity),
+    nodeId: nodeIdFor(pub),
     bootstrap: ['127.0.0.1:' + BOOTSTRAP_DHT_PORT]
     // ,
     // bootstrap: ['tradle.io:25778']
   })
 }
 
-function nodeIdFor (identity) {
+function nodeIdFor (pub) {
   return crypto.createHash('sha256')
-    .update(identity.keys({ type: 'dsa' })[0].fingerprint())
+    .update(getDSAKey(pub.pubkeys).fingerprint)
     .digest()
     .slice(0, 20)
 }
@@ -1343,16 +1359,19 @@ function cloneDeadDriver (driver) {
   return new Driver(pick(driver, [
     'pathPrefix',
     'identity',
-    'identityKeys',
+    'keys',
     'wallet',
-    'dht',
-    'port',
+    // 'dht',
+    // 'port',
     'networkName',
     'blockchain',
     'leveldown',
     'syncInterval',
     'chainThrottle',
-    'keeper'
+    'unchainThrottle',
+    'sendThrottle',
+    'keeper',
+    '_send'
   ]))
 }
 
@@ -1393,4 +1412,66 @@ function newKeeper () {
   }
 
   return k
+}
+
+function newMessenger (opts) {
+  typeforce({
+    identityJSON: 'Object',
+    keys: 'Array',
+    port: 'Number',
+    dht: 'Object'
+  }, opts)
+
+  var otrKey = getDSAKey(opts.keys)
+  return new P2PTransport({
+    zlorp: new Zlorp({
+      available: true,
+      leveldown: memdown,
+      port: opts.port,
+      dht: opts.dht,
+      key: toKey(otrKey).priv()
+    })
+  })
+}
+
+function getDSAKey (keys) {
+  return keys.filter(function (p) {
+    return p.type === 'dsa' && p.purpose === 'sign'
+  })[0]
+}
+
+function killAndRessurrect (name) {
+  var config = CONFIGS[name]
+  var state = config.state
+  var driver = state.driver
+  return destroyStuff(state)
+    .then(function () {
+      driver = cloneDeadDriver(driver)
+      var dht = dhtFor(config.identityJSON)
+      dht.listen(config.port)
+
+      var messenger = state.messenger = newMessenger(extend(config, {
+        dht: dht
+      }))
+
+      config.state = {
+        dht: dht,
+        messenger: messenger,
+        driver: driver
+      }
+
+      switch (name) {
+        case 'bill':
+          driverBill = driver
+          break
+        case 'ted':
+          driverTed = driver
+          break
+        case 'rufus':
+          driverRufus = driver
+          break
+      }
+
+      messenger.on('message', driver.receiveMsg)
+    })
 }
