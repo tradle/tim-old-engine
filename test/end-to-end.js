@@ -1340,7 +1340,7 @@ function toMsg (msg) {
 }
 
 function cloneDeadDriver (driver) {
-  return new Driver(extend(pick(driver, [
+  return new Driver(pick(driver, [
     'pathPrefix',
     'identity',
     'identityKeys',
@@ -1351,11 +1351,9 @@ function cloneDeadDriver (driver) {
     'blockchain',
     'leveldown',
     'syncInterval',
-    'chainThrottle'
-  ]), {
-    // keeper: new Keeper({ dht: driverBill.dht, storage: STORAGE_DIR })
-    keeper: sharedKeeper
-  }))
+    'chainThrottle',
+    'keeper'
+  ]))
 }
 
 function getIdentifier (identity) {
