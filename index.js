@@ -1192,7 +1192,6 @@ Driver.prototype._processTxs = function (txInfos) {
       // TODO: filter shouldn't have side effects
       self._pendingTxs.push(id)
       idsToLookup.push(id)
-      txInfo.id = id
       return true
     })
 
@@ -1203,7 +1202,7 @@ Driver.prototype._processTxs = function (txInfos) {
     .then(function (results) {
       var logPromises = results.map(function (result, i) {
         var txInfo = filtered[i]
-        var id = txInfo.id
+        var id = txInfo.txId
         var entry = result.value
         var err = result.reason
         var unexpectedErr = err && !err.notFound
