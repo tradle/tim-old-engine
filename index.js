@@ -111,6 +111,8 @@ function Driver (options) {
   typeforce(optionsTypes, options)
 
   EventEmitter.call(this)
+  this.setMaxListeners(0)
+
   tradleUtils.bindPrototypeFunctions(this)
   extend(this, DEFAULT_OPTIONS, options)
   this._options = utils.pick(this, Object.keys(optionsTypes))
@@ -916,7 +918,7 @@ Driver.prototype._processQueue = function (opts) {
           runASAP(state)
         } else {
           insert(state)
-          processQueue(state.to[ROOT_HASH])
+          processQueue(getQueueID(state))
         }
 
         cb()
@@ -925,6 +927,12 @@ Driver.prototype._processQueue = function (opts) {
   )
 
   this._pauseStreamIfPaused(stream)
+
+  function getQueueID (data) {
+    // should public go in one queue?
+    // return data.public ? data[ROOT_HASH] : data.to[ROOT_HASH]
+    return data.to[ROOT_HASH]
+  }
 
   function runASAP (state) {
     if (self._destroyed) return
@@ -991,7 +999,7 @@ Driver.prototype._processQueue = function (opts) {
   }
 
   function insert (data) {
-    var rid = data.to[ROOT_HASH]
+    var rid = getQueueID(data)
     var q = queues[rid] = queues[rid] || []
     if (!sync) return q.push(data)
 
@@ -1318,6 +1326,7 @@ Driver.prototype._setupDBs = function () {
   reemit(this.msgDB, this, msgDBEvents)
   ;['message', 'unchained'].forEach(function (event) {
     self.msgDB.on(event, function (entry) {
+      self._debug('event', event, entry.uid)
       if (entry.tx && entry.dateReceived) {
         self.emit('resolved', entry)
       }
@@ -2043,6 +2052,11 @@ Driver.prototype.send = function (options) {
       return Q.all(entries.map(self.log, self))
     })
 }
+
+// Driver.prototype._cache = function (chainedObj) {
+//   this._cachedObjs = this._cachedObjs || {}
+//   this._cachedObjs[utils.getUID(chainedObj)] = chainedObj
+// }
 
 Driver.prototype.forget = function (rootHash) {
   var self = this
