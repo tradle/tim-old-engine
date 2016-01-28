@@ -69,6 +69,7 @@ Driver.Kiki = kiki
 Driver.Identity = Identity
 Driver.Wallet = Wallet
 Driver.EventType = EventType
+Driver.PROTOCOL_VERSION = '1.0.0'
 // TODO: export other deps
 
 var DEFAULT_OPTIONS = {
@@ -1671,7 +1672,7 @@ Driver.prototype.receiveMsg = function (buf, senderInfo) {
       chainedObj = {
         addressesFrom: [fromKey.fingerprint],
         addressesTo: [self.wallet.addressString],
-        txData: msg.txData,
+        // txData: msg.txData,
         txType: msg.txType,
         encryptedData: msg.encryptedData,
         encryptedPermission: msg.encryptedPermission
@@ -1690,13 +1691,18 @@ Driver.prototype.receiveMsg = function (buf, senderInfo) {
     })
     .then(function (permission) {
       chainedObj.permission = permission
+      if (!chainedObj.permissionKey) {
+        return derivePermissionKey(chainedObj)
+      }
+    })
+    .then(function () {
       return self.keeper.putMany([
         {
           key: chainedObj.permissionKey.toString('hex'),
           value: msg.encryptedPermission
         },
         {
-          key: permission.fileKeyString(),
+          key: chainedObj.permission.fileKeyString(),
           value: msg.encryptedData
         }
       ])
@@ -1905,7 +1911,8 @@ Driver.prototype.share = function (options) {
           addressesTo: [share.address],
           addressesFrom: [self.wallet.addressString],
           txType: TxData.types.permission,
-          txData: utils.toBuffer(share.encryptedKey, 'hex')
+          txData: utils.toBuffer(share.encryptedKey, 'hex'),
+          v: Driver.PROTOCOL_VERSION
         })
       })
 
@@ -2033,7 +2040,8 @@ Driver.prototype.send = function (options) {
             addressesFrom: [self.wallet.addressString],
             addressesTo: [btcKeys[i].fingerprint],
             txType: TxData.types.public,
-            txData: utils.toBuffer(resp.key, 'hex')
+            txData: utils.toBuffer(resp.key, 'hex'),
+            v: Driver.PROTOCOL_VERSION
           })
         })
       } else {
@@ -2043,7 +2051,8 @@ Driver.prototype.send = function (options) {
             addressesTo: [share.address],
             addressesFrom: [self.wallet.addressString],
             txType: TxData.types.permission,
-            txData: utils.toBuffer(share.encryptedKey, 'hex')
+            txData: utils.toBuffer(share.encryptedKey, 'hex'),
+            v: Driver.PROTOCOL_VERSION
           })
         })
       }
@@ -2266,4 +2275,18 @@ function throttleIfRetrying (errors, throttle, cb) {
 
 function alwaysFalse () {
   return false
+}
+
+function derivePermissionKey (chainedObj) {
+  return Q.ninvoke(tradleUtils, 'getStorageKeyFor', chainedObj.encryptedPermission)
+    .then(function (key) {
+      chainedObj.permissionKey = key
+      return Q.ninvoke(tradleUtils, 'encryptAsync', {
+        data: key,
+        key: chainedObj.sharedKey
+      })
+    })
+    .then(function (encryptedPermissionKey) {
+      chainedObj.txData = encryptedPermissionKey
+    })
 }
