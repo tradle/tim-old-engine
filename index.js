@@ -104,7 +104,7 @@ var noop = function () {}
 
 module.exports = Driver
 util.inherits(Driver, EventEmitter)
-Driver.enableOptimizations = require('./lib/optimizations').enable
+Driver.enableOptimizations = require('./lib/optimizations')
 
 function Driver (options) {
   var self = this
