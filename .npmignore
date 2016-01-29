@@ -33,12 +33,11 @@ eventTypes1.md
 example.js
 publishIdentity.js
 schema.md
-storage/
+*storage*/
 
 checkLicenses.js
 lib/promise-queue.js
 shim.js
-storage/
-storage1/
 coverage/
 test/
+*.txt
