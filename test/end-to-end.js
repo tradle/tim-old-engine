@@ -203,12 +203,12 @@ test('export history', function (t) {
       deliver: true,
       to: [getIdentifier(tedPub)]
     })
-    .done()
-
-    driverRufus.send({
-      msg: toBill,
-      deliver: true,
-      to: [getIdentifier(billPub)]
+    .then(function () {
+      return driverRufus.send({
+        msg: toBill,
+        deliver: true,
+        to: [getIdentifier(billPub)]
+      })
     })
     .done()
 
@@ -225,17 +225,13 @@ test('export history', function (t) {
       ])
       .spread(function (billHist, tedHist) {
         t.equal(billHist.length, 5) // 3 identities + 2 msgs
-        billHist.sort(function (a, b) {
-          return a.timestamp - b.timestamp
-        })
+        billHist.sort(byTimestampAsc)
 
         t.deepEqual(billHist.pop().parsed.data, toBill)
         t.deepEqual(billHist.pop().parsed.data, toTed)
 
         t.equal(tedHist.length, 4) // 3 identities + 1 msg
-        tedHist.sort(function (a, b) {
-          return a.timestamp - b.timestamp
-        })
+        tedHist.sort(byTimestampAsc)
 
         t.deepEqual(tedHist.pop().parsed.data, toTed)
         return Q.all([
@@ -499,6 +495,9 @@ test('give up unchaining after max retries', function (t) {
 test('the reader and the writer', function (t) {
   t.timeoutAfter(20000)
 
+  // die rufus! see you in the next test
+  driverRufus.destroy()
+
   var togo = 4
   var reader = driverBill
   reader.readOnly = true
@@ -515,12 +514,13 @@ test('the reader and the writer', function (t) {
     })
     .done()
 
-  reader.on('unchained', onUnchainedIdentity)
-  writer.on('unchained', onUnchainedIdentity)
+  reader.on('unchained', onUnchainedIdentity.bind(reader))
+  writer.on('unchained', onUnchainedIdentity.bind(writer))
   var msg = toMsg({
     hey: 'ho'
   })
 
+  // writer.on('unchained', console.log)
   writer.once('message', function (info) {
     writer.chainExisting(info.uid)
     reader.once('unchained', function (info) {
@@ -532,7 +532,7 @@ test('the reader and the writer', function (t) {
     })
   })
 
-  function onUnchainedIdentity () {
+  function onUnchainedIdentity (info) {
     if (--togo) return
 
     reader.removeListener('unchained', onUnchainedIdentity)
@@ -542,8 +542,6 @@ test('the reader and the writer', function (t) {
       .then(function (status) {
         t.ok(status.ever)
         t.ok(status.current)
-      })
-      .then(function (signed) {
         return reader.send({
           chain: false,
           deliver: true,
@@ -552,17 +550,6 @@ test('the reader and the writer', function (t) {
         })
       })
       .done()
-
-    // reader.send({
-    //   chain: false,
-    //   deliver: true,
-    //   public: true,
-    //   msg: extend(reader.identityJSON),
-    //   to: writerCoords
-    // })
-    // .then(function () {
-
-    // })
   }
 })
 
@@ -1474,4 +1461,8 @@ function killAndRessurrect (name) {
 
       messenger.on('message', driver.receiveMsg)
     })
+}
+
+function byTimestampAsc (a, b) {
+  return parseFloat(a.timestamp) - parseFloat(b.timestamp)
 }

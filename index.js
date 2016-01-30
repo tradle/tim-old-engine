@@ -313,6 +313,7 @@ Driver.prototype._readFromChain = function () {
       // was read from chain and hasn't been processed yet
       var txId = entry.txId
       if (!entry.dateDetected || entry.dateUnchained || entry.ignore) {
+        self._debug('skipping ' + txId, entry)
         return finish()
       }
 
@@ -451,6 +452,8 @@ Driver.prototype._setupTxFetching = function () {
     })
 
     var togo = ids.length
+    if (togo == 0) return cb()
+
     self._multiGetFromDB({
       db: self.txDB,
       keys: ids
@@ -1670,6 +1673,7 @@ Driver.prototype.receiveMsg = function (buf, senderInfo) {
       })
 
       chainedObj = {
+        timestamp: timestamp,
         addressesFrom: [fromKey.fingerprint],
         addressesTo: [self.wallet.addressString],
         // txData: msg.txData,
@@ -1732,7 +1736,6 @@ Driver.prototype.receiveMsg = function (buf, senderInfo) {
       })
     })
     .then(function (entry) {
-      entry.set('timestamp', timestamp)
       self._debug('processed received msg')
       return self.log(entry)
     })
