@@ -16,6 +16,7 @@ var map = require('map-stream')
 var pump = require('pump')
 var find = require('array-find')
 var deepEqual = require('deep-equal')
+var Cache = require('lru-cache')
 var ChainedObj = require('@tradle/chained-obj')
 var TxData = require('@tradle/tx-data').TxData
 var TxInfo = require('@tradle/tx-data').TxInfo
@@ -307,7 +308,7 @@ Driver.prototype._readFromChain = function () {
         return cb()
       }
 
-      return cb(null, data.value)
+      cb(null, data.value)
     }),
     map(function (entry, cb) {
       // was read from chain and hasn't been processed yet
@@ -697,7 +698,6 @@ Driver.prototype.decryptedMessagesStream = function () {
   var self = this
   return this.msgDB.createValueStream()
     .pipe(map(function (info, cb) {
-      // console.log(info)
       self.lookupObject(info)
         .nodeify(cb)
     }))
@@ -1064,12 +1064,16 @@ Driver.prototype._processSendQueueItem = function (entry) {
 }
 
 Driver.prototype.name = function () {
+  if (this._name) return this._name
+
   var name = this.identityJSON.name
   if (name) {
-    return name.firstName
+    name = name.firstName
   } else {
-    return this.identityJSON.pubkeys[0].fingerprint
+    name = this.identityJSON.pubkeys[0].fingerprint
   }
+
+  return this._name = name
 }
 
 Driver.prototype._markSending = function (entry) {
@@ -1207,6 +1211,8 @@ Driver.prototype._processTxs = function (txInfos) {
       return true
     })
 
+  if (!idsToLookup.length) return
+
   return this._multiGetFromDB({
       db: this.txDB,
       keys: idsToLookup
@@ -1310,6 +1316,7 @@ Driver.prototype._setupDBs = function () {
 
   this.addressBook.name = this.name()
   this._identityCache = {}
+
   this.msgDB = createMsgDB(this._prefix('messages.db'), {
     leveldown: this.leveldown,
     log: this._log,
@@ -1328,9 +1335,10 @@ Driver.prototype._setupDBs = function () {
   ]
 
   reemit(this.msgDB, this, msgDBEvents)
+  this._enableObjectCaching()
+
   ;['message', 'unchained'].forEach(function (event) {
     self.msgDB.on(event, function (entry) {
-      self._debug('event', event, entry.uid)
       if (entry.tx && entry.dateReceived) {
         self.emit('resolved', entry)
       }
@@ -1412,9 +1420,57 @@ Driver.prototype.lookupObject = function (info, verify) {
     }
   }
 
+  if (!verify) {
+    var cached = this._getCachedObject(info)
+    if (cached) return Q(cached)
+  }
+
   return this.unchainer.unchain(clone(info), {
-    verify: !!verify
+      verify: !!verify
+    })
+    .then(function (obj) {
+      self._cacheObject(obj)
+      return obj
+    })
+}
+
+Driver.prototype._enableObjectCaching = function () {
+  var self = this
+  if (this._objectCache) return
+
+  this._objectCache = new Cache({
+    max: 100
   })
+
+  ;['message', 'sent', 'chained', 'unchained'].forEach(function (event) {
+    self.msgDB.on(event, function (entry) {
+      self._debug('event', event, entry.uid)
+      var cached = self._getCachedObject(entry)
+      if (!cached) return
+
+      // cached object is frozen
+      cached = clone(cached)
+      for (var p in entry) {
+        if (!(p in cached)) {
+          cached[p] = entry[p]
+        }
+      }
+
+      self._cacheObject(cached)
+    })
+  })
+}
+
+Driver.prototype._getCachedObject = function (info) {
+  if (!info.txData || !this._objectCache) return
+
+  return this._objectCache.get(info.txData.toString('hex'))
+}
+
+Driver.prototype._cacheObject = function (obj) {
+  if (!this._objectCache) return
+
+  return this._objectCache.set(obj.txData.toString('hex'), Object.freeze(obj))
 }
 
 Driver.prototype.lookupRootHash = function (fingerprint) {
@@ -1488,23 +1544,46 @@ Driver.prototype.getBlockchainKey = function () {
 Driver.prototype.getCachedIdentity = function (query) {
   if (this._destroyed) throw new Error('already destroyed')
 
-  return this._identityCache[tradleUtils.stringify(query)]
+  for (var p in query) {
+    var cached = this._identityCache[query[p]]
+    if (cached) return cached
+  }
 }
 
-Driver.prototype._cacheIdentity = function (query, value) {
-  this._identityCache[tradleUtils.stringify(query)] = value
+Driver.prototype._cacheIdentity = function (identityInfo, query) {
+  var queries = []
+  var identity = identityInfo.identity
+  identity.pubkeys.forEach(function (k) {
+    queries.push(k.fingerprint, k.value)
+  })
+
+  // each fingerprint/pubkey/hash is enough
+  // to uniquely identify an identity
+  var rh = identityInfo[ROOT_HASH]
+  var ch = identityInfo[CUR_HASH]
+  if (rh) queries.push(rh)
+  if (ch) queries.push(ch)
+  if (query) {
+    for (p in query) {
+      queries.push(p)
+    }
+  }
+
+  queries.forEach(function (q) {
+    this._identityCache[q] = identityInfo
+  }, this)
+
+  var size = Object.keys(this._identityCache)
+  if (size > 1000) {
+    for (var p in this._identityCache) {
+      delete this._identityCache[p]
+      if (--size < 1000) break
+    }
+  }
 }
 
 Driver.prototype.lookupIdentity = function (query) {
   var self = this
-  return this._lookupIdentity(query)
-    .then(function (result) {
-      self._cacheIdentity(query, result)
-      return result
-    })
-}
-
-Driver.prototype._lookupIdentity = function (query) {
   var me = this.identityJSON
   var isMe = query[ROOT_HASH] === this.myRootHash() ||
     query[CUR_HASH] === this.myCurrentHash() ||
@@ -1524,15 +1603,23 @@ Driver.prototype._lookupIdentity = function (query) {
   if (cached) return Q(cached)
 
   return Q.ninvoke(this.addressBook, 'query', query)
+    .then(function (result) {
+      self._cacheIdentity(result, query)
+      return result
+    })
 }
 
 Driver.prototype.log = function (entry) {
   utils.jsonifyErrors(entry)
-  return Q.ninvoke(this._log, 'append', entry)
-    .then(function () {
-      // pass through for convenience
-      return entry
-    })
+  var defer = Q.defer()
+  // faster than ninvoke
+  this._log.append(entry, function (err) {
+    if (err) defer.reject(err)
+    // pass through for convenience
+    else defer.resolve(entry)
+  })
+
+  return defer.promise
 }
 
 Driver.prototype.createReadStream = function (options) {
@@ -1623,11 +1710,6 @@ Driver.prototype.addContactIdentity = function (identity) {
 // }
 
 Driver.prototype.receiveMsg = function (buf, senderInfo) {
-//   return (this._receiving || Q())
-//     .finally(this._receiveMsg.bind(this, buf, senderInfo))
-// }
-
-// Driver.prototype._receiveMsg = function (buf, senderInfo) {
   var self = this
   if (this._destroyed) {
     return Q.reject(new Error('already destroyed'))
@@ -1662,8 +1744,10 @@ Driver.prototype.receiveMsg = function (buf, senderInfo) {
   }
 
   var from
-  return this._receiving = promiseValid
-    .then(this.lookupIdentity.bind(this, senderInfo))
+  return this._receivingPromise = promiseValid
+    .then(function () {
+      return self.lookupIdentity(senderInfo)
+    })
     .then(function (result) {
       from = result
       var fromKey = utils.firstKey(result.identity.pubkeys, {
@@ -1714,7 +1798,9 @@ Driver.prototype.receiveMsg = function (buf, senderInfo) {
     .then(function () {
       return self.lookupObject(chainedObj, true)
     })
-    .then(self.unchainResultToEntry)
+    .then(function (obj) {
+      return self.unchainResultToEntry(obj)
+    })
     .then(function (entry) {
       return entry.set({
         type: EventType.msg.receivedValid,
@@ -2001,6 +2087,7 @@ Driver.prototype.send = function (options) {
 
   var recipients
   var btcKeys
+  // var parsed
   return this._readyPromise
     // validate
     .then(function () {
@@ -2057,6 +2144,26 @@ Driver.prototype.send = function (options) {
             txData: utils.toBuffer(share.encryptedKey, 'hex'),
             v: Driver.PROTOCOL_VERSION
           })
+
+          // side effect that can be cached in objectCache
+          // var json = shareEntry.toJSON()
+          // json.key = resp.key
+          // json.data = data
+          // json.parsed = parsed
+          // json.permission = share.permission
+          // json.permissionKey = share.permission.key().toString('hex')
+          // json.sharedKey = share.ecdhKey
+          // json.encryptedKey = json.txData
+          // json.encryptedPermission = share.value
+          // json.encryptedData = resp.value
+          // json.from = { identity: Identity.fromJSON(self.identityJSON) }
+          // json.from[ROOT_HASH] = self.myRootHash()
+          // json.to = { identity: Identity.fromJSON(recipients[i].identity) }
+          // json.to[ROOT_HASH] = recipients[i][ROOT_HASH]
+          // utils.setUID(json)
+          // // console.log('share Entry', shareEntry.toJSON())
+          // self._cacheObject(json)
+          // return shareEntry
         })
       }
 
@@ -2281,15 +2388,21 @@ function alwaysFalse () {
 }
 
 function derivePermissionKey (chainedObj) {
-  return Q.ninvoke(tradleUtils, 'getStorageKeyFor', chainedObj.encryptedPermission)
-    .then(function (key) {
-      chainedObj.permissionKey = key
-      return Q.ninvoke(tradleUtils, 'encryptAsync', {
-        data: key,
-        key: chainedObj.sharedKey
-      })
+  var defer = Q.defer()
+  tradleUtils.getStorageKeyFor(chainedObj.encryptedPermission, function (err, key) {
+    if (err) return defer.reject(err)
+
+    chainedObj.permissionKey = key
+    tradleUtils.encryptAsync({
+      data: key,
+      key: chainedObj.sharedKey
+    }, function (err, encryptedPermissionKey) {
+      if (err) return defer.reject(err)
+
+      chainedObj.txData = chainedObj.encryptedKey = encryptedPermissionKey
+      defer.resolve()
     })
-    .then(function (encryptedPermissionKey) {
-      chainedObj.txData = encryptedPermissionKey
-    })
+  })
+
+  return defer.promise
 }

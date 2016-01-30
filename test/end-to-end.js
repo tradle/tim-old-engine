@@ -1,3 +1,11 @@
+// var mockery = require('mockery')
+// mockery.enable({
+//   warnOnReplace: false,
+//   warnOnUnregistered: false
+// })
+
+// mockery.registerSubstitute('q', 'bluebird-q')
+
 if (process.env.MULTIPLEX) {
   console.log('multiplex over UTP')
   require('@tradle/multiplex-utp')
