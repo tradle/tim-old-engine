@@ -7,6 +7,8 @@ mockery.enable({
 
 mockery.registerSubstitute('q', 'bluebird-q')
 
+var http = require('http')
+// http.globalAgent.maxSockets = 100
 var path = require('path')
 var test = require('tape')
 var find = require('array-find')
@@ -56,15 +58,14 @@ var commonOpts = {
 }
 
 var TimeMethod = require('time-method')
-var timTimer = TimeMethod.timeFunctions(Tim.prototype)
-
+// var timTimer = TimeMethod.timeFunctions(Tim.prototype)
 // var processTimer = TimeMethod.timerFor(process)
 // processTimer.time('nextTick')
 
 init()
 // setInterval(process.exit.bind(process, 0), 10000)
 process.on('SIGINT', function () {
-  printStats(timTimer)
+  // printStats(timTimer)
   process.exit(1)
 })
 
@@ -88,6 +89,7 @@ function clearStorage () {
 }
 
 function init () {
+  clearStorage()
   var userInfo = users[0]
   var wallet = walletFor(userInfo.priv, null, 'messaging')
   var pub = userInfo.pub

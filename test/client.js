@@ -51,17 +51,26 @@ var commonOpts = {
   leveldown: leveldown
 }
 
+var serverInfo = users.shift()
+var serverHash = serverInfo.rootHash
+
 var CACHE_PATH = './test/cache.json'
+var REQS_PATH = './test/reqs.json'
 try {
   var CACHE = fs.readFileSync(CACHE_PATH)
   CACHE = JSON.parse(CACHE.toString('binary'))
   CACHE = require('logbase').rebuf(CACHE)
+  // var reqs = {}
+  // users.forEach(function (u) {
+  //   if (u.rootHash in CACHE) {
+  //     reqs['http://127.0.0.1:' + BASE_PORT + '/' + serverHash + '/' + u.rootHash] = CACHE[u.rootHash].toString('binary')
+  //   }
+  // })
+  // fs.writeFileSync(REQS_PATH, JSON.stringify(reqs))
 } catch (err) {
   CACHE = {}
 }
 
-var serverInfo = users.shift()
-var serverHash = serverInfo.rootHash
 var TimeMethod = require('time-method')
 var timTimer
 // var processTimer = TimeMethod.timerFor(process)

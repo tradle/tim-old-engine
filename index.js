@@ -2275,6 +2275,8 @@ Driver.prototype.destroy = function () {
 }
 
 Driver.prototype._debug = function () {
+  if (!debug.enabled) return
+
   var args = [].slice.call(arguments)
   args.unshift(this.name())
   return debug.apply(null, args)
