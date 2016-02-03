@@ -23,6 +23,7 @@ var argv = require('minimist')(process.argv.slice(2), {
   alias: {
     g: 'gen',
     n: 'number',
+    s: 'sign',
     c: 'cache-path'
   },
   boolean: ['gen']
@@ -155,12 +156,19 @@ function run () {
           return user.addContactIdentity(serverInfo.pub)
         })
         .then(function () {
-          user.send({
-            msg: {
-              _t: 'tradle.SimpleMessage',
-              _z: '' + i,
-              hey: 'ho'
-            },
+          var msg = {
+            _t: 'tradle.SimpleMessage',
+            _z: '' + i,
+            hey: 'ho'
+          }
+
+          return argv.sign
+            ? user.sign(msg)
+            : msg
+        })
+        .then(function (signed) {
+          return user.send({
+            msg: signed,
             to: [{ _r: serverHash }],
             deliver: true
           })
