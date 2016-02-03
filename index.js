@@ -447,12 +447,12 @@ Driver.prototype._setupTxFetching = function () {
   )
 
   function getFromCache (ids, cb) {
-    ids = ids.filter(function (id) {
-      return self._ignoreTxs.indexOf(id) === -1
-    })
+    // ids = ids.filter(function (id) {
+    //   return self._ignoreTxs.indexOf(id) === -1
+    // })
 
-    var togo = ids.length
-    if (togo == 0) return cb()
+    // var togo = ids.length
+    // if (togo === 0) return cb(null, [])
 
     self._multiGetFromDB({
       db: self.txDB,
