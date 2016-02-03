@@ -934,7 +934,7 @@ Driver.prototype._processQueue = function (opts) {
   function getQueueID (data) {
     // should public go in one queue?
     // return data.public ? data[ROOT_HASH] : data.to[ROOT_HASH]
-    return data.to[ROOT_HASH]
+    return data.to[ROOT_HASH] || data.to.fingerprint
   }
 
   function runASAP (state) {
