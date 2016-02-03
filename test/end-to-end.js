@@ -1054,32 +1054,51 @@ test('http messenger, recipient-specific', function (t) {
   })
 })
 
-test('forget contact', function (t) {  // t.timeoutAfter(20000)
-  publishIdentities([driverBill, driverTed], function () {
-    var receivePromise = Q.Promise(function (resolve) {
+test('forget contact', function (t) {
+  t.timeoutAfter(20000)
+  publishIdentities([driverBill, driverTed, driverRufus], function () {
+    var tedReceived = Q.Promise(function (resolve) {
       driverTed.once('message', resolve)
     })
 
+    var rufusReceived = Q.Promise(function (resolve) {
+      driverRufus.once('message', resolve)
+    })
+
+    var rufusRootHash = driverRufus.myRootHash()
     var tedRootHash = driverTed.myRootHash()
     var billRootHash = driverBill.myRootHash()
+    var msgHash
     driverBill.send({
         msg: toMsg({ yo: 'ted' }),
         deliver: true,
         chain: true,
         to: [getIdentifier(tedPub)]
       })
-      .then(function () {
-        return receivePromise
+      .then(function (entries) {
+        var share = {
+          to: [getIdentifier(rufusPub)],
+          deliver: true
+        }
+
+        share[CUR_HASH] = msgHash = entries[0].get(ROOT_HASH)
+        return Q.all([
+          driverBill.share(share),
+          tedReceived,
+          rufusReceived
+        ])
       })
       .then(function () {
-        return driverBill.getConversation(tedRootHash)
+        return Q.all([
+          driverBill.getConversation(tedRootHash),
+          driverBill.getConversation(rufusRootHash),
+          driverTed.getConversation(billRootHash)
+        ])
       })
-      .then(function (msgs) {
-        t.equal(msgs.length, 1)
-        return driverTed.getConversation(billRootHash)
-      })
-      .then(function (msgs) {
-        t.equal(msgs.length, 1)
+      .then(function (convs) {
+        convs.forEach(function (c) {
+          t.equal(c.length, 1)
+        })
 
         // this message should be forgotten
         // before it gets sent
@@ -1094,20 +1113,23 @@ test('forget contact', function (t) {  // t.timeoutAfter(20000)
         return driverBill.forget(tedRootHash)
       })
       .then(function () {
-        return driverBill.getConversation(tedRootHash)
+        return Q.all([
+          driverBill.getConversation(tedRootHash),
+          driverBill.getConversation(rufusRootHash)
+        ])
       })
-      .then(function (msgs) {
-        t.equal(msgs.length, 0)
+      .spread(function (tHist, rHist) {
+        t.equal(tHist.length, 0)
+        t.equal(rHist.length, 1)
         return driverTed.forget(billRootHash)
       })
       .then(function () {
         return driverTed.getConversation(billRootHash)
       })
-      .then(function (msgs) {
+      .done(function (msgs) {
         t.equal(msgs.length, 0)
         t.end()
       })
-      .done()
   })
 })
 
@@ -1325,11 +1347,7 @@ function walletFor (keys, blockchain, purpose) {
   return fakeWallet({
     blockchain: blockchain,
     unspents: unspents,
-    priv: find(keys, function (k) {
-      return k.type === 'bitcoin' &&
-        k.networkName === networkName &&
-        k.purpose === purpose
-    }).priv
+    priv: findBitcoinKey(keys, purpose).priv
   })
 }
 
@@ -1473,4 +1491,12 @@ function killAndRessurrect (name) {
 
 function byTimestampAsc (a, b) {
   return parseFloat(a.timestamp) - parseFloat(b.timestamp)
+}
+
+function findBitcoinKey (keys, purpose) {
+  return find(keys, function (k) {
+    return k.type === 'bitcoin' &&
+      k.networkName === networkName &&
+      k.purpose === purpose
+  })
 }

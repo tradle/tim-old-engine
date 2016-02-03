@@ -136,7 +136,6 @@ function Driver (options) {
 
   var networkName = this.networkName
   var keeper = this.keeper
-  var dht = this.dht
   var blockchain = this.blockchain
   var leveldown = this.leveldown
   var wallet = this.wallet = this.wallet || new Wallet({
@@ -1135,10 +1134,16 @@ Driver.prototype._runTxProcessingLoop = function (fromHeight, skipIds) {
   this._fetchAndReschedule()
 }
 
+Driver.prototype.sync = function () {
+  this._fetchAndReschedule()
+}
+
 Driver.prototype._fetchAndReschedule = function () {
   var self = this
   var waitTillUnpaused
   if (this._destroyed) return
+
+  clearTimeout(this._fetchTxsTimeout)
   if (this._paused) {
     waitTillUnpaused = Q.Promise(function (resolve) {
       if (!self._paused) resolve()
@@ -1159,8 +1164,10 @@ Driver.prototype._fetchAndReschedule = function () {
     })
 
   function waitAndLoop() {
-    return utils.promiseDelay(self.syncInterval) // wait
-      .then(self._fetchAndReschedule)            // loop
+    var defer = Q.defer()
+    self._fetchTxsTimeout = setTimeout(defer.resolve, self.syncInterval)
+    return defer.promise
+      .then(self._fetchAndReschedule)
   }
 }
 
@@ -2181,12 +2188,9 @@ Driver.prototype.forget = function (rootHash) {
   var self = this
   typeforce('String', rootHash)
   return this.getConversation(rootHash)
-    .then(function (msgs) {
-      var keys = msgs.map(function (msg) {
-        return msg[ROOT_HASH]
-      })
-
-      return self.keeper.removeMany(keys)
+    .then(getOnlyChildren)
+    .then(function (curHashes) {
+      return self.keeper.removeMany(curHashes)
     })
     .then(function () {
       return self.log(new Entry({
@@ -2194,6 +2198,27 @@ Driver.prototype.forget = function (rootHash) {
         who: rootHash
       }))
     })
+
+
+  function getOnlyChildren (msgs) {
+    var byCurHash = {}
+    var curHashes = utils.pluck(msgs, CUR_HASH)
+    var stream = self.msgDB.createValueStream()
+      .on('data', function (data) {
+        var curHash = data[CUR_HASH]
+        byCurHash[curHash] = (byCurHash[curHash] || 0) + 1
+      })
+      .on('end', function () {
+        var onlyChildren = Object.keys(byCurHash).filter(function (curHash) {
+          return byCurHash[curHash] === 1
+        })
+
+        defer.resolve(onlyChildren)
+      })
+
+    var defer = Q.defer()
+    return defer.promise
+  }
 }
 
 Driver.prototype._push = function () {
