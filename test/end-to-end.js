@@ -1112,7 +1112,13 @@ test('forget contact', function (t) {
       .then(function () {
         return driverBill.forget(tedRootHash)
       })
-      .then(function () {
+      .then(function (forgotten) {
+        forgotten.forEach(function (msg) {
+          // 1st message shouldn't be deleted as it was shared with rufus
+          // 2nd should
+          t.equal(msg.deleted, msg[CUR_HASH] !== msgHash)
+        })
+
         return Q.all([
           driverBill.getConversation(tedRootHash),
           driverBill.getConversation(rufusRootHash)
@@ -1123,7 +1129,8 @@ test('forget contact', function (t) {
         t.equal(rHist.length, 1)
         return driverTed.forget(billRootHash)
       })
-      .then(function () {
+      .then(function (forgotten) {
+        t.equal(forgotten[0].deleted, true)
         return driverTed.getConversation(billRootHash)
       })
       .done(function (msgs) {

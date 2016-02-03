@@ -2187,9 +2187,20 @@ Driver.prototype.send = function (options) {
 Driver.prototype.forget = function (rootHash) {
   var self = this
   typeforce('String', rootHash)
+  var forgotten
   return this.getConversation(rootHash)
-    .then(getOnlyChildren)
+    .then(function (msgs) {
+      forgotten = msgs.map(function (msg) {
+        return utils.pick(msg, CUR_HASH)
+      })
+
+      return getOnlyChildren(msgs)
+    })
     .then(function (curHashes) {
+      forgotten.forEach(function (delInfo) {
+        delInfo.deleted = curHashes.indexOf(delInfo[CUR_HASH]) !== -1
+      })
+
       return self.keeper.removeMany(curHashes)
     })
     .then(function () {
@@ -2198,7 +2209,9 @@ Driver.prototype.forget = function (rootHash) {
         who: rootHash
       }))
     })
-
+    .then(function () {
+      return forgotten
+    })
 
   function getOnlyChildren (msgs) {
     var byCurHash = {}
