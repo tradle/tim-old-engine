@@ -1469,15 +1469,39 @@ Driver.prototype._enableObjectCaching = function () {
 }
 
 Driver.prototype._getCachedObject = function (info) {
-  if (!info.txData || !this._objectCache) return
+  if (!this._objectCache) return
 
-  return this._objectCache.get(info.txData.toString('hex'))
+  var keys = this._getCachedObjectKeys(info)
+  for (var i = 0; i < keys.length; i++) {
+    var cached = this._objectCache.get(keys[i])
+    if (cached) return cached
+  }
 }
 
 Driver.prototype._cacheObject = function (obj) {
   if (!this._objectCache) return
 
-  return this._objectCache.set(obj.txData.toString('hex'), Object.freeze(obj))
+  obj = Object.freeze(obj)
+
+  this._getCachedObjectKeys(obj).forEach(function (key) {
+    this._objectCache.set(key, obj)
+  }, this)
+}
+
+Driver.prototype._uncacheObject = function (obj) {
+  if (!this._objectCache) return
+
+  this._getCachedObjectKeys(obj).forEach(function (key) {
+    this._objectCache.del(key)
+  }, this)
+}
+
+Driver.prototype._getCachedObjectKeys = function (obj) {
+  var keys = []
+  // if (obj[CUR_HASH]) keys.push(obj[CUR_HASH])
+  if (obj.txData) keys.push(obj.txData.toString('hex'))
+
+  return keys
 }
 
 Driver.prototype.lookupRootHash = function (fingerprint) {
@@ -2190,15 +2214,13 @@ Driver.prototype.forget = function (rootHash) {
   var forgotten
   return this.getConversation(rootHash)
     .then(function (msgs) {
-      forgotten = msgs.map(function (msg) {
-        return utils.pick(msg, CUR_HASH)
-      })
-
+      forgotten = msgs
       return getOnlyChildren(msgs)
     })
     .then(function (curHashes) {
-      forgotten.forEach(function (delInfo) {
-        delInfo.deleted = curHashes.indexOf(delInfo[CUR_HASH]) !== -1
+      forgotten.forEach(function (info) {
+        info.deleted = curHashes.indexOf(info[CUR_HASH]) !== -1
+        self._uncacheObject(info)
       })
 
       return self.keeper.removeMany(curHashes)
@@ -2219,7 +2241,9 @@ Driver.prototype.forget = function (rootHash) {
     var stream = self.msgDB.createValueStream()
       .on('data', function (data) {
         var curHash = data[CUR_HASH]
-        byCurHash[curHash] = (byCurHash[curHash] || 0) + 1
+        if (curHashes.indexOf(curHash) !== -1) {
+          byCurHash[curHash] = (byCurHash[curHash] || 0) + 1
+        }
       })
       .on('end', function () {
         var onlyChildren = Object.keys(byCurHash).filter(function (curHash) {

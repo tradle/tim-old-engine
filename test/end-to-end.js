@@ -1,10 +1,10 @@
-// var mockery = require('mockery')
-// mockery.enable({
-//   warnOnReplace: false,
-//   warnOnUnregistered: false
-// })
+var mockery = require('mockery')
+mockery.enable({
+  warnOnReplace: false,
+  warnOnUnregistered: false
+})
 
-// mockery.registerSubstitute('q', 'bluebird-q')
+mockery.registerSubstitute('q', 'bluebird-q')
 
 if (process.env.MULTIPLEX) {
   console.log('multiplex over UTP')
@@ -1054,60 +1054,121 @@ test('http messenger, recipient-specific', function (t) {
   })
 })
 
-test('forget contact', function (t) {
+test('forget contact forgets just contact', function (t) {
   t.timeoutAfter(20000)
   publishIdentities([driverBill, driverTed, driverRufus], function () {
-    var tedReceived = Q.Promise(function (resolve) {
-      driverTed.once('message', resolve)
-    })
-
-    var rufusReceived = Q.Promise(function (resolve) {
-      driverRufus.once('message', resolve)
-    })
-
     var rufusRootHash = driverRufus.myRootHash()
     var tedRootHash = driverTed.myRootHash()
     var billRootHash = driverBill.myRootHash()
-    var msgHash
-    driverBill.send({
-        msg: toMsg({ yo: 'ted' }),
-        deliver: true,
-        chain: true,
-        to: [getIdentifier(tedPub)]
-      })
-      .then(function (entries) {
-        var share = {
-          to: [getIdentifier(rufusPub)],
-          deliver: true
-        }
+    var tedMsgHash
 
-        share[CUR_HASH] = msgHash = entries[0].get(ROOT_HASH)
-        return Q.all([
-          driverBill.share(share),
-          tedReceived,
-          rufusReceived
-        ])
+    contactBoth()
+      .then(forgetRufus)
+      .done(function () {
+        t.end()
       })
-      .then(function () {
+
+    function contactBoth () {
+      return Q.all([
+        driverBill.send({
+          msg: toMsg({ yo: 'ted' }),
+          deliver: true,
+          to: [getIdentifier(tedPub)]
+        }),
+        driverBill.send({
+          msg: toMsg({ yo: 'rufus' }),
+          deliver: true,
+          to: [getIdentifier(rufusPub)]
+        }),
+        onceReceivedMessage(driverTed),
+        onceReceivedMessage(driverRufus)
+      ])
+      .spread(function (tedEntries) {
+        tedMsgHash = tedEntries[0].get(ROOT_HASH)
         return Q.all([
           driverBill.getConversation(tedRootHash),
-          driverBill.getConversation(rufusRootHash),
-          driverTed.getConversation(billRootHash)
+          driverBill.getConversation(rufusRootHash)
         ])
       })
       .then(function (convs) {
         convs.forEach(function (c) {
           t.equal(c.length, 1)
         })
+      })
+    }
 
-        // this message should be forgotten
-        // before it gets sent
-        return driverBill.send({
-          msg: toMsg({ yo: 'again' }),
-          deliver: true,
-          chain: true,
-          to: [getIdentifier(tedPub)]
+    function forgetRufus () {
+      return driverBill.forget(rufusRootHash)
+        .then(function (forgotten) {
+          t.equal(forgotten.length, 1)
+          return Q.all([
+            driverBill.getConversation(tedRootHash),
+            driverBill.getConversation(rufusRootHash)
+          ])
         })
+        .spread(function (tedConv, rufusConv) {
+          t.equal(tedConv.length, 1)
+          t.equal(rufusConv.length, 0)
+          // make sure keeper still has
+          // ted conversations messages
+          return Q.all(tedConv.map(function (info) {
+            return driverBill.lookupObject(info, true) // no cache
+          }))
+        })
+    }
+  })
+})
+
+test('forget contact does not forget messages with more than one unforgotten recipient', function (t) {
+  t.timeoutAfter(20000)
+  publishIdentities([driverBill, driverTed, driverRufus], function () {
+    var rufusRootHash = driverRufus.myRootHash()
+    var tedRootHash = driverTed.myRootHash()
+    var billRootHash = driverBill.myRootHash()
+    var tedMsgHash
+
+    msgTed()
+      .then(shareWithRufus)
+      .then(forgetTed)
+      .done(function () {
+        t.end()
+      })
+
+    function msgTed () {
+      return Q.all([
+        driverBill.send({
+          msg: toMsg({ yo: 'ted' }),
+          deliver: true,
+          to: [getIdentifier(tedPub)]
+        }),
+        onceReceivedMessage(driverTed),
+      ])
+      .spread(function (entries) {
+        tedMsgHash = entries[0].get(ROOT_HASH)
+      })
+    }
+
+    function shareWithRufus () {
+      var share = {
+        to: [getIdentifier(rufusPub)],
+        deliver: true
+      }
+
+      share[CUR_HASH] = tedMsgHash
+      return Q.all([
+        driverBill.share(share),
+        onceReceivedMessage(driverRufus)
+      ])
+    }
+
+    function forgetTed () {
+      // this message should be forgotten
+      // before it gets sent
+      return driverBill.send({
+        msg: toMsg({ yo: 'again' }),
+        deliver: true,
+        chain: true,
+        to: [getIdentifier(tedPub)]
       })
       .then(function () {
         return driverBill.forget(tedRootHash)
@@ -1116,7 +1177,7 @@ test('forget contact', function (t) {
         forgotten.forEach(function (msg) {
           // 1st message shouldn't be deleted as it was shared with rufus
           // 2nd should
-          t.equal(msg.deleted, msg[CUR_HASH] !== msgHash)
+          t.equal(msg.deleted, msg[CUR_HASH] !== tedMsgHash)
         })
 
         return Q.all([
@@ -1133,10 +1194,10 @@ test('forget contact', function (t) {
         t.equal(forgotten[0].deleted, true)
         return driverTed.getConversation(billRootHash)
       })
-      .done(function (msgs) {
+      .then(function (msgs) {
         t.equal(msgs.length, 0)
-        t.end()
       })
+    }
   })
 })
 
@@ -1506,4 +1567,10 @@ function findBitcoinKey (keys, purpose) {
       k.networkName === networkName &&
       k.purpose === purpose
   })
+}
+
+function onceReceivedMessage (driver) {
+  var defer = Q.defer()
+  driver.once('message', defer.resolve)
+  return defer.promise
 }
