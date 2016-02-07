@@ -313,7 +313,7 @@ Driver.prototype._readFromChain = function () {
       // was read from chain and hasn't been processed yet
       var txId = entry.txId
       if (!entry.dateDetected || entry.dateUnchained || entry.ignore) {
-        self._debug('skipping ' + txId, entry)
+        self._debug('skipping ' + txId)
         return finish()
       }
 
