@@ -50,6 +50,7 @@ var RETRY_UNCHAIN_ERRORS = [
   return ErrType.type
 })
 
+var DEV = process.env.NODE_ENV !== 'production'
 var TYPE = constants.TYPE
 var TYPES = constants.TYPES
 var SIGNEE = constants.SIGNEE
@@ -98,7 +99,8 @@ var optionsTypes = {
   unchainThrottle: '?Number',
   sendThrottle: '?Number',
   readOnly: '?Boolean',
-  afterBlockTimestamp: '?Number'
+  afterBlockTimestamp: '?Number',
+  name: '?String'
 }
 
 var noop = function () {}
@@ -116,8 +118,11 @@ function Driver (options) {
   this.setMaxListeners(0)
 
   tradleUtils.bindPrototypeFunctions(this)
-  extend(this, DEFAULT_OPTIONS, options)
+  options = clone(DEFAULT_OPTIONS, options)
+  extend(this, omit(options, ['name']))
+
   this._options = utils.pick(this, Object.keys(optionsTypes))
+  this._name = options.name
 
   this._signingKey = toKey(
     this.getPrivateKey({
@@ -313,7 +318,6 @@ Driver.prototype._readFromChain = function () {
       // was read from chain and hasn't been processed yet
       var txId = entry.txId
       if (!entry.dateDetected || entry.dateUnchained || entry.ignore) {
-        self._debug('skipping ' + txId)
         return finish()
       }
 
@@ -907,7 +911,8 @@ Driver.prototype._processQueue = function (opts) {
       self.msgDB.get(data.value, function (err, state) {
         if (err) {
           self._debug('error on "get" from msgDB', err)
-          throw err
+          remove(data)
+          return throwIfDev(err)
         }
 
         // HACK for bug fixed in 3.5.1
@@ -1065,14 +1070,7 @@ Driver.prototype._processSendQueueItem = function (entry) {
 Driver.prototype.name = function () {
   if (this._name) return this._name
 
-  var name = this.identityJSON.name
-  if (name) {
-    name = name.firstName
-  } else {
-    name = this.identityJSON.pubkeys[0].fingerprint
-  }
-
-  return this._name = name
+  return this._name = this.identityJSON.pubkeys[0].fingerprint
 }
 
 Driver.prototype._markSending = function (entry) {
@@ -2117,7 +2115,8 @@ Driver.prototype.send = function (options) {
   })
 
   var recipients
-  var btcKeys
+  var blockchainAddrs
+  var blockchainKeys
   // var parsed
   return this._readyPromise
     // validate
@@ -2126,26 +2125,33 @@ Driver.prototype.send = function (options) {
     })
     .then(function (parsed) {
       entry.set(TYPE, parsed.data[TYPE])
-      return isPublic
+      return isPublic && to.every(function (r) { return r.fingerprint })
         ? Q.resolve(to)
         : Q.all(to.map(self.lookupIdentity, self))
     })
     .then(function (_recipients) {
       recipients = _recipients
-      if (isPublic) {
-        btcKeys = to
+      if (recipients === to) {
+        blockchainAddrs = to
       } else {
-        btcKeys = utils.pluck(recipients, 'identity')
+        var rawKeys = utils.pluck(recipients, 'identity')
           .map(self._getBTCKey, self)
+
+        blockchainKeys = rawKeys
           .map(function (k) {
             return k.value
+          })
+
+        blockchainAddrs = rawKeys
+          .map(function (k) {
+            return { fingerprint: k.fingerprint }
           })
       }
 
       return self.chainwriter.create()
         .data(data)
         .setPublic(isPublic)
-        .recipients(btcKeys)
+        .recipients(blockchainKeys || blockchainAddrs)
         .execute()
     })
     .then(function (resp) {
@@ -2159,7 +2165,7 @@ Driver.prototype.send = function (options) {
           return entry.clone().set({
             to: contact,
             addressesFrom: [self.wallet.addressString],
-            addressesTo: [btcKeys[i].fingerprint],
+            addressesTo: [blockchainAddrs[i].fingerprint],
             txType: TxData.types.public,
             txData: utils.toBuffer(resp.key, 'hex'),
             v: Driver.PROTOCOL_VERSION
@@ -2469,4 +2475,8 @@ function derivePermissionKey (chainedObj) {
   })
 
   return defer.promise
+}
+
+function throwIfDev (err) {
+  if (DEV) throw err
 }
