@@ -321,6 +321,11 @@ Driver.prototype._readFromChain = function () {
         return finish()
       }
 
+      // no body yet
+      if (!entry.tx) {
+        return finish()
+      }
+
       // clear old errors
       var errs = utils.getErrors(entry, 'unchain')
       delete entry.errors
@@ -474,7 +479,7 @@ Driver.prototype._setupTxFetching = function () {
       })
 
       results = results.map(function (v) {
-        return v && v.confirmations >= CONFIRMATIONS_BEFORE_CONFIRMED ? v : undefined
+        return v && v.tx && v.confirmations >= CONFIRMATIONS_BEFORE_CONFIRMED ? v : undefined
       })
 
       cb(null, results)
@@ -1193,7 +1198,9 @@ Driver.prototype._processTxs = function (txInfos) {
 
   var filtered = txInfos.filter(function (txInfo) {
       var id = txInfo.txId
-      if (txInfo.blockTimestamp &&
+      if (self._watchedTxs.indexOf(id) === -1 &&
+          !txInfo.watch &&
+          txInfo.blockTimestamp &&
           txInfo.blockTimestamp <= self.afterBlockTimestamp) {
 
         // TODO: remove this when we have a blockchain API
@@ -1250,7 +1257,7 @@ Driver.prototype._processTxs = function (txInfos) {
         // console.log(TxInfo.parse(txInfo.tx))
         var parsedTx = TxInfo.parse(txInfo.tx, self.networkName, self.opReturnPrefix)
         if (entry) {
-          if (entry.dateDetected || entry.ignore) {
+          if (entry.tx && (entry.dateDetected || entry.ignore)) {
             // already got this from chain
             // at least once
             return
@@ -2390,10 +2397,17 @@ Driver.prototype.watchAddresses = function (/* addresses */) {
 }
 
 Driver.prototype.watchTxs = function (/* txIds */) {
-  utils.argsToArray(arguments).forEach(function (tx) {
-    if (this._watchedTxs.indexOf(tx) === -1) {
-      this._watchedTxs.push(tx)
-    }
+  utils.argsToArray(arguments).forEach(function (txId) {
+    if (this._watchedTxs.indexOf(txId) !== -1) return
+
+    this._watchedTxs.push(txId)
+    this.log(new Entry({
+      type: EventType.tx.watch,
+      txId: txId
+    }))
+
+    var idx = this._ignoreTxs.indexOf(txId)
+    if (idx !== -1) this._ignoreTxs.splice(idx, 1)
   }, this)
 
   return this
