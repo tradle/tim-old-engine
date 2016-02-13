@@ -707,7 +707,12 @@ Driver.prototype.decryptedMessagesStream = function () {
   return this.msgDB.createValueStream()
     .pipe(map(function (info, cb) {
       self.lookupObject(info)
-        .nodeify(cb)
+        .then(function (obj) {
+          cb(null, obj)
+        }, function (err) {
+          self._debug('failed to lookup object: ' + info[CUR_HASH])
+          cb()
+        })
     }))
 }
 
