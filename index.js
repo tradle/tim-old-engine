@@ -2539,6 +2539,7 @@ Driver.prototype._loadWatchedAddrs = function () {
 
 Driver.prototype._setWatchedAddresses = function (addrs) {
   this._watchedAddresses = addrs
+  this.sync()
 }
 
 Driver.prototype._addresses = function () {
@@ -2550,6 +2551,8 @@ Driver.prototype._setWatchedTxs = function (txIds) {
   this._ignoreTxs = this._ignoreTxs.filter(function (txId) {
     return this._watchedTxs.indexOf(txId) !== -1
   }, this)
+
+  this.sync()
 }
 
 Driver.prototype._addresses = function () {
