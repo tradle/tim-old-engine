@@ -1209,11 +1209,14 @@ Driver.prototype._fetchAndReschedule = function () {
 
 Driver.prototype._fetchTxs = function () {
   var self = this
-  var watchedTxs = this._getWatchedTxs()
-  return Q.all([
-      Q.ninvoke(this.blockchain.addresses, 'transactions', this._getWatchedAddresses()),
-      watchedTxs.length && Q.ninvoke(this.blockchain.transactions, 'get', watchedTxs)
-    ])
+  return this._loadWatchesPromise
+    .then(function () {
+      var watchedTxs = self._getWatchedTxs()
+      return Q.all([
+        Q.ninvoke(self.blockchain.addresses, 'transactions', self._getWatchedAddresses()),
+        watchedTxs.length && Q.ninvoke(self.blockchain.transactions, 'get', watchedTxs)
+      ])
+    })
     .spread(function (part1, part2) {
       var txInfos = part2 ? part1.concat(part2) : part1
       // TODO: get rid of this parse everywhere
