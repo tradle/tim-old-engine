@@ -570,6 +570,7 @@ test('the reader and the writer', function (t) {
       .then(function (status) {
         t.ok(status.ever)
         t.ok(status.current)
+        t.ok(status.txId)
         return reader.send({
           chain: false,
           deliver: true,

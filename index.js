@@ -634,8 +634,12 @@ Driver.prototype.identityPublishStatus = function () {
       })
 
       status.ever = !!unchained.length
-      status.current = unchained.some(function (e) {
-        return e[CUR_HASH] === curHash
+      unchained.some(function (e) {
+        if (e[CUR_HASH] === curHash) {
+          status.txId = e.txId
+          status.current = true
+          return true
+        }
       })
 
       status.queued = !status.current && entries.some(function (e) {
