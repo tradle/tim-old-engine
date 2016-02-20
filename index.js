@@ -2390,6 +2390,7 @@ Driver.prototype.destroy = function () {
     Q.ninvoke(self.addressBook, 'close'),
     Q.ninvoke(self.msgDB, 'close'),
     Q.ninvoke(self.txDB, 'close'),
+    Q.ninvoke(self.miscDB, 'close'),
     Q.ninvoke(self._log, 'close')
   ]
 
