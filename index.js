@@ -119,6 +119,8 @@ function Driver (options) {
   this.setMaxListeners(0)
 
   tradleUtils.bindPrototypeFunctions(this)
+  this._fetchAndReschedule = promiseDebounce(this._fetchAndReschedule, this)
+
   options = clone(DEFAULT_OPTIONS, options)
   extend(this, omit(options, ['name']))
 
@@ -1199,15 +1201,14 @@ Driver.prototype._fetchAndReschedule = function () {
     })
     .then(function () {
       if (!self._destroyed) {
-        return waitAndLoop()
+        waitAndLoop()
       }
     })
 
   function waitAndLoop() {
     var defer = Q.defer()
     self._fetchTxsTimeout = setTimeout(defer.resolve, self.syncInterval)
-    return defer.promise
-      .then(self._fetchAndReschedule)
+    defer.promise.then(self._fetchAndReschedule)
   }
 }
 
@@ -2649,4 +2650,16 @@ function derivePermissionKey (chainedObj) {
 
 function throwIfDev (err) {
   if (DEV) throw err
+}
+
+function promiseDebounce (fn, ctx) {
+  var pending = null
+  function clear() { pending = null }
+
+  return function() {
+    if (pending) return pending
+    pending = fn.apply(ctx, arguments)
+    pending.finally(clear, clear)
+    return pending
+  }
 }
