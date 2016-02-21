@@ -119,7 +119,7 @@ function Driver (options) {
   this.setMaxListeners(0)
 
   tradleUtils.bindPrototypeFunctions(this)
-  this._fetchAndReschedule = promiseDebounce(this._fetchAndReschedule, this)
+  // this._fetchAndReschedule = promiseDebounce(this._fetchAndReschedule, this)
 
   options = clone(DEFAULT_OPTIONS, options)
   extend(this, omit(options, ['name']))
@@ -1176,7 +1176,11 @@ Driver.prototype._runTxProcessingLoop = function (fromHeight, skipIds) {
   this._fetchAndReschedule()
 }
 
-Driver.prototype.sync = function () {
+Driver.prototype.sync = function (force) {
+  if (force) {
+    delete this._pendingFetch
+  }
+
   this._fetchAndReschedule()
 }
 
@@ -1184,6 +1188,8 @@ Driver.prototype._fetchAndReschedule = function () {
   var self = this
   var waitTillUnpaused
   if (this._destroyed) return
+
+  if (this._pendingFetch) return this._pendingFetch
 
   clearTimeout(this._fetchTxsTimeout)
   if (this._paused) {
@@ -1193,13 +1199,14 @@ Driver.prototype._fetchAndReschedule = function () {
     })
   }
 
-  return Q(waitTillUnpaused)
+  return this._pendingFetch = Q(waitTillUnpaused)
     .then(this._fetchTxs)
     .then(this._processTxs)
     .catch(function (err) {
       debug('failed to fetch/process txs', err)
     })
     .then(function () {
+      delete self._pendingFetch
       if (!self._destroyed) {
         waitAndLoop()
       }
@@ -2549,7 +2556,7 @@ Driver.prototype._setWatchedAddresses = function (addrs) {
   }, this)
 
   this._watchedAddresses = addrs
-  if (hasNew) this.sync()
+  if (hasNew) this.sync(true)
 }
 
 Driver.prototype._addresses = function () {
@@ -2566,7 +2573,7 @@ Driver.prototype._setWatchedTxs = function (txIds) {
     return this._watchedTxs.indexOf(txId) !== -1
   }, this)
 
-  if (hasNew) this.sync()
+  if (hasNew) this.sync(true)
 }
 
 Driver.prototype._addresses = function () {
@@ -2660,14 +2667,14 @@ function throwIfDev (err) {
   if (DEV) throw err
 }
 
-function promiseDebounce (fn, ctx) {
-  var pending = null
-  function clear() { pending = null }
+// function promiseDebounce (fn, ctx) {
+//   var pending = null
+//   function clear() { pending = null }
 
-  return function() {
-    if (pending) return pending
-    pending = fn.apply(ctx, arguments)
-    pending.finally(clear, clear)
-    return pending
-  }
-}
+//   return function() {
+//     if (pending) return pending
+//     pending = fn.apply(ctx, arguments)
+//     pending.finally(clear, clear)
+//     return pending
+//   }
+// }
