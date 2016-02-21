@@ -832,9 +832,9 @@ Driver.prototype._writeToChain = function () {
     throttle: throttle,
     retryDelay: throttle,
     successType: EventType.chain.writeSuccess,
-    shouldSkipQueue: function (state) {
-      return state.public
-    },
+    // shouldSkipQueue: function (state) {
+    //   return state.public
+    // },
     shouldTryLater: function (state) {
       if (self._balance < Driver.MIN_BALANCE) {
         self._updateBalance()
