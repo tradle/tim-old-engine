@@ -1864,6 +1864,7 @@ Driver.prototype.receiveMsg = function (buf, senderInfo) {
         addressesTo: [self.wallet.addressString],
         // txData: msg.txData,
         txType: msg.txType,
+        data: msg.data,
         encryptedData: msg.encryptedData,
         encryptedPermission: msg.encryptedPermission
       }
@@ -1877,25 +1878,11 @@ Driver.prototype.receiveMsg = function (buf, senderInfo) {
     })
     .then(function (info) {
       extend(chainedObj, info)
-      return Q.ninvoke(Permission, 'recover', msg.encryptedPermission, chainedObj.sharedKey)
-    })
-    .then(function (permission) {
-      chainedObj.permission = permission
-      if (!chainedObj.permissionKey) {
-        return derivePermissionKey(chainedObj)
+      if (info.txType === TxData.types.public) {
+        return loadPublicMessage()
+      } else {
+        return loadPrivateMessage()
       }
-    })
-    .then(function () {
-      return self.keeper.putMany([
-        {
-          key: chainedObj.permissionKey.toString('hex'),
-          value: msg.encryptedPermission
-        },
-        {
-          key: chainedObj.permission.fileKeyString(),
-          value: msg.encryptedData
-        }
-      ])
     })
     .then(function () {
       return self.lookupObject(chainedObj, true)
@@ -1927,6 +1914,36 @@ Driver.prototype.receiveMsg = function (buf, senderInfo) {
       self._debug('processed received msg')
       return self.log(entry)
     })
+
+  function loadPublicMessage () {
+    // nothing to do here
+    return self.keeper.putOne({
+      key: chainedObj.key,
+      value: chainedObj.data
+    })
+  }
+
+  function loadPrivateMessage () {
+    return Q.ninvoke(Permission, 'recover', msg.encryptedPermission, chainedObj.sharedKey)
+      .then(function (permission) {
+        chainedObj.permission = permission
+        if (!chainedObj.permissionKey) {
+          return derivePermissionKey(chainedObj)
+        }
+      })
+      .then(function () {
+        return self.keeper.putMany([
+          {
+            key: chainedObj.permissionKey.toString('hex'),
+            value: msg.encryptedPermission
+          },
+          {
+            key: chainedObj.permission.fileKeyString(),
+            value: msg.encryptedData
+          }
+        ])
+      })
+  }
 }
 
 Driver.prototype.myRootHash = function () {
