@@ -548,13 +548,15 @@ test('the reader and the writer', function (t) {
     hey: 'ho'
   })
 
+  var signed
   // writer.on('unchained', console.log)
   writer.once('message', function (info) {
     writer.chainExisting(info.uid)
     reader.once('unchained', function (info) {
+      t.equal(info.from[ROOT_HASH], reader.myRootHash())
       reader.lookupObject(info)
         .done(function (obj) {
-          t.deepEqual(obj.parsed.data, msg)
+          t.deepEqual(obj.data, signed)
           t.end()
         })
     })
@@ -571,10 +573,14 @@ test('the reader and the writer', function (t) {
         t.ok(status.ever)
         t.ok(status.current)
         t.ok(status.txId)
+        return reader.sign(msg)
+      })
+      .then(function (_signed){
+        signed = _signed
         return reader.send({
           chain: false,
           deliver: true,
-          msg: msg,
+          msg: signed,
           to: writerCoords
         })
       })
