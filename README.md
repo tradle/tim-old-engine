@@ -88,12 +88,6 @@ When you want to communicate with someone else on the network, you need to ident
 // if this is the identity of your friend Bill:
 {
   "_t": "tradle.Identity",
-  "name": {
-    "firstName": "Bill",
-    "formatted": "Bill S. Preston",
-    "lastName": "Preston",
-    "middleName": "S"
-  },
   "pubkeys": [
     {
       "fingerprint": "mvDNdZFbCCmnAPCBmLY91LnfKWoMH39Q2c",
@@ -118,47 +112,70 @@ When you want to communicate with someone else on the network, you need to ident
 ### Initialization
 
 ```js
+var path = require('path')
+var levelup = require('levelup')
 var leveldown = require('leveldown') // or asyncstorage-down or whatever you're using
-var DHT = require('bittorrent-dht') // use tradle/bittorrent-dht fork
 var Blockchain = require('cb-blockr') // use tradle/cb-blockr fork
-var Identity = require('midentity').Identity
-var Bitkeeper = require('bitkeeper-js')
-var Wallet = require('simple-wallet')
+var Identity = require('@tradle/identity').Identity
+var defaultKeySet = require('@tradle/identity').defaultKeySet
+var Keeper = require('@tradle/http-keeper')
 var Tim = require('tim')
 
 // Setup components:
 var networkName = 'testnet'
 var blockchain = new Blockchain(networkName)
-//   Create an identity or load an existing one (see midentity readme):
-var jack = Identity.fromJSON(jackJSON)
-//   a dht node is your first point of contact with the outside world
-var dht = new DHT()
-//   a keeper stores/replicates your encrypted files
-var keeper = new Bitkeeper({
-  dht: dht
+//   Create an identity or load an existing one (see tradle/identity readme):
+var jack = new Identity()
+var jackPrivKeys = defaultKeySet({ networkName: networkName })
+jackPrivKeys.forEach(jack.addKey, jack)
+//   to export private keys:    jackPrivKeys.forEach(k => k.exportPrivate())
+//   to export public identity: jack.toJSON()
+
+var myDir = path.join(process.env.HOME, 'myTradle')
+//   content-address storage for your encrypted messages
+var keeper = new Keeper({
+  db: levelup(path.resolve(myDir, 'keeper'), { db: leveldown, valueEncoding: 'binary' }),
+  fallbacks: ['http://tradle.io:25667']
 })
 
-var wallet = new Wallet({
-  networkName: networkName,
-  blockchain: blockchain,
-  // temporary insecure API
-  priv: jackBTCKey 
-})
-
+// the API
 var tim = new Tim({
-  pathPrefix: 'tim', // for playing nice with other levelup-based storage
+  pathPrefix: path.join(myDir, 'tim'), // for playing nice with other levelup-based storage
   leveldown: leveldown,
   networkName: networkName,
   identity: jack,
-  // temporary insecure API
-  identityKeys: jackPrivKeys, 
+  keys: jackPrivKeys, 
   keeper: keeper,
-  wallet: wallet,
   blockchain: blockchain,
-  port: 12345, // your choice
   // optional
-  syncInterval: 60000 // how often to bother cb-blockr
+  syncInterval: 600000 // how often to bother cb-blockr
 })
+
+// define a _send function that will determine the transport to use
+// to deliver a message to a particular recipient
+tim._send = function (recipientRootHash, msg, recipientInfo) {
+  // return a Promise that resolves when the message is delivered
+  // e.g. tim2.receiveMsg(msg, { _r: recipientRootHash })
+  // 
+  // tradle has several network-adapters for message delivery that you can use here. 
+  // They are all open source on Github:
+  //   tradle/zlorp - pure p2p messaging with OTR over UDP
+  //   tradle/http-client & tradle/http-server
+  //   tradle/ws-client & tradle/ws-relay - OTR over websockets
+  //   
+  //   latest, but unstable:
+  //   tradle/sendy, tradle/sendy-otr
+  //     reliable delivery over network of choice. 
+  //     websockets implementation: tradle/sendy-ws, tradle/sendy-ws-relay
+}
+
+tim.send({
+  to: [{ fingerprint: 'one of their fingerprints' }],
+  msg: { hey: 'ho' },
+  deliver: true,  
+  chain: false
+})
+
 ```
 
 ### Publishing your identity
@@ -188,8 +205,8 @@ tim.send({
 
 ```js
 
-var constants = require('tradle-constants')
-var curHash = '...' // the "hash" of the existing message
+var constants = require('@tradle/constants')
+var curHash = '...' // the infoHash of the existing message, see tradle/utils `getStorageKeyFor`
 var shareOpts = {
   // record message on chain
   chain: true,
@@ -266,6 +283,10 @@ An object was read off chain<sup>1</sup>
 ### tim.on('message', function (info) {...}
 
 A message was received peer-to-peer<sup>1</sup>
+
+### tim.on('sent', function (info) {...}
+
+A message was delivered<sup>1</sup>
 
 ### tim.on('resolved', function (info) {...}
 
