@@ -897,7 +897,8 @@ Driver.prototype._sendTheUnsent = function () {
     errorsGroup: Errors.group.send,
     processItem: this._processSendQueueItem,
     retryDelay: this.sendThrottle,
-    successType: EventType.msg.sendSuccess
+    successType: EventType.msg.sendSuccess,
+    giveUpType: EventType.msg.giveUpSend
   })
 }
 
@@ -937,6 +938,7 @@ Driver.prototype._processQueue = function (opts) {
   var retryDelay = opts.retryDelay
   var retryOnFail = opts.retryOnFail !== false
   var successType = opts.successType
+  var giveUpType = opts.giveUpType
   var stream = opts.getStream()
   var sync
   stream.once('sync', function () {
@@ -1022,7 +1024,9 @@ Driver.prototype._processQueue = function (opts) {
 
         self._debug('processed item from queue', name)
         q.processing = false
-        var isFinished = utils.getEntryProp(entry, 'type') === successType
+        var eType = utils.getEntryProp(entry, 'type')
+        var isFinished = eType === successType
+          || eType === giveUpType
           || !retryOnFail
 
         if (!isFinished) {
@@ -1095,8 +1099,12 @@ Driver.prototype._processSendQueueItem = function (entry) {
     })
     .catch(function (err) {
       self._debug('msg send failed', err.message)
+      var eType = err.type === 'fileNotFound'
+        ? EventType.msg.giveUpSend
+        : EventType.msg.sendError
+
       nextEntry.set({
-        type: EventType.msg.sendError
+        type: eType
       })
 
       utils.addError({
@@ -2181,6 +2189,7 @@ Driver.prototype.send = function (options) {
   }
 
   var data = utils.toBuffer(options.msg)
+  var msg = Buffer.isBuffer(options.msg) ? JSON.parse(options.msg) : options.msg
   // assert(TYPE in data, 'structured messages must specify type property: ' + TYPE)
 
   // either "public" or it has recipients
@@ -2201,7 +2210,9 @@ Driver.prototype.send = function (options) {
     public: isPublic,
     chain: !!options.chain,
     deliver: !!options.deliver,
-    from: utils.toObj(ROOT_HASH, this.myRootHash())
+    from: utils.toObj(ROOT_HASH, this.myRootHash()),
+    [PREV_HASH]: msg[PREV_HASH],
+    [ROOT_HASH]: msg[ROOT_HASH]
   })
 
   var recipients

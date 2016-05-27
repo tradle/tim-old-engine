@@ -52,7 +52,7 @@
     "level-live-stream": "^1.4.9",
     "levelup": "^0.18.0",
     "lexicographic-integer": "^1.1.0",
-    "logbase": "^3.5.1",
+    "logbase": "^4.0.0",
     "lru-cache": "^3.2.0",
     "map-stream": "0.0.6",
     "monotonic-timestamp": "0.0.9",
