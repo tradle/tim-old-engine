@@ -945,6 +945,10 @@ Driver.prototype._processQueue = function (opts) {
     sync = true
   })
 
+  stream.once('end', function () {
+    debugger
+  })
+
   this._streams[name] = stream
   pump(
     stream,
@@ -1067,6 +1071,11 @@ Driver.prototype._processQueue = function (opts) {
   }
 
   function remove (data) {
+    if (!data.value) {
+      debugger
+      return
+    }
+
     var idx = -1
     var uid = data.value
     var rid = utils.parseUID(uid).to
