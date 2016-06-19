@@ -39,6 +39,7 @@ var EventType = require('./lib/eventType')
 var Dir = require('./lib/dir')
 var createIdentityDB = require('./lib/identityDB')
 var createMsgDB = require('./lib/msgDB')
+var createTypeDB = require('./lib/typeDB')
 var createTxDB = require('./lib/txDB')
 var createMiscDB = require('./lib/miscDB')
 var Errors = require('./lib/errors')
@@ -216,6 +217,7 @@ function Driver (options) {
       self.msgDB.start()
       self.txDB.start()
       self.addressBook.start()
+      self.typeDB.start()
       self.miscDB.start()
 
       self._ready = true
@@ -1454,6 +1456,16 @@ Driver.prototype._setupDBs = function () {
   })
 
   this.miscDB.name = this.name()
+
+  this.typeDB = createTypeDB(this._prefix('type.db'), {
+    leveldown: this.leveldown,
+    log: this._log,
+    timeout: false,
+    autostart: false,
+    keeper: this.keeper
+  })
+
+  this.typeDB.name = this.name()
 }
 
 Driver.prototype._trySend = function (entry) {
@@ -1527,6 +1539,18 @@ Driver.prototype.lookupObject = function (info, verify) {
       self._cacheObject(obj)
       return obj
     })
+}
+
+Driver.prototype.byType = function (type) {
+  var self = this
+  return this.typeDB.createReadStream(type).pipe(map(function (txData, cb) {
+    self.lookupObject({ txData: txData })
+      .then(function (obj) {
+        cb(null, obj)
+      }, function (err) {
+        cb(err)
+      })
+  }))
 }
 
 Driver.prototype._enableObjectCaching = function () {

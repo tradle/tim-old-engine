@@ -201,6 +201,61 @@ test('msgDB', function (t) {
   })
 })
 
+test('typeDB', function (t) {
+  var msgs = [
+    { [TYPE]: 'a', blah: 1 },
+    { [TYPE]: 'b', blah: 2 },
+    { [TYPE]: 'c', blah: 3 },
+    { [TYPE]: 'a', blah: 4 },
+  ].map(toMsg)
+
+  var togo = 4 // 4 msgs to deliver
+
+  t.plan(6) // 2 people * 3 types
+
+  var people = [driverBill, driverTed]
+  monitorIdentityPublishAddr(people)
+  publishIdentities(people, function () {
+    // make sure all the combinations work
+    // make it easier to check by sending settings as messages
+    msgs.forEach(function (msg) {
+      driverTed.send({
+        msg: msg,
+        to: [{
+          fingerprint: billPub.pubkeys[0].fingerprint
+        }],
+        deliver: true
+      })
+      .done()
+    })
+
+    driverBill.on('message', function (msg) {
+      if (--togo) return
+
+      people.forEach(function (driver) {
+        ;['a', 'b', 'c'].forEach(function (type) {
+          collect(driver.byType(type), function (err, results) {
+            if (err) throw err
+
+            results = results.map(function (r) {
+              return r.parsed.data
+            })
+            .sort(function (a, b) {
+              return a.blah - b.blah
+            })
+
+            const expected = msgs.filter(function (msg) {
+              return msg[TYPE] === type
+            })
+
+            t.same(results, expected)
+          })
+        })
+      })
+    })
+  })
+})
+
 test('export history', function (t) {
   t.timeoutAfter(20000)
   var people = [driverBill, driverTed, driverRufus]
