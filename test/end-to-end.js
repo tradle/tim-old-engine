@@ -214,6 +214,10 @@ test('typeDB', function (t) {
   t.plan(6) // 2 people * 3 types
 
   var people = [driverBill, driverTed]
+  people.forEach(function (driver) {
+    delete driver._objectCache // disable caching
+  })
+
   monitorIdentityPublishAddr(people)
   publishIdentities(people, function () {
     // make sure all the combinations work

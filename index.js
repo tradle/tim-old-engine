@@ -947,10 +947,6 @@ Driver.prototype._processQueue = function (opts) {
     sync = true
   })
 
-  stream.once('end', function () {
-    debugger
-  })
-
   this._streams[name] = stream
   pump(
     stream,
@@ -1543,8 +1539,8 @@ Driver.prototype.lookupObject = function (info, verify) {
 
 Driver.prototype.byType = function (type) {
   var self = this
-  return this.typeDB.createReadStream(type).pipe(map(function (txData, cb) {
-    self.lookupObject({ txData: txData })
+  return this.typeDB.createReadStream(type).pipe(map(function (meta, cb) {
+    self.lookupObject(meta)
       .then(function (obj) {
         cb(null, obj)
       }, function (err) {
