@@ -1498,9 +1498,14 @@ Driver.prototype.lookupObjectsByRootHash = function (rootHash) {
     })
 }
 
-Driver.prototype.lookupObjectByCurHash = function (curHash) {
-  return Q.ninvoke(this.messages(), 'byCurHash', curHash)
-    .then(this.lookupObject)
+Driver.prototype.lookupObjectByCurHash = function (curHash, all) {
+  var self = this
+  return Q.ninvoke(this.messages(), 'byCurHash', curHash, all)
+    .then(function (obj) {
+      return Array.isArray(obj)
+        ? Q.all(obj.map(o => self.lookupObject(o))) :
+        self.lookupObject(obj)
+    })
 }
 
 Driver.prototype.lookupObject = function (info, verify) {
